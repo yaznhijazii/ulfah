@@ -257,60 +257,69 @@ export function SettingsScreen({
     <motion.button
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="w-full flex items-center justify-between p-6 bg-card rounded-[2rem] shadow-xl shadow-black/[0.01] border border-border/50 group transition-all hover:bg-muted/30"
+      className="w-full flex items-center justify-between p-8 glass rounded-[3rem] shadow-2xl border-white/60 group transition-all duration-500 bg-white/20 active:bg-white/40"
     >
-      <div className="flex items-center gap-5">
-        <div className="w-12 h-12 rounded-2xl bg-muted/50 flex items-center justify-center group-hover:bg-card transition-colors shadow-inner">
-          <Icon className={`w-6 h-6 ${color}`} />
+      <div className="flex items-center gap-6">
+        <div className="w-16 h-16 rounded-[2rem] bg-secondary/50 flex items-center justify-center group-hover:bg-primary/10 transition-all duration-500 shadow-inner border border-white">
+          <Icon className={`w-7 h-7 ${color}`} />
         </div>
         <div className="text-right">
-          <p className="font-black text-base text-foreground mb-0.5">{title}</p>
-          <p className="text-[11px] font-bold text-muted-foreground uppercase opacity-60 tracking-tight">{subtitle}</p>
+          <p className="font-black text-lg text-foreground tracking-tight mb-1">{title}</p>
+          <p className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest">{subtitle}</p>
         </div>
       </div>
-      <div className="w-10 h-10 rounded-xl bg-muted/30 flex items-center justify-center text-muted-foreground/30 group-hover:text-primary transition-colors">
-        <ChevronLeft className="w-5 h-5" />
+      <div className="w-12 h-12 rounded-2xl bg-black/[0.02] flex items-center justify-center text-muted-foreground/20 group-hover:text-primary group-hover:bg-primary/5 transition-all duration-500">
+        <ChevronLeft className="w-6 h-6" />
       </div>
     </motion.button>
   );
 
   return (
-    <div className="flex-1 bg-background flex flex-col relative h-screen">
-      <header className="px-6 pt-12 pb-6 flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-xl z-30 border-b border-border/50">
-        <motion.button whileTap={{ scale: 0.9 }} onClick={() => onNavigate('home')} className="w-11 h-11 flex items-center justify-center bg-card rounded-2xl shadow-sm border border-border">
-          <ArrowLeft className="w-5 h-5 text-foreground" />
+    <div className="flex-1 bg-background flex flex-col relative h-screen overflow-hidden">
+      {/* Settings Ambient Glow */}
+      <div className="fixed inset-0 pointer-events-none -z-10">
+        <div className="absolute top-[-10%] left-[-10%] w-[80%] h-[50%] bg-primary/5 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[40%] bg-accent/5 blur-[100px] rounded-full" />
+      </div>
+
+      <header className="px-8 pt-12 pb-6 flex items-center justify-between sticky top-0 bg-background/40 backdrop-blur-3xl z-40">
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={() => onNavigate('home')}
+          className="w-14 h-14 flex items-center justify-center glass rounded-3xl border-white/60 shadow-xl text-foreground/40"
+        >
+          <ArrowLeft className="w-6 h-6" />
         </motion.button>
         <div className="text-center">
-          <h1 className="text-xl font-black text-foreground">الإعدادات</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none mt-1">تخصيص تجربتك الخاصة</p>
+          <h1 className="text-2xl font-black text-foreground tracking-tighter">مركز الألفة</h1>
+          <p className="text-[9px] font-black text-primary/40 uppercase tracking-[0.5em]">تخصيص مساحتك الخاصة</p>
         </div>
-        <div className="w-11" />
+        <div className="w-14" />
       </header>
 
       <div className="flex-1 px-6 py-8 space-y-10 overflow-y-auto pb-32">
         {/* Profile Card */}
-        <div className="bg-card rounded-[3.5rem] p-8 shadow-xl shadow-black/[0.02] border border-border/50 flex items-center justify-between relative overflow-hidden group">
-          <div className="flex items-center gap-6 relative z-10">
+        <div className="glass rounded-[4rem] p-10 shadow-2xl border-white/80 flex items-center justify-between relative overflow-hidden bg-white/30">
+          <div className="flex items-center gap-7 relative z-10">
             <motion.div
               whileHover={{ scale: 1.05 }}
-              className="w-20 h-20 rounded-[2.2rem] bg-muted/30 overflow-hidden border-2 border-primary/10 shadow-inner flex items-center justify-center relative"
+              className="w-24 h-24 rounded-[2.5rem] bg-secondary overflow-hidden border-4 border-white shadow-2xl flex items-center justify-center relative"
             >
-              {myAvatar ? <img src={myAvatar} alt="Profile" className="w-full h-full object-cover" /> : <User className="w-10 h-10 text-muted-foreground" />}
-              <button onClick={() => setShowEditProfile(true)} className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"><Camera className="w-5 h-5" /></button>
+              {myAvatar ? <img src={myAvatar} alt="Profile" className="w-full h-full object-cover" /> : <User className="w-12 h-12 text-muted-foreground/30" />}
+              <button onClick={() => setShowEditProfile(true)} className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-white"><Camera className="w-6 h-6" /></button>
             </motion.div>
             <div className="text-right">
-              <p className="text-xl font-black text-foreground mb-0.5">{myName || 'مستخدم جديد'}</p>
-              <p className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">الملف الشخصي</p>
+              <p className="text-2xl font-black text-foreground tracking-tighter mb-1">{myName || 'ضيف الألفة'}</p>
+              <p className="text-[10px] font-black text-primary/40 uppercase tracking-[0.3em]">بصمتك الرقمية</p>
             </div>
           </div>
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={() => setShowEditProfile(true)}
-            className="w-11 h-11 bg-muted/30 rounded-2xl flex items-center justify-center text-foreground hover:bg-muted/50 transition-colors relative z-10"
+            className="w-14 h-14 bg-primary/10 rounded-3xl flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all duration-500 shadow-lg shadow-primary/5"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-6 h-6" />
           </motion.button>
-          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full translate-x-10 -translate-y-10" />
         </div>
 
         {/* Linking Status */}

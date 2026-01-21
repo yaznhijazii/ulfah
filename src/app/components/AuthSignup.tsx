@@ -91,12 +91,11 @@ export function AuthSignup({ onSignup, onNavigateToLogin, isDarkMode }: AuthSign
       >
         <div className="text-center mb-10">
           <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-primary/5 rounded-[2.2rem] flex items-center justify-center">
-              <Logo size="xl" />
-            </div>
+            <Logo size="xl" />
           </div>
-          <h1 className="text-3xl font-black mb-2 text-foreground tracking-tight">أُلْفَة</h1>
-          <p className="text-muted-foreground text-[11px] font-black uppercase tracking-[0.3em]">انضم لعالم المودة</p>
+          <p className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-[0.4em] mb-4">مساء السكينة والمودة</p>
+          <h1 className="text-5xl font-black mb-3 text-primary tracking-tighter">أُلْفَة</h1>
+          <p className="text-muted-foreground text-[10px] font-black uppercase tracking-[0.3em] opacity-60">انضم لعالم المودة</p>
         </div>
 
         <div className="bg-muted/30 p-1.5 rounded-[2rem] border border-border/20 mb-10 flex relative">

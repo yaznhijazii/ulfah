@@ -1,4 +1,4 @@
-import { Heart, ImageIcon, Calendar, Target, MessageCircle } from 'lucide-react';
+import { Heart, Calendar, MessageCircle, Wallet, Gamepad2, Home } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface BottomNavProps {
@@ -7,17 +7,17 @@ interface BottomNavProps {
 }
 
 export function BottomNav({ currentScreen, onNavigate }: BottomNavProps) {
-
     const navItems = [
-        { id: 'home', label: 'الرئيسية', icon: Heart },
-        { id: 'calendar', label: 'الذكرى والوقت', icon: Calendar },
-        { id: 'dialogues', label: 'دستور العلاقة', icon: MessageCircle },
+        { id: 'home', label: 'ألفة', icon: Home, moodClass: 'text-[#ec4899]', glowClass: 'bg-[#ec4899]' },
+        { id: 'calendar', label: 'الذكرى', icon: Calendar, moodClass: 'text-rose-500', glowClass: 'bg-rose-500' },
+        { id: 'finance', label: 'المالية', icon: Wallet, moodClass: 'text-emerald-500', glowClass: 'bg-emerald-500' },
+        { id: 'games', label: 'ألعابنا', icon: Gamepad2, moodClass: 'text-purple-500', glowClass: 'bg-purple-500' },
+        { id: 'dialogues', label: 'الميثاق', icon: MessageCircle, moodClass: 'text-blue-500', glowClass: 'bg-blue-500' },
     ];
 
-
     return (
-        <nav className="w-full bg-background/95 backdrop-blur-xl border-t border-border z-[100] pb-safe">
-            <div className="max-w-[480px] mx-auto h-[60px] flex items-center justify-around">
+        <div className="w-full">
+            <nav className="w-full h-[84px] bg-background/80 backdrop-blur-3xl border-t border-border/50 flex items-center justify-around px-2 pb-safe shadow-[0_-20px_50px_rgba(0,0,0,0.05)]">
                 {navItems.map((item) => {
                     const isActive = currentScreen === item.id;
                     const Icon = item.icon;
@@ -25,31 +25,34 @@ export function BottomNav({ currentScreen, onNavigate }: BottomNavProps) {
                     return (
                         <motion.button
                             key={item.id}
-                            whileTap={{ scale: 0.95 }}
+                            whileTap={{ scale: 0.9 }}
                             onClick={() => onNavigate(item.id)}
-                            className={`flex flex-col items-center justify-center gap-0.5 w-[72px] h-full transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'
+                            className={`flex flex-col items-center justify-center gap-2 w-[72px] h-full transition-all duration-500 relative ${isActive ? item.moodClass : 'text-muted-foreground/40 hover:text-foreground/60'
                                 }`}
                         >
-                            <div className="relative">
+                            <div className="relative z-10 flex flex-col items-center">
                                 <Icon
-                                    className={`w-5 h-5 transition-transform ${isActive ? 'scale-110' : ''}`}
+                                    className={`w-6 h-6 transition-all duration-500 ${isActive ? 'scale-110 drop-shadow-[0_0_8px_currentColor]' : ''}`}
                                     strokeWidth={isActive ? 2.5 : 2}
-                                    fill={isActive && (item.id === 'home' || item.id === 'memories') ? 'currentColor' : 'none'}
                                 />
+                                {isActive && (
+                                    <motion.div
+                                        layoutId="nav-pill"
+                                        className={`absolute -top-3.5 w-1.5 h-1.5 rounded-full shadow-[0_0_15px_currentColor] ${item.glowClass}`}
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                                    />
+                                )}
                             </div>
-                            <span className={`text-[9px] font-black tracking-tight ${isActive ? 'text-primary' : 'opacity-70'}`}>
+                            <span className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-30'
+                                }`}>
                                 {item.label}
                             </span>
-                            {isActive && (
-                                <motion.div
-                                    layoutId="active-nav-dot"
-                                    className="w-1 h-1 bg-primary rounded-full absolute bottom-1"
-                                />
-                            )}
                         </motion.button>
                     );
                 })}
-            </div>
-        </nav>
+            </nav>
+        </div>
     );
 }

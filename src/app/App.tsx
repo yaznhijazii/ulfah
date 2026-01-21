@@ -9,6 +9,8 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { DialogueScreen } from './components/DialogueScreen';
 import { BottomNav } from './components/BottomNav';
 import { LoveNotesScreen } from './components/LoveNotesScreen';
+import { AdventureBucketScreen } from './components/AdventureBucketScreen';
+import { FinanceScreen } from './components/FinanceScreen';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -21,7 +23,9 @@ type Screen =
   | 'commitments'
   | 'settings'
   | 'dialogues'
-  | 'love_notes';
+  | 'love_notes'
+  | 'finance'
+  | 'adventure_bucket';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
@@ -101,7 +105,7 @@ function App() {
       case 'calendar':
         return <CalendarScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       case 'games':
-        return <GamesScreen onNavigate={handleNavigate} isDarkMode={isDarkMode} />;
+        return <GamesScreen onNavigate={handleNavigate} isDarkMode={isDarkMode} userId={userId} />;
       case 'commitments':
         return <CommitmentsScreen onBack={() => handleNavigate('home')} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       case 'settings':
@@ -120,6 +124,10 @@ function App() {
         return <DialogueScreen onBack={() => handleNavigate('home')} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       case 'love_notes':
         return <LoveNotesScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
+      case 'finance':
+        return <FinanceScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
+      case 'adventure_bucket':
+        return <AdventureBucketScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} />;
       default:
         return <HomeScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
     }
@@ -133,12 +141,15 @@ function App() {
   };
 
   return (
-    <div className={`min-h-screen bg-background flex justify-center font-sans text-foreground antialiased selection:bg-primary/10 selection:text-primary relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
-      {/* Premium Background Elements - Adjusted for Dark Mode */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] dark:bg-primary/20" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/20 rounded-full blur-[120px] dark:bg-rose-500/10" />
+    <div className={`min-h-screen bg-background mesh-gradient flex justify-center font-sans text-foreground antialiased selection:bg-mood-home/20 relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
+      {/* Animated Background Blobs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-float" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] bg-mood-adventure/10 rounded-full blur-[120px] animate-float-delayed" />
+        <div className="absolute top-[20%] right-[-5%] w-[30%] h-[30%] bg-mood-love/10 rounded-full blur-[100px] animate-float-slow" />
+      </div>
 
-      <div className="w-full max-w-[500px] bg-background h-screen relative shadow-[0_0_100px_rgba(0,0,0,0.03)] border-x border-border/50 overflow-hidden flex flex-col z-10">
+      <div className="w-full max-w-[480px] bg-background/60 backdrop-blur-xl h-screen relative border-x border-border/20 overflow-hidden flex flex-col z-10 transition-all duration-300 shadow-2xl">
         {!userId ? (
           <div className="flex-1 flex flex-col">
             {renderLoggedOut()}
@@ -160,8 +171,8 @@ function App() {
               </AnimatePresence>
             </main>
 
-            {['home', 'calendar', 'commitments', 'dialogues'].includes(currentScreen) && (
-              <footer className="shrink-0 bg-background/80 backdrop-blur-xl border-t border-border/50 z-50">
+            {['home', 'calendar', 'commitments', 'dialogues', 'finance', 'games', 'love_notes', 'adventure_bucket'].includes(currentScreen) && (
+              <footer className="shrink-0 bg-background/80 backdrop-blur-3xl border-t border-border/50 z-50">
                 <BottomNav currentScreen={currentScreen} onNavigate={handleNavigate} />
               </footer>
             )}

@@ -139,30 +139,39 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
   const streakDays = 7;
 
   return (
-    <div className="flex-1 bg-background flex flex-col relative h-screen">
-      <header className="px-6 pt-12 pb-6 flex items-center justify-between sticky top-0 bg-background/80 backdrop-blur-xl z-30 border-b border-border/50">
-        <motion.button whileTap={{ scale: 0.9 }} onClick={onBack} className="w-11 h-11 flex items-center justify-center bg-card rounded-2xl shadow-sm border border-border">
-          <ArrowLeft className="w-5 h-5 text-foreground" />
+    <div className="flex-1 bg-background flex flex-col relative h-screen overflow-hidden mood-dialogue">
+      {/* Covenants Atmospheric Blue Aura */}
+      <div className="fixed inset-0 pointer-events-none -z-10">
+        <div className="absolute top-[-10%] left-[-10%] w-[100%] h-[60%] bg-blue-500/10 blur-[150px] rounded-full opacity-60" />
+      </div>
+
+      <header className="px-8 pt-12 pb-6 flex items-center justify-between sticky top-0 bg-background/40 backdrop-blur-3xl z-40">
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={onBack}
+          className="w-14 h-14 flex items-center justify-center glass rounded-3xl border-white/60 shadow-xl text-foreground/40"
+        >
+          <ArrowLeft className="w-6 h-6" />
         </motion.button>
         <div className="text-center">
-          <h1 className="text-xl font-black text-foreground">مواثيقنا</h1>
-          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none mt-1">عهود تبني جسور المودة</p>
+          <h1 className="text-2xl font-black text-foreground tracking-tighter">مواثيقنا</h1>
+          <p className="text-[9px] font-black text-blue-600/40 uppercase tracking-[0.5em]">عهود تبني جسور المودة</p>
         </div>
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={() => setShowAddForm(true)}
-          className="w-11 h-11 flex items-center justify-center bg-primary text-white rounded-2xl shadow-lg shadow-primary/20"
+          className="w-14 h-14 flex items-center justify-center bg-blue-500 text-white rounded-3xl shadow-2xl shadow-blue-500/30 border-t border-white/30"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-8 h-8" />
         </motion.button>
       </header>
 
       <div className="flex-1 px-6 py-8 space-y-8 overflow-y-auto pb-32">
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-card rounded-[2.5rem] p-6 shadow-xl shadow-black/[0.02] border border-border/50 relative overflow-hidden group">
-            <div className="absolute -right-2 -bottom-2 w-20 h-20 bg-primary/10 rounded-full blur-2xl group-hover:bg-primary/20 transition-colors" />
+            <div className="absolute -right-2 -bottom-2 w-20 h-20 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-colors" />
             <div className="flex items-center gap-3 mb-3 relative z-10">
-              <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner"><Target className="w-5 h-5" /></div>
+              <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 shadow-inner"><Target className="w-5 h-5" /></div>
               <span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">جارية</span>
             </div>
             <p className="text-3xl font-black text-foreground relative z-10">{activeCommitments.length}</p>
@@ -187,7 +196,7 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" /></div>
+            <div className="flex items-center justify-center py-24"><div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" /></div>
           ) : activeCommitments.length === 0 ? (
             <div className="bg-muted/30 border-2 border-dashed border-border/50 rounded-[3rem] p-16 text-center flex flex-col items-center">
               <div className="w-20 h-20 bg-muted/50 rounded-[2rem] flex items-center justify-center mb-4"><Target className="w-8 h-8 text-muted-foreground/30" /></div>
@@ -205,7 +214,7 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
                 >
                   <div className="flex items-start justify-between mb-5 relative z-10">
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-primary/5 rounded-2xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                      <div className="w-12 h-12 bg-blue-500/5 rounded-2xl flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
                         <Heart className="w-6 h-6" />
                       </div>
                       <div className="text-right">
@@ -234,7 +243,7 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${(commitment.current_count / commitment.target_count) * 100}%` }}
-                        className="h-full bg-primary"
+                        className="h-full bg-blue-500"
                       />
                     </div>
                   </div>
@@ -242,12 +251,12 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex -space-x-2 flex-row-reverse">
                       <div className="w-8 h-8 rounded-full bg-accent text-accent-foreground border-2 border-card flex items-center justify-center text-[10px] font-black">Y</div>
-                      <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground border-2 border-card flex items-center justify-center text-[10px] font-black">M</div>
+                      <div className="w-8 h-8 rounded-full bg-blue-500 text-white border-2 border-card flex items-center justify-center text-[10px] font-black">M</div>
                     </div>
                     <Button
                       onClick={() => handleMarkComplete(commitment.id)}
                       disabled={commitment.current_count >= commitment.target_count}
-                      className="flex-1 h-12 bg-primary/10 hover:bg-primary/20 text-primary border-none rounded-2xl font-black text-xs transition-all active:scale-95 disabled:opacity-30"
+                      className="flex-1 h-12 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 border-none rounded-2xl font-black text-xs transition-all active:scale-95 disabled:opacity-30"
                     >
                       <CheckCircle2 className="w-4 h-4 mr-2" />
                       تسجيل إنجاز
@@ -287,7 +296,7 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
                   <label className="text-[11px] font-black text-rose-500 uppercase mr-1">الفدية (في حال التقصير)</label>
                   <input className="w-full h-14 rounded-2xl bg-rose-500/5 border border-rose-500/10 text-sm font-bold px-5 text-right text-foreground" placeholder="مثلاً: التصدق بمبلغ بسيط..." value={formData.punishment} onChange={e => setFormData({ ...formData, punishment: e.target.value })} />
                 </div>
-                <Button type="submit" className="w-full h-16 rounded-2xl text-base font-black shadow-lg shadow-primary/20 mt-4">بناء الميثاق</Button>
+                <Button type="submit" className="w-full h-16 rounded-2xl text-base font-black shadow-lg shadow-blue-500/20 mt-4 bg-blue-600">بناء الميثاق</Button>
               </form>
             </motion.div>
           </div>

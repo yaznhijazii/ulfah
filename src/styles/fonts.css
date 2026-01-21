@@ -1,1 +1,65 @@
-@import url('https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Lateef:wght@200;300;400;500;600;700;800&family=Noto+Kufi+Arabic:wght@300;400;500;600;700&display=swap');
+@font-face {
+    font-family: 'Mestika';
+    src: url('/fonts/Mestika Thin.otf') format('opentype');
+    font-weight: 100;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mestika';
+    src: url('/fonts/Mestika ExtraLight.otf') format('opentype');
+    font-weight: 200;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mestika';
+    src: url('/fonts/Mestika Light.otf') format('opentype');
+    font-weight: 300;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mestika';
+    src: url('/fonts/Mestika Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mestika';
+    src: url('/fonts/Mestika Medium.otf') format('opentype');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mestika';
+    src: url('/fonts/Mestika Semibold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mestika';
+    src: url('/fonts/Mestika Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mestika';
+    src: url('/fonts/Mestika ExtraBold.otf') format('opentype');
+    font-weight: 800;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'Mestika';
+    src: url('/fonts/Mestika Black.otf') format('opentype');
+    font-weight: 900;
+    font-style: normal;
+}
+
+/* Fallback imports for Latin if needed, but Mestika should cover Arabic */
+@import url('https://fonts.googleapis.com/css2?family=Included+Family+If+Needed&display=swap');

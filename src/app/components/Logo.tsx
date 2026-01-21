@@ -14,8 +14,12 @@ export function Logo({ size = 'md', className = '' }: LogoProps) {
   };
 
   return (
-    <div className={`${sizes[size]} rounded-full bg-gradient-to-br from-pink-400 to-rose-400 flex items-center justify-center ${className}`}>
-      <Heart className="w-1/2 h-1/2 text-white" fill="currentColor" />
+    <div className={`relative ${sizes[size]} flex items-center justify-center ${className}`}>
+      <Heart
+        className="w-full h-full transition-all duration-500"
+        style={{ color: '#f43f5e', filter: 'drop-shadow(0 0 10px rgba(244, 63, 94, 0.4))' }}
+        fill="currentColor"
+      />
     </div>
   );
 }

@@ -174,3 +174,35 @@ export type Commitment = {
   created_at: string;
   updated_at: string;
 };
+
+export type AdventureBucket = {
+  id: string;
+  partnership_id: string;
+  created_by_user_id: string;
+  title: string;
+  category: 'trip' | 'travel';
+  location?: string;
+  budget_level: 'low' | 'medium' | 'high';
+  estimated_cost: number;
+  image_url?: string;
+  status: 'dream' | 'planned' | 'done';
+  planned_at?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FinanceJar = {
+  id: string;
+  partnership_id: string;
+  created_by_user_id: string;
+  title: string;
+  description?: string;
+  target_amount: number;
+  current_amount: number;
+  deadline?: string;
+  is_shared: boolean;
+  icon?: string;
+  color?: string;
+  created_at: string;
+  updated_at: string;
+};

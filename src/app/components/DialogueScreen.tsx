@@ -22,6 +22,7 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
     const [loading, setLoading] = useState(true);
     const [names, setNames] = useState<{ me: string, partner: string }>({ me: 'أنا', partner: 'الشريك' });
     const [partnerId, setPartnerId] = useState<string | null>(null);
+    const [selectedDialogue, setSelectedDialogue] = useState<any>(null);
 
     // Data States
     const [dialogues, setDialogues] = useState<any[]>([]);
@@ -292,272 +293,145 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
     const prevStep = () => setDialogueStep(prev => Math.max(prev - 1, 1));
 
     return (
-        <div className="flex-1 bg-background flex flex-col relative h-screen">
+        <div className="flex-1 bg-background flex flex-col relative h-screen mood-dialogue">
+            {/* Pact Atmospheric Blue Aura */}
+            <div className="fixed inset-0 pointer-events-none -z-10">
+                <div className="absolute top-[-10%] right-[-10%] w-[100%] h-[60%] bg-blue-500/10 blur-[150px] rounded-full opacity-60" />
+            </div>
+
             {/* Header */}
-            <header className="px-6 pt-12 pb-6 sticky top-0 bg-background/80 backdrop-blur-xl border-b border-border/50 z-30">
+            <header className="px-8 pt-12 pb-8 sticky top-0 bg-background/40 backdrop-blur-3xl z-40">
                 <div className="flex items-center justify-between mb-8">
-                    <motion.button whileTap={{ scale: 0.9 }} onClick={onBack} className="w-11 h-11 flex items-center justify-center bg-card rounded-2xl shadow-sm border border-border">
-                        <ArrowLeft className="w-5 h-5 text-foreground" />
+                    <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={onBack}
+                        className="w-12 h-12 flex items-center justify-center glass rounded-2xl border-white/60 shadow-xl text-foreground/40"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
                     </motion.button>
                     <div className="text-center">
-                        <h1 className="text-xl font-black text-foreground">{activeTab === 'constitution' ? 'دستور العلاقة' : 'التزاماتي'}</h1>
-                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{activeTab === 'constitution' ? 'حوارنا واتفاقاتنا' : 'عادات ووعد شخصي'}</p>
+                        <h1 className="text-xl font-black text-foreground tracking-tighter">ميثاق المودة</h1>
+                        <p className="text-[9px] font-black text-blue-600/40 uppercase tracking-[0.5em]">حواراتنا.. ومحطات اتفاقنا</p>
                     </div>
-                    <div className="w-11 h-11 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
-                        {activeTab === 'constitution' ? <ShieldCheck className="w-6 h-6" /> : <Target className="w-6 h-6" />}
+                    <div className="w-12 h-12 glass-dark border-blue-500/20 rounded-2xl flex items-center justify-center text-blue-500 shadow-xl shadow-blue-500/5">
+                        <ShieldCheck className="w-6 h-6" />
                     </div>
                 </div>
 
-                <div className="flex bg-muted/30 p-1.5 rounded-[2rem] border border-border/20 max-w-[320px] mx-auto relative overflow-hidden">
-                    <motion.div
-                        className="absolute top-1.5 bottom-1.5 bg-card rounded-[1.8rem] shadow-sm z-0"
-                        animate={{ x: activeTab === 'constitution' ? '100%' : '0%' }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                        style={{ width: 'calc(50% - 6px)', left: '3px' }}
-                    />
-                    <button onClick={() => setActiveTab('constitution')} className={`flex-1 py-3 text-[11px] font-black relative z-10 transition-colors ${activeTab === 'constitution' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                        جلسات الحوار
-                    </button>
-                    <button onClick={() => setActiveTab('commitments')} className={`flex-1 py-3 text-[11px] font-black relative z-10 transition-colors ${activeTab === 'commitments' ? 'text-foreground' : 'text-muted-foreground'}`}>
-                        الالتزامات الشخصية
-                    </button>
+                <div className="flex glass rounded-[2.8rem] border-white/80 p-1.5 shadow-2xl bg-white/40 ring-1 ring-black/[0.03] max-w-[320px] mx-auto relative overflow-hidden">
+                    {[
+                        { id: 'constitution', label: 'جلسات الحوار', icon: MessageCircle },
+                        { id: 'commitments', label: 'التزاماتنا', icon: Target }
+                    ].map((tab) => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as any)}
+                                className={`flex-1 flex items-center justify-center gap-3 py-3 rounded-[2.2rem] transition-all duration-700 relative z-10 ${isActive ? 'text-white' : 'text-blue-800/30 hover:text-blue-500'}`}
+                            >
+                                {isActive && <motion.div layoutId="pact-tab-pill" className="absolute inset-0 bg-blue-600 rounded-[2.2rem] shadow-2xl shadow-blue-500/20 z-[-1]" />}
+                                <tab.icon className={`w-4 h-4 transition-transform ${isActive ? 'rotate-12' : ''}`} />
+                                <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
+                            </button>
+                        );
+                    })}
                 </div>
             </header>
 
-            <div className="flex-1 px-4 py-8 overflow-y-auto pb-32">
+            <div className="flex-1 px-4 py-8 overflow-y-auto pb-32 scrollbar-hide">
                 {activeTab === 'constitution' ? (
-                    <div className="space-y-10">
-                        {/* New Dialogue Trigger - Premium Redesign */}
+                    <div className="space-y-12">
+                        {/* New Dialogue Trigger */}
                         <motion.button
-                            whileHover={{ y: -4, scale: 1.01 }}
+                            whileHover={{ y: -4 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => setShowAddDialogue(true)}
                             className="w-full relative overflow-hidden rounded-[3rem] p-1 group"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-br from-primary/40 via-primary/5 to-transparent blur-2xl opacity-50 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative bg-card/60 backdrop-blur-xl border-2 border-dashed border-primary/30 py-10 px-6 rounded-[2.9rem] flex flex-col items-center justify-center gap-4">
-                                <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary/60 rounded-[1.8rem] flex items-center justify-center shadow-xl shadow-primary/20 group-hover:rotate-12 transition-transform">
-                                    <MessageCircle className="w-8 h-8 text-white" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/30 via-blue-500/5 to-transparent blur-2xl opacity-50 group-hover:opacity-100 transition-opacity" />
+                            <div className="relative glass border-white/20 py-10 px-8 rounded-[2.8rem] flex flex-col items-center justify-center gap-5 shadow-2xl">
+                                <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/5 group-hover:rotate-6 transition-transform">
+                                    <MessageCircle className="w-8 h-8 text-blue-500" />
                                 </div>
                                 <div className="text-center space-y-1">
-                                    <span className="text-lg font-black text-foreground block">بدء جلسة حوار جديدة</span>
-                                    <p className="text-[11px] font-bold text-muted-foreground max-w-[200px]">نتناقش بكل هدوء، لنتفق على ما ينمي حبنا</p>
-                                </div>
-                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/20" />
-                                    <div className="w-4 h-1.5 rounded-full bg-primary/40" />
-                                    <div className="w-1.5 h-1.5 rounded-full bg-primary/20" />
+                                    <span className="text-xl font-black text-foreground tracking-tighter block">تأسيس جلسة حوار</span>
+                                    <p className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] max-w-[200px]">نتحاور بوعي.. لنرتقي بالعهد الذي بيننا</p>
                                 </div>
                             </div>
                         </motion.button>
 
-                        {/* Recent Dialogues & Agreements */}
-                        <div className="space-y-10">
+                        <div className="grid grid-cols-2 gap-5 px-2">
                             {dialogues.length === 0 && !loading && (
-                                <div className="py-20 text-center space-y-4">
-                                    <div className="w-20 h-20 bg-muted/30 rounded-[2.5rem] flex items-center justify-center mx-auto text-muted-foreground/30">
-                                        <ShieldCheck className="w-10 h-10" />
+                                <div className="col-span-2 py-24 text-center space-y-6 opacity-20">
+                                    <div className="w-24 h-24 glass border-white/10 rounded-[3rem] flex items-center justify-center mx-auto">
+                                        <MessageCircle className="w-12 h-12" />
                                     </div>
-                                    <p className="text-sm font-black text-muted-foreground">لا يوجد اتفاقات مسجلة بعد..</p>
+                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] leading-relaxed">لم يتم تدوين أي جلسة حوار بعد..</p>
                                 </div>
                             )}
 
                             {dialogues.map((d, i) => (
                                 <motion.div
                                     key={d.id}
+                                    layoutId={`dialogue-card-${d.id}`}
                                     initial={{ opacity: 0, y: 30 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.1 }}
-                                    className="relative group"
+                                    transition={{ delay: i * 0.05 }}
+                                    onClick={() => setSelectedDialogue(d)}
+                                    className="aspect-square glass border-white/10 rounded-[2.5rem] p-5 relative overflow-hidden group cursor-pointer hover:shadow-2xl transition-all duration-500 shadow-sm active:scale-95 flex flex-col justify-between"
                                 >
-                                    {/* Decorative Glow */}
-                                    <div className="absolute -inset-4 bg-gradient-to-br from-indigo-500/5 via-transparent to-emerald-500/5 rounded-[4rem] blur-3xl opacity-0 group-hover:opacity-100 transition-opacity -z-10" />
-
-                                    <div className="bg-card/80 backdrop-blur-md rounded-[3.5rem] p-1 shadow-2xl shadow-black/[0.03] border border-border/40 overflow-hidden">
-                                        <div className="p-8 pb-4 flex items-center justify-between">
-                                            <div className="flex items-center gap-4 text-right">
-                                                <div className="w-14 h-14 bg-gradient-to-br from-indigo-500/10 to-indigo-600/5 rounded-2xl flex items-center justify-center text-indigo-500 shadow-inner">
-                                                    <Users className="w-7 h-7" />
-                                                </div>
-                                                <div>
-                                                    <h3 className="text-xl font-black text-foreground mb-0.5 tracking-tight">{d.title}</h3>
-                                                    <div className="flex items-center gap-1.5">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{d.dialogue_date}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <motion.button
-                                                whileHover={{ scale: 1.1 }}
-                                                whileTap={{ scale: 0.9 }}
-                                                onClick={() => setConfirmModal({ show: true, type: 'delete_dialogue', data: d })}
-                                                className="w-11 h-11 flex items-center justify-center bg-destructive/5 hover:bg-destructive/10 text-destructive rounded-[1.2rem] transition-colors border border-destructive/10"
-                                            >
-                                                <Trash2 className="w-4.5 h-4.5" />
-                                            </motion.button>
+                                    <div className="flex justify-between items-start">
+                                        <div className="w-11 h-11 glass-dark border-white/10 rounded-2xl flex items-center justify-center text-blue-500 shadow-inner">
+                                            <MessageCircle className="w-5 h-5" />
                                         </div>
-
-                                        {/* Visual Flow Journey */}
-                                        <div className="px-8 space-y-8 relative py-4">
-                                            {/* Journey Line */}
-                                            <div className="absolute top-10 right-[42px] bottom-10 w-0.5 bg-gradient-to-b from-rose-500/20 via-indigo-500/20 to-emerald-500/20 -z-10" />
-
-                                            {/* 1. The Issue */}
-                                            <div className="flex items-start gap-5">
-                                                <div className="w-8 h-8 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-rose-500/30 border-4 border-card">
-                                                    <AlertCircle className="w-4 h-4" />
-                                                </div>
-                                                <div className="bg-rose-500/[0.03] rounded-3xl p-5 w-full border border-rose-500/10 space-y-1">
-                                                    <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest block">نقطة الخلاف</span>
-                                                    <p className="text-sm font-bold text-foreground/90 leading-relaxed">{d.problem || d.description}</p>
-                                                </div>
-                                            </div>
-
-                                            {/* 2. The Opinions */}
-                                            <div className="flex items-start gap-5">
-                                                <div className="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-indigo-500/30 border-4 border-card">
-                                                    <MessageCircle className="w-4 h-4" />
-                                                </div>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
-                                                    <div className="bg-indigo-500/[0.03] rounded-3xl p-5 border border-indigo-500/10 relative">
-                                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-500/10 rounded-full blur-sm" />
-                                                        <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block mb-2">{names.me}</span>
-                                                        <p className="text-[13px] font-bold text-foreground/80 leading-relaxed italic">"{d.my_opinion || '...'}"</p>
-                                                    </div>
-                                                    <div className="bg-indigo-500/[0.03] rounded-3xl p-5 border border-indigo-500/10 relative">
-                                                        <div className="absolute -top-1 -left-1 w-4 h-4 bg-indigo-500/10 rounded-full blur-sm" />
-                                                        <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block mb-2">{names.partner}</span>
-                                                        <p className="text-[13px] font-bold text-foreground/80 leading-relaxed italic">"{d.partner_opinion || '...'}"</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* 3. The Decree (Agreement) */}
-                                            <div className="flex items-start gap-5">
-                                                <div className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-emerald-500/30 border-4 border-card">
-                                                    <ShieldCheck className="w-4 h-4" />
-                                                </div>
-                                                <div className="bg-emerald-500/[0.06] rounded-[2rem] p-7 w-full border-2 border-emerald-500/10 relative overflow-hidden group/decree shadow-inner">
-                                                    <Sparkles className="absolute top-4 left-4 w-5 h-5 text-emerald-500/30 group-hover/decree:scale-125 transition-transform" />
-                                                    <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl" />
-
-                                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] block mb-3">ميثاق الغليظ (الاتفاق)</span>
-                                                    <p className="text-lg font-black text-foreground leading-tight tracking-tight">{d.final_agreement}</p>
-                                                </div>
-                                            </div>
+                                        <div className="px-3 py-1.5 glass-dark border-white/5 rounded-xl">
+                                            <span className="text-[9px] font-black text-foreground/40 uppercase tracking-widest">{d.dialogue_date?.slice(5)}</span>
                                         </div>
+                                    </div>
 
-                                        {/* Linked Agreement - Formal Frame */}
-                                        {(() => {
-                                            const ag = agreements.find(a =>
-                                                (a.origin_dialogue_id && a.origin_dialogue_id === d.id) ||
-                                                (a.title === d.final_agreement && a.partnership_id === d.partnership_id)
-                                            );
-
-                                            if (ag) {
-                                                const isAssignee = ag.assignee === 'me' || ag.assignee === 'both';
-
-                                                return (
-                                                    <div className="p-8 pt-4 space-y-4">
-                                                        <div className="bg-gradient-to-br from-primary/[0.08] to-primary/[0.03] rounded-[2.5rem] p-6 border border-primary/20 relative overflow-hidden">
-                                                            <div className="flex items-center justify-between relative z-10">
-                                                                <div className="flex items-center gap-4 text-right">
-                                                                    <div className="w-12 h-12 bg-primary/20 rounded-2xl flex items-center justify-center text-primary shadow-sm border border-primary/10">
-                                                                        <User className="w-6 h-6" />
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="text-[9px] font-black text-primary uppercase tracking-widest mb-0.5 opacity-70">الموجه إليه الوعد</p>
-                                                                        <p className="text-base font-black text-foreground">
-                                                                            {ag.assignee === 'both' ? 'نحن الاثنان' : (ag.assignee === 'me' ? names.me : names.partner)}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                                <motion.button
-                                                                    whileHover={{ scale: 1.05 }}
-                                                                    whileTap={{ scale: 0.95 }}
-                                                                    onClick={() => setConfirmModal({ show: true, type: 'delete_agreement', data: ag })}
-                                                                    className="px-4 py-2 bg-destructive/10 text-destructive rounded-xl text-[10px] font-black hover:bg-destructive/20 transition-colors uppercase border border-destructive/10"
-                                                                >
-                                                                    إنهاء الوعد
-                                                                </motion.button>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Breach Counter Section */}
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="flex-1 bg-muted/40 backdrop-blur-sm p-6 rounded-[2.5rem] border border-border/40 flex items-center justify-between">
-                                                                <div className="flex items-center gap-4 text-right">
-                                                                    <div className="w-14 h-14 bg-rose-500/10 rounded-2xl flex flex-col items-center justify-center text-rose-500 border border-rose-500/10">
-                                                                        <span className="text-xl font-black leading-none">{ag.breach_count || 0}</span>
-                                                                        <span className="text-[7px] font-black uppercase mt-1">تجاوز</span>
-                                                                    </div>
-                                                                    <div>
-                                                                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block mb-0.5">سجل الالتزام</span>
-                                                                        <span className="text-xs font-bold text-foreground/80">{ag.breach_count > 0 ? 'هناك تجاوزات مسجلة' : 'نقي وبلا غبار! 🎉'}</span>
-                                                                    </div>
-                                                                </div>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    onClick={() => setConfirmModal({ show: true, type: 'breach', data: ag })}
-                                                                    className="h-12 px-6 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-2xl text-[11px] font-black border border-rose-500/10"
-                                                                >
-                                                                    ⚠️ سجل إخلاف
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            }
-                                            return (
-                                                <div className="p-8 pt-0">
-                                                    <div className="bg-amber-500/5 backdrop-blur-sm border border-amber-500/20 p-6 rounded-[2.5rem] text-center space-y-3">
-                                                        <div className="w-10 h-10 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto text-amber-500">
-                                                            <AlertTriangle className="w-5 h-5" />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <p className="text-[11px] font-black text-amber-600">هذه الجلسة قديمة أو غير موثقة</p>
-                                                            <p className="text-[9px] text-muted-foreground font-bold">لم يتم ربطها بوعد رسمي في النظام الجديد.</p>
-                                                        </div>
-                                                        <Button variant="outline" size="sm" onClick={() => loadData()} className="h-9 px-6 rounded-xl text-[10px] font-black border-amber-500/20 text-amber-700 hover:bg-amber-500/10">
-                                                            تحديث شامل 🔄
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
+                                    <div className="space-y-2 text-right">
+                                        <h3 className="font-black text-lg leading-tight line-clamp-2 tracking-tight opacity-90">{d.title}</h3>
+                                        <div className="flex items-center gap-1.5">
+                                            <div className="w-1 h-1 rounded-full bg-blue-500" />
+                                            <p className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest line-clamp-1">
+                                                {d.problem || d.description}
+                                            </p>
+                                        </div>
                                     </div>
                                 </motion.div>
                             ))}
                         </div>
                     </div>
+
                 ) : (
-                    <div className="space-y-10">
-                        {/* New Commitment Trigger - Premium style */}
+                    <div className="space-y-12">
+                        {/* New Commitment Trigger */}
                         <motion.button
-                            whileHover={{ y: -4, scale: 1.01 }}
+                            whileHover={{ y: -4 }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => setShowAddCommitment(true)}
                             className="w-full relative overflow-hidden rounded-[3rem] p-1 group"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/40 via-amber-500/5 to-transparent blur-2xl opacity-50 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative bg-card/60 backdrop-blur-xl border-2 border-dashed border-amber-500/30 py-10 px-6 rounded-[2.9rem] flex flex-col items-center justify-center gap-4">
-                                <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-amber-600 rounded-[1.8rem] flex items-center justify-center shadow-xl shadow-amber-500/20 group-hover:rotate-12 transition-transform">
-                                    <Target className="w-8 h-8 text-white" />
+                            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/30 via-amber-500/5 to-transparent blur-2xl opacity-50 group-hover:opacity-100 transition-opacity" />
+                            <div className="relative glass border-white/20 py-10 px-8 rounded-[2.8rem] flex flex-col items-center justify-center gap-5 shadow-2xl">
+                                <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center shadow-xl shadow-amber-500/5 group-hover:rotate-6 transition-transform">
+                                    <Target className="w-8 h-8 text-amber-500" />
                                 </div>
-                                <div className="text-center space-y-1">
-                                    <span className="text-lg font-black text-foreground block">إضافة التزام شخصي</span>
-                                    <p className="text-[11px] font-bold text-muted-foreground max-w-[200px]">عادات تبني الشخصية، وتزيد من رصيد المحبة</p>
+                                <div className="text-center space-y-2">
+                                    <span className="text-xl font-black text-foreground tracking-tighter block">تعهد والتزام جديد</span>
+                                    <p className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] max-w-[200px]">نبني أنفسنا معاً.. لنبني بيتاً من السكينة</p>
                                 </div>
                             </div>
                         </motion.button>
 
-                        <div className="space-y-8">
+                        <div className="space-y-10 px-2">
                             {commitments.length === 0 && !loading && (
-                                <div className="py-20 text-center space-y-4">
-                                    <div className="w-20 h-20 bg-muted/30 rounded-[2.5rem] flex items-center justify-center mx-auto text-muted-foreground/30">
-                                        <Flame className="w-10 h-10" />
+                                <div className="py-24 text-center space-y-6 opacity-20">
+                                    <div className="w-24 h-24 glass border-white/10 rounded-[3rem] flex items-center justify-center mx-auto">
+                                        <Flame className="w-12 h-12" />
                                     </div>
-                                    <p className="text-sm font-black text-muted-foreground">لا يوجد التزامات نشطة حالياً..</p>
+                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] leading-relaxed">لا توجد التزامات نشطة بعد..</p>
                                 </div>
                             )}
 
@@ -569,76 +443,75 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                                     transition={{ delay: i * 0.1 }}
                                     className="relative group"
                                 >
-                                    <div className={`absolute -inset-4 bg-gradient-to-br ${c.status === 'failed' ? 'from-rose-500/10' : 'from-primary/10'} via-transparent to-transparent rounded-[4rem] blur-3xl opacity-0 group-hover:opacity-100 transition-opacity -z-10`} />
-
-                                    <div className={`bg-card/80 backdrop-blur-md rounded-[3.5rem] p-8 shadow-2xl shadow-black/[0.03] border relative overflow-hidden transition-colors ${c.status === 'failed' ? 'border-rose-500/20' : 'border-border/40'}`}>
+                                    <div className={`glass-dark rounded-[3rem] p-8 shadow-2xl shadow-black/[0.05] border relative overflow-hidden transition-all duration-500 ${c.status === 'failed' ? 'border-rose-500/20' : 'border-white/10'}`}>
                                         <div className="flex items-center justify-between mb-8 relative z-10">
                                             <div className="flex items-center gap-5 text-right">
-                                                <div className={`w-16 h-16 rounded-[1.6rem] flex items-center justify-center text-3xl shadow-inner ${c.status === 'failed' ? 'bg-rose-500/10 text-rose-500' : 'bg-primary/10 text-primary'}`}>
+                                                <div className={`w-16 h-16 rounded-2xl glass-dark border-white/10 flex items-center justify-center shadow-inner ${c.status === 'failed' ? 'text-rose-500 animate-pulse' : 'text-blue-500'}`}>
                                                     {c.status === 'failed' ? <XCircle className="w-8 h-8" /> : <Flame className="w-8 h-8" />}
                                                 </div>
-                                                <div>
-                                                    <h3 className="text-xl font-black text-foreground mb-1 tracking-tight">{c.title}</h3>
-                                                    <div className="flex items-center gap-2">
-                                                        <div className={`w-2 h-2 rounded-full ${c.status === 'failed' ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                                                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                                                <div className="space-y-1">
+                                                    <h3 className="text-xl font-black text-foreground tracking-tighter">{c.title}</h3>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-2.5 h-2.5 rounded-full ${c.status === 'failed' ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]'}`} />
+                                                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em]">
                                                             {c.owner_user_id === userId ? `أنا (${names.me})` : `${names.partner}`}
                                                         </span>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-4">
                                                 {c.status !== 'failed' && isObserver(c.owner_user_id) && (
                                                     <motion.button
                                                         whileHover={{ scale: 1.1 }}
                                                         whileTap={{ scale: 0.9 }}
                                                         onClick={() => setConfirmModal({ show: true, type: 'fail_commitment', data: c })}
-                                                        className="w-11 h-11 flex items-center justify-center bg-rose-500/10 text-rose-500 rounded-2xl transition-all border border-rose-500/10"
-                                                        title="إبلاغ عن تقصير"
+                                                        className="w-12 h-12 flex items-center justify-center glass border-rose-500/20 text-rose-500 rounded-2xl transition-all shadow-sm"
                                                     >
-                                                        <AlertTriangle className="w-5 h-5" />
+                                                        <AlertTriangle className="w-6 h-6" />
                                                     </motion.button>
                                                 )}
                                                 <motion.button
                                                     whileHover={{ scale: 1.1, rotate: 5 }}
                                                     whileTap={{ scale: 0.9 }}
                                                     onClick={() => setConfirmModal({ show: true, type: 'delete_commitment', data: c })}
-                                                    className="w-11 h-11 flex items-center justify-center bg-muted text-muted-foreground rounded-2xl transition-all border border-border/50"
-                                                    title="حذف الالتزام"
+                                                    className="w-12 h-12 flex items-center justify-center glass border-white/10 text-muted-foreground/30 rounded-2xl transition-all hover:bg-rose-500/10 hover:text-rose-500"
                                                 >
-                                                    <Trash2 className="w-4.5 h-4.5" />
+                                                    <Trash2 className="w-5 h-5" />
                                                 </motion.button>
                                             </div>
                                         </div>
 
                                         {c.status === 'failed' ? (
                                             <motion.div
-                                                initial={{ y: 10, opacity: 0 }}
+                                                initial={{ y: 20, opacity: 0 }}
                                                 animate={{ y: 0, opacity: 1 }}
-                                                className="bg-rose-500/[0.03] rounded-[2.5rem] p-8 text-center border border-rose-500/10 relative overflow-hidden"
+                                                className="glass-dark border-rose-500/10 rounded-[3rem] p-10 text-center relative overflow-hidden"
                                             >
-                                                <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full blur-3xl -mr-16 -mt-16" />
-                                                <span className="text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] block mb-3 opacity-60">العقوبة المشروطة</span>
-                                                <p className="text-lg font-black text-foreground leading-tight tracking-tight">{c.punishment || 'لا توجد عقوبة محددة'}</p>
-                                                <div className="mt-6 inline-flex items-center gap-2 px-4 py-1.5 bg-rose-500/10 rounded-full text-[10px] font-black text-rose-500">
-                                                    تم تسجيل التقصير ⚠️
+                                                <div className="absolute top-0 right-0 w-40 h-40 bg-rose-500/5 rounded-full blur-3xl -mr-20 -mt-20" />
+                                                <span className="text-[9px] font-black text-rose-500/40 uppercase tracking-[0.3em] block mb-4">كفارة الوعد</span>
+                                                <p className="text-xl font-black text-foreground tracking-tight flex items-center justify-center gap-3">
+                                                    <AlertCircle className="w-5 h-5 text-rose-500/30" />
+                                                    {c.punishment || 'لم يتم تحديد أثر'}
+                                                </p>
+                                                <div className="mt-8 inline-flex items-center gap-3 px-6 py-2 glass border-rose-500/20 rounded-full text-[9px] font-black text-rose-500 uppercase tracking-widest leading-none">
+                                                    تم تسجيل التقصير اليوم ⚠️
                                                 </div>
                                             </motion.div>
                                         ) : (
-                                            <div className="space-y-6">
-                                                <div className="bg-muted/30 rounded-[2.5rem] p-6 border border-border/40">
+                                            <div className="space-y-10">
+                                                <div className="glass-dark border-white/5 rounded-[2.5rem] p-6 shadow-inner shadow-black/5">
                                                     <div className="flex items-center justify-between mb-4 px-2">
-                                                        <span className="text-[11px] font-black text-muted-foreground uppercase tracking-wider">الإنجاز الحالي</span>
-                                                        <div className="flex items-baseline gap-1">
-                                                            <span className="text-2xl font-black text-primary leading-none">{c.current_count}</span>
-                                                            <span className="text-xs font-bold text-muted-foreground">/ {c.target_count}</span>
+                                                        <span className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-[0.2em]">مؤشر المداومة</span>
+                                                        <div className="flex items-baseline gap-2">
+                                                            <span className="text-3xl font-black text-blue-600 tracking-tighter leading-none">{c.current_count}</span>
+                                                            <span className="text-[9px] font-black text-muted-foreground/40 uppercase leading-none">/ {c.target_count}</span>
                                                         </div>
                                                     </div>
-                                                    <div className="h-4 bg-muted/60 rounded-full overflow-hidden p-1 border border-border/20 shadow-inner">
+                                                    <div className="h-3 w-full glass-dark border-white/10 rounded-full overflow-hidden p-0.5">
                                                         <motion.div
                                                             initial={{ width: 0 }}
                                                             animate={{ width: `${Math.min(100, (c.current_count / c.target_count) * 100)}%` }}
-                                                            className="h-full bg-gradient-to-l from-primary via-primary/80 to-primary/40 rounded-full shadow-lg shadow-primary/20"
+                                                            className="h-full bg-blue-500 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.5)]"
                                                         />
                                                     </div>
                                                 </div>
@@ -646,14 +519,17 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                                                 <Button
                                                     onClick={() => handleMarkProgress(c.id, c.current_count, c.target_count)}
                                                     disabled={c.current_count >= c.target_count}
-                                                    className="w-full h-16 rounded-[2rem] font-black text-sm shadow-xl shadow-primary/10 relative overflow-hidden group"
+                                                    className="w-full h-16 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-blue-500/20 relative overflow-hidden group/btn bg-blue-600 text-white transition-all transform hover:scale-[1.01] active:scale-95 disabled:opacity-30"
                                                 >
-                                                    <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/10 to-primary/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
                                                     {c.current_count >= c.target_count ? (
-                                                        <span className="flex items-center justify-center gap-2">
-                                                            أتممتُ الهمة بنجاح! <Sparkles className="w-5 h-5 text-amber-300" />
+                                                        <span className="flex items-center justify-center gap-3 leading-none">
+                                                            تم بلوغ الغاية بنجاح <CheckCircle2 className="w-6 h-6" />
                                                         </span>
-                                                    ) : 'تسجيل إنجاز اليوم ✅'}
+                                                    ) : (
+                                                        <span className="flex items-center justify-center gap-3 tracking-[0.2em] leading-none">
+                                                            تسجيل إتمام الهمة <Plus className="w-6 h-6" />
+                                                        </span>
+                                                    )}
                                                 </Button>
                                             </div>
                                         )}
@@ -682,12 +558,12 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                             exit={{ scale: 0.9, y: 40, opacity: 0 }}
                             className="relative w-full max-w-md bg-card/70 backdrop-blur-2xl rounded-[3.5rem] p-10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] z-10 border border-white/20 overflow-hidden"
                         >
-                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
 
                             {/* Step Indicators */}
                             <div className="flex justify-center gap-2.5 mb-10">
                                 {[1, 2, 3, 4, 5].map(step => (
-                                    <div key={step} className={`h-1.5 rounded-full transition-all duration-500 ${step <= dialogueStep ? 'w-10 bg-primary shadow-[0_0_10px_rgba(var(--primary),0.3)]' : 'w-2 bg-muted'}`} />
+                                    <div key={step} className={`h-1.5 rounded-full transition-all duration-500 ${step <= dialogueStep ? 'w-10 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'w-2 bg-muted'}`} />
                                 ))}
                             </div>
 
@@ -769,10 +645,10 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                                                     whileHover={{ x: -4 }}
                                                     whileTap={{ scale: 0.98 }}
                                                     onClick={() => setDialogueForm({ ...dialogueForm, assignee: type as any })}
-                                                    className={`w-full p-6 rounded-3xl border-2 transition-all text-right flex items-center justify-between ${dialogueForm.assignee === type ? 'border-primary bg-primary/10 shadow-lg shadow-primary/5' : 'border-border/40 bg-muted/20 hover:bg-muted/40'}`}
+                                                    className={`w-full p-6 rounded-3xl border-2 transition-all text-right flex items-center justify-between ${dialogueForm.assignee === type ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/5' : 'border-border/40 bg-muted/20 hover:bg-muted/40'}`}
                                                 >
-                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${dialogueForm.assignee === type ? 'border-primary' : 'border-muted-foreground/30'}`}>
-                                                        {dialogueForm.assignee === type && <div className="w-3 h-3 rounded-full bg-primary" />}
+                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${dialogueForm.assignee === type ? 'border-blue-500' : 'border-muted-foreground/30'}`}>
+                                                        {dialogueForm.assignee === type && <div className="w-3 h-3 rounded-full bg-blue-500" />}
                                                     </div>
                                                     <div>
                                                         <p className="text-base font-black text-foreground">
@@ -801,7 +677,7 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                                 <Button
                                     onClick={dialogueStep === 5 ? handleSaveDialogue : nextStep}
                                     disabled={isSubmitting}
-                                    className="flex-1 h-16 rounded-2xl font-black text-sm shadow-xl shadow-primary/20"
+                                    className="flex-1 h-16 rounded-2xl font-black text-sm shadow-xl shadow-blue-500/20"
                                 >
                                     {dialogueStep === 5 ? (isSubmitting ? 'جاري الحفظ...' : 'اعتماد وحفظ الوعد ✨') : 'التالي'}
                                 </Button>
@@ -836,7 +712,7 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                                                 key={type}
                                                 type="button"
                                                 onClick={() => setCommitmentForm({ ...commitmentForm, assignee: type as any })}
-                                                className={`flex-1 h-14 rounded-2xl border-2 transition-all font-black text-sm ${commitmentForm.assignee === type ? 'border-primary bg-primary/10 ring-4 ring-primary/5' : 'border-border/40 bg-muted/20 hover:bg-muted/40'}`}
+                                                className={`flex-1 h-14 rounded-2xl border-2 transition-all font-black text-sm ${commitmentForm.assignee === type ? 'border-blue-500 bg-blue-500/10 ring-4 ring-blue-500/5' : 'border-border/40 bg-muted/20 hover:bg-muted/40'}`}
                                             >
                                                 {type === 'partner' ? names.partner : names.me}
                                             </button>
@@ -864,7 +740,7 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                                     </div>
                                 </div>
 
-                                <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2rem] font-black shadow-2xl shadow-primary/20 mt-6 text-sm">
+                                <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2rem] font-black shadow-2xl shadow-blue-500/20 mt-6 text-sm bg-blue-600">
                                     {isSubmitting ? 'جاري الحفظ...' : 'تثبيت الالتزام 💪'}
                                 </Button>
                             </form>
@@ -873,7 +749,157 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                 )}
             </AnimatePresence>
 
-            {/* Confirmation Modal */}
+
+
+            {/* Selected Dialogue Details Modal */}
+            <AnimatePresence>
+                {selectedDialogue && (
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-background/80 backdrop-blur-xl"
+                            onClick={() => setSelectedDialogue(null)}
+                        />
+                        <motion.div
+                            layoutId={`dialogue-card-${selectedDialogue.id}`}
+                            initial={{ scale: 0.9, y: 50, opacity: 0 }}
+                            animate={{ scale: 1, y: 0, opacity: 1 }}
+                            exit={{ scale: 0.9, y: 50, opacity: 0 }}
+                            className="w-full h-full max-h-[85vh] overflow-y-auto bg-card border border-border/50 rounded-[3rem] shadow-2xl relative z-10 max-w-lg scrollbar-hide"
+                        >
+                            {/* Decorative Header */}
+                            <div className="sticky top-0 bg-card/80 backdrop-blur-xl p-6 border-b border-border/10 z-20 flex justify-between items-center">
+                                <button
+                                    onClick={() => setSelectedDialogue(null)}
+                                    className="w-10 h-10 bg-muted rounded-full flex items-center justify-center hover:bg-muted/80"
+                                >
+                                    <ArrowLeft className="w-4 h-4" />
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <div className="text-right">
+                                        <h3 className="font-black text-sm">{selectedDialogue.title}</h3>
+                                        <p className="text-[10px] text-muted-foreground font-bold">{selectedDialogue.dialogue_date}</p>
+                                    </div>
+                                    <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500">
+                                        <MessageCircle className="w-5 h-5" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-8 space-y-8">
+                                {/* Visual Flow Journey - Reusing existing design */}
+                                <div className="space-y-8 relative">
+                                    {/* Journey Line */}
+                                    <div className="absolute top-4 right-[19px] bottom-10 w-0.5 bg-gradient-to-b from-rose-500/20 via-indigo-500/20 to-emerald-500/20 -z-10" />
+
+                                    {/* 1. The Issue */}
+                                    <div className="flex items-start gap-5">
+                                        <div className="w-10 h-10 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-rose-500/30 border-4 border-card relative z-10">
+                                            <AlertCircle className="w-5 h-5" />
+                                        </div>
+                                        <div className="bg-rose-500/[0.03] rounded-3xl p-6 w-full border border-rose-500/10 space-y-2">
+                                            <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest block opacity-70">نقطة الخلاف</span>
+                                            <p className="text-base font-bold text-foreground/90 leading-relaxed text-right">{selectedDialogue.problem || selectedDialogue.description}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. The Opinions */}
+                                    <div className="flex items-start gap-5">
+                                        <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30 border-4 border-card relative z-10">
+                                            <MessageCircle className="w-5 h-5" />
+                                        </div>
+                                        <div className="space-y-4 w-full">
+                                            <div className="bg-indigo-500/[0.03] rounded-3xl p-6 border border-indigo-500/10 relative text-right">
+                                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-500/10 rounded-full blur-sm" />
+                                                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block mb-2">{names.me}</span>
+                                                <p className="text-sm font-bold text-foreground/80 leading-relaxed italic">"{selectedDialogue.my_opinion || '...'}"</p>
+                                            </div>
+                                            <div className="bg-indigo-500/[0.03] rounded-3xl p-6 border border-indigo-500/10 relative text-right">
+                                                <div className="absolute -top-1 -left-1 w-4 h-4 bg-indigo-500/10 rounded-full blur-sm" />
+                                                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block mb-2">{names.partner}</span>
+                                                <p className="text-sm font-bold text-foreground/80 leading-relaxed italic">"{selectedDialogue.partner_opinion || '...'}"</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 3. The Decree (Agreement) */}
+                                    <div className="flex items-start gap-5">
+                                        <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30 border-4 border-card relative z-10">
+                                            <ShieldCheck className="w-5 h-5" />
+                                        </div>
+                                        <div className="bg-emerald-500/[0.06] rounded-[2rem] p-8 w-full border-2 border-emerald-500/10 relative overflow-hidden group/decree shadow-inner text-right">
+                                            <Sparkles className="absolute top-4 left-4 w-6 h-6 text-emerald-500/30 animate-pulse" />
+                                            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl" />
+
+                                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] block mb-4">الاتفاق النهائي</span>
+                                            <p className="text-xl font-black text-foreground leading-snug tracking-tight">{selectedDialogue.final_agreement}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Linked Agreement Status */}
+                                <div className="pt-6 border-t border-border/10">
+                                    {(() => {
+                                        const ag = agreements.find(a =>
+                                            (a.origin_dialogue_id && a.origin_dialogue_id === selectedDialogue.id) ||
+                                            (a.title === selectedDialogue.final_agreement && a.partnership_id === selectedDialogue.partnership_id)
+                                        );
+
+                                        if (ag) {
+                                            return (
+                                                <div className="bg-muted/30 rounded-[2.5rem] p-6 text-right space-y-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                                                            <Target className="w-5 h-5" />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="font-black text-sm">حالة الالتزام</h4>
+                                                            <p className="text-[10px] text-muted-foreground font-bold">متابعة تنفيذ الوعد</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex gap-3">
+                                                        <div className="flex-1 bg-background rounded-2xl p-4 border border-border/20 text-center">
+                                                            <span className="block text-2xl font-black text-foreground">{ag.breach_count || 0}</span>
+                                                            <span className="text-[10px] font-bold text-muted-foreground uppercase">مخالفة</span>
+                                                        </div>
+                                                        <Button
+                                                            variant="ghost"
+                                                            onClick={() => setConfirmModal({ show: true, type: 'breach', data: ag })}
+                                                            className="flex-1 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 h-auto rounded-2xl font-black text-xs"
+                                                        >
+                                                            تسجيل إخلاف
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
+
+                                {/* Delete Action */}
+                                <div className="pt-6">
+                                    <button
+                                        onClick={() => {
+                                            setConfirmModal({ show: true, type: 'delete_dialogue', data: selectedDialogue });
+                                            // Close details modal? No, wait for confirmation modal
+                                        }}
+                                        className="w-full h-14 flex items-center justify-center gap-2 text-rose-500 bg-rose-500/5 hover:bg-rose-500/10 rounded-2xl transition-colors font-black text-xs"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        حذف هذه الجلسة نهائياً
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Confirmation Modal - Reusing existing logic but ensure z-index is higher */}
             <AnimatePresence>
                 {confirmModal?.show && (
                     <div className="fixed inset-0 z-[70] flex items-center justify-center p-5">
@@ -908,6 +934,6 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                     </div>
                 )}
             </AnimatePresence>
-        </div>
+        </div >
     );
 }

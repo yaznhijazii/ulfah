@@ -1,98 +1,92 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  font-size: 14px;
   --font-size: 14px;
-  --radius: 1.5rem;
+  --radius: 2.2rem;
 
-  /* Premium Alabaster & Midnight Theme */
-  --background: oklch(1 0 0);
-  /* Pure White Base */
-  --foreground: oklch(0.2 0.02 260);
-  /* Deep Slate/Midnight */
+  /* Premium "Velvet & Cream" Palette - OKLCH */
+  --background: oklch(0.97 0.015 20);
+  /* Champagne Rose Cream */
+  --foreground: oklch(0.12 0.03 20);
+  /* Deep Espresso */
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.02 260);
+  --card: oklch(0.99 0.01 20 / 0.8);
+  --card-foreground: oklch(0.12 0.03 20);
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.02 260);
+  --popover: oklch(0.98 0.02 20);
+  --popover-foreground: oklch(0.12 0.03 20);
 
-  /* Sophisticated Accents */
-  --primary: oklch(0.35 0.08 260);
-  /* Elegant Deep Indigo */
-  --primary-foreground: oklch(1 0 0);
+  /* Signature "Soulful" Colors - EXACT LOGO PINK */
+  --primary: #f43f5e;
+  --primary-foreground: #ffffff;
 
-  --secondary: oklch(0.98 0 0);
-  /* Ultra Soft Gray */
-  --secondary-foreground: oklch(0.4 0.02 260);
+  --secondary: #fff1f2;
+  /* Ultra Soft Rose */
+  --secondary-foreground: #e11d48;
 
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.5 0.02 260);
+  --muted: oklch(0.94 0.01 20);
+  --muted-foreground: oklch(0.45 0.05 20 / 0.6);
 
-  --accent: oklch(0.92 0.03 40);
-  /* Soft Champagne/Gold */
-  --accent-foreground: oklch(0.35 0.05 40);
+  --accent: oklch(0.82 0.12 45);
+  /* Warm Honey Gold */
+  --accent-foreground: oklch(0.25 0.08 45);
 
-  --destructive: oklch(0.55 0.18 25);
+  --destructive: oklch(0.5 0.2 25);
   --destructive-foreground: oklch(1 0 0);
 
-  --border: oklch(0.94 0.005 260);
-  --input: oklch(0.96 0.005 260);
-  --ring: oklch(0.35 0.08 260 / 0.2);
+  --border: oklch(0.12 0.03 20 / 0.08);
+  --input: oklch(0.12 0.03 20 / 0.05);
+  --ring: oklch(0.58 0.18 18 / 0.2);
 
-  /* Premium Palette */
-  --pastel-peach: oklch(0.96 0.02 45);
-  --pastel-green: oklch(0.96 0.02 160);
-  --pastel-blue: oklch(0.96 0.02 240);
-  --pastel-purple: oklch(0.96 0.02 300);
+  /* Mood Identities */
+  --mood-home: #f43f5e;
+  --mood-love: #e11d48;
+  --mood-finance: #10b981;
+  --mood-adventure: #f59e0b;
+  --mood-dialogue: #6366f1;
+  --mood-games: #a855f7;
 
-  /* Deep High-End Shadows */
-  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.02);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.06);
+  /* Premium Shadows */
+  --shadow-sm: 0 4px 20px oklch(0.12 0.03 20 / 0.03);
+  --shadow-md: 0 16px 40px oklch(0.12 0.03 20 / 0.05);
+  --shadow-lg: 0 32px 80px oklch(0.12 0.03 20 / 0.08);
 
-  /* Refined Glassmorphism */
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.4);
-  --glass-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.03);
+  /* Elite Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 8px 32px 0 oklch(0.12 0.03 20 / 0.04);
 }
 
 .dark {
-  /* Dark Theme - Midnight Rose */
-  --background: oklch(0.12 0.02 260);
-  /* Deep Slate Blue/Black */
-  --foreground: oklch(0.98 0.01 260);
+  --background: oklch(0.08 0.02 20);
+  /* Obsidian Rose */
+  --foreground: oklch(0.95 0.02 20);
 
-  --card: oklch(0.15 0.03 260);
-  --card-foreground: oklch(0.98 0.01 260);
+  --card: oklch(0.12 0.03 20 / 0.7);
+  --card-foreground: oklch(0.95 0.02 20);
 
-  --popover: oklch(0.15 0.03 260);
-  --popover-foreground: oklch(0.98 0.01 260);
+  /* Dark Luxury Accents */
+  --primary: oklch(0.62 0.2 18);
+  /* Luminous Rose */
+  --primary-foreground: oklch(0.99 0.01 20);
 
-  --primary: oklch(0.65 0.2 15);
-  /* Vibrant Rose for Dark Mode */
-  --primary-foreground: oklch(0.98 0.01 260);
+  --secondary: oklch(0.16 0.04 20);
+  --secondary-foreground: oklch(0.85 0.05 20);
 
-  --secondary: oklch(0.2 0.04 260);
-  --secondary-foreground: oklch(0.9 0.02 260);
+  --muted: oklch(0.14 0.02 20);
+  --muted-foreground: oklch(0.55 0.04 20);
 
-  --muted: oklch(0.2 0.02 260);
-  --muted-foreground: oklch(0.65 0.02 260);
+  --accent: oklch(0.35 0.1 45);
+  /* Antique Gold */
+  --accent-foreground: oklch(0.9 0.08 45);
 
-  --accent: oklch(0.25 0.06 15);
-  /* Dark Rose/Gold Tint */
-  --accent-foreground: oklch(0.95 0.05 15);
+  --border: oklch(0.95 0.02 20 / 0.1);
+  --ring: oklch(0.62 0.2 18 / 0.4);
 
-  --destructive: oklch(0.5 0.2 25);
-  --destructive-foreground: oklch(0.98 0 0);
-
-  --border: oklch(0.25 0.02 260);
-  --input: oklch(0.25 0.02 260);
-  --ring: oklch(0.65 0.2 15 / 0.5);
-
-  /* Glassmorphism Variables Dark */
-  --glass-bg: rgba(20, 20, 30, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  --glass-bg: rgba(20, 10, 10, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
 }
 
 @theme inline {
@@ -100,8 +94,6 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
@@ -110,57 +102,111 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 16px);
+  --color-mood: var(--mood-color, #f43f5e);
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2.5rem;
+  --radius-3xl: 3.5rem;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    font-family: 'Noto Kufi Arabic', sans-serif;
+    font-family: 'Outfit', 'Mestika', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: -0.02em;
   }
 
   body {
-    @apply bg-background text-foreground transition-colors duration-300;
+    @apply bg-background text-foreground transition-all duration-700 ease-in-out;
     direction: rtl;
+    background-image:
+      radial-gradient(at 0% 0%, oklch(0.65 0.2 340 / 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, oklch(0.62 0.17 145 / 0.03) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, oklch(0.55 0.18 250 / 0.03) 0px, transparent 50%);
+    background-attachment: fixed;
   }
 
-  /* Glassmorphism Utilities */
+  /* Ultimate Glassmorphism */
   .glass {
     background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
   }
 
-  html {
-    font-size: var(--font-size);
+  .glass-dark {
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .mesh-gradient {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(at 0% 0%, oklch(0.65 0.2 340 / 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, oklch(0.62 0.17 145 / 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, oklch(0.55 0.18 250 / 0.1) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, oklch(0.72 0.18 60 / 0.1) 0px, transparent 50%);
   }
 
   h1,
   h2,
   h3,
-  h4,
-  h5,
-  h6 {
-    font-weight: 800;
-    /* ExtraBlack equivalent for Arabic usually works better */
-    letter-spacing: -0.02em;
+  h4 {
+    @apply font-black tracking-tight;
+    line-height: 1.05;
+  }
+
+  button {
+    @apply transition-all duration-500 active:scale-95 hover:brightness-110;
+  }
+
+  /* Mood Identities */
+  .mood-home {
+    --mood-color: var(--mood-home);
+  }
+
+  .mood-love {
+    --mood-color: var(--mood-love);
+  }
+
+  .mood-finance {
+    --mood-color: var(--mood-finance);
+  }
+
+  .mood-adventure {
+    --mood-color: var(--mood-adventure);
+  }
+
+  .mood-games {
+    --mood-color: var(--mood-games);
+  }
+
+  .mood-dialogue {
+    --mood-color: var(--mood-dialogue);
+  }
+
+  .bg-mood {
+    background-color: var(--mood-color);
+  }
+
+  .text-mood {
+    color: var(--mood-color);
+  }
+
+  .border-mood {
+    border-color: var(--mood-color);
   }
 }
 
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
 }
 
 @utility scrollbar-hide {
@@ -172,58 +218,61 @@
   }
 }
 
-/* Lateef Font Styles */
-.lateef-extralight {
-  font-family: "Lateef", serif;
-  font-weight: 200;
-  font-style: normal;
+/* Animations */
+@keyframes float {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
 }
 
-.lateef-light {
-  font-family: "Lateef", serif;
-  font-weight: 300;
-  font-style: normal;
+@keyframes pulse-soft {
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
 }
 
-.lateef-regular {
-  font-family: "Lateef", serif;
-  font-weight: 400;
-  font-style: normal;
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.lateef-medium {
-  font-family: "Lateef", serif;
-  font-weight: 500;
-  font-style: normal;
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
 }
 
-.lateef-semibold {
-  font-family: "Lateef", serif;
-  font-weight: 600;
-  font-style: normal;
+.animate-float {
+  animation: float 20s ease-in-out infinite;
 }
 
-.lateef-bold {
-  font-family: "Lateef", serif;
-  font-weight: 700;
-  font-style: normal;
+.animate-float-delayed {
+  animation: float 25s ease-in-out infinite reverse;
 }
 
-.lateef-extrabold {
-  font-family: "Lateef", serif;
-  font-weight: 800;
-  font-style: normal;
-}
-
-/* Aref Ruqaa Font Styles */
-.aref-regular {
-  font-family: "Aref Ruqaa", serif;
-  font-weight: 400;
-  font-style: normal;
-}
-
-.aref-bold {
-  font-family: "Aref Ruqaa", serif;
-  font-weight: 700;
-  font-style: normal;
+.animate-float-slow {
+  animation: float 30s ease-in-out infinite;
 }

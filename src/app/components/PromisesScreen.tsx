@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus, Heart, CheckCircle2, X, Trash2, ShieldCheck, Target, Sparkles } from 'lucide-react';
+import { ArrowLeft, Plus, Heart, CheckCircle2, X, Trash2, ShieldCheck, Target, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -88,86 +88,114 @@ export function PromisesScreen({ onNavigate, userId, partnershipId }: PromisesSc
 
   if (!partnershipId) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center bg-background">
-        <div className="w-20 h-20 rounded-3xl bg-accent/30 flex items-center justify-center mb-5"><ShieldCheck className="w-10 h-10 text-primary" strokeWidth={1.5} /></div>
-        <h2 className="text-xl font-bold mb-2">ميثاق العلاقة</h2>
-        <p className="text-muted-foreground mb-6 text-sm">الرجاء ربط الشريك أولاً من الإعدادات للبدء في كتابة وعودكما.</p>
-        <Button onClick={() => onNavigate('settings')} className="w-full h-12 bg-primary text-white rounded-xl shadow-lg shadow-primary/20 text-md font-bold">الذهاب للإعدادات</Button>
+      <div className="flex-1 bg-background flex flex-col items-center justify-center p-10 text-center">
+        <div className="w-24 h-24 rounded-[2.5rem] glass-dark border-white/5 flex items-center justify-center mb-8 shadow-2xl">
+          <ShieldCheck className="w-12 h-12 text-primary/40" />
+        </div>
+        <h2 className="text-2xl font-black mb-3 tracking-tighter">ميثاق المودة</h2>
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/30 mb-10 leading-relaxed">يرجى إتمام ربط الشريك لتفعيل بنود هذا الميثاق المقدس</p>
+        <Button onClick={() => onNavigate('settings')} className="w-full h-16 bg-primary text-white rounded-[2rem] shadow-2xl shadow-primary/20 text-sm font-black uppercase tracking-widest leading-none">إتمام الربط الآن</Button>
       </div>
     );
   }
 
   const tabs = [
-    { id: 'promises', label: 'وعودنا', icon: Heart, color: 'text-rose-500' },
-    { id: 'rules', label: 'قواعدنا', icon: ShieldCheck, color: 'text-sky-500' },
-    { id: 'tasks', label: 'مهامنا', icon: Target, color: 'text-emerald-500' },
+    { id: 'promises', label: 'وعودنا', icon: Heart, color: 'text-rose-500', bg: 'bg-rose-500/10' },
+    { id: 'rules', label: 'قواعدنا', icon: ShieldCheck, color: 'text-sky-500', bg: 'bg-sky-500/10' },
+    { id: 'tasks', label: 'مهامنا', icon: Target, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
   ];
 
   return (
-    <div className="flex-1 bg-background flex flex-col relative overflow-hidden">
-      <header className="px-5 pt-5 pb-2 sticky top-0 bg-background/80 backdrop-blur-xl z-20">
-        <div className="flex items-center justify-between mb-4">
-          <motion.button whileTap={{ scale: 0.9 }} onClick={() => onNavigate('home')} className="w-9 h-9 flex items-center justify-center bg-white rounded-xl shadow-sm border border-border">
-            <ArrowLeft className="w-4 h-4 text-foreground" />
+    <div className="flex-1 bg-background flex flex-col relative h-full overflow-hidden">
+      <header className="px-8 pt-12 pb-6 sticky top-0 bg-background/60 backdrop-blur-3xl z-30">
+        <div className="flex items-center justify-between mb-10">
+          <motion.button whileTap={{ scale: 0.9 }} onClick={() => onNavigate('home')} className="w-12 h-12 flex items-center justify-center glass rounded-2xl border-white/20 shadow-sm text-foreground/70">
+            <ArrowLeft className="w-5 h-5" />
           </motion.button>
-          <h1 className="text-lg font-black">ميثاقنا</h1>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowAddForm(true)} className="bg-primary text-white w-9 h-9 rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
-            <Plus className="w-5 h-5" />
+          <div className="text-center">
+            <h1 className="text-xl font-black text-foreground tracking-tight">ميثاقنا</h1>
+            <p className="text-[10px] font-black text-primary/40 uppercase tracking-[0.2em]">بنود المحبة.. وعهود السكينة</p>
+          </div>
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowAddForm(true)}
+            className="w-12 h-12 glass border-primary/20 rounded-2xl flex items-center justify-center text-primary shadow-lg shadow-primary/5"
+          >
+            <Plus className="w-6 h-6" />
           </motion.button>
         </div>
 
-        <div className="flex p-1 bg-muted/30 rounded-xl mb-1.5">
+        <div className="flex glass-dark border-white/5 p-1.5 rounded-[2.2rem] max-w-[340px] mx-auto relative overflow-hidden">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg transition-all relative ${isActive ? 'text-primary' : 'text-muted-foreground font-black'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-[1.8rem] transition-all relative z-10 ${isActive ? 'text-white' : 'text-muted-foreground/40'}`}
               >
-                {isActive && <motion.div layoutId="tab-pill" className="absolute inset-0 bg-white rounded-lg shadow-sm z-0" />}
-                <tab.icon className={`w-3.5 h-3.5 z-10 ${isActive ? tab.color : ''}`} />
-                <span className="text-[10px] font-black z-10">{tab.label}</span>
+                {isActive && <motion.div layoutId="tab-pill" className="absolute inset-0 bg-primary rounded-[1.8rem] shadow-xl shadow-primary/20 z-[-1]" />}
+                <tab.icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-muted-foreground/30'}`} />
+                <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
               </button>
             );
           })}
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-5 py-3 pb-28">
+      <div className="flex-1 overflow-y-auto px-8 py-6 pb-40 scrollbar-hide">
         <AnimatePresence mode="wait">
           {loading ? (
-            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-16"><div className="w-6 h-6 border-3 border-primary border-t-transparent rounded-full animate-spin" /></motion.div>
+            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-24">
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin shadow-xl shadow-primary/10" />
+            </motion.div>
           ) : (
             <motion.div
-              key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-              className="space-y-3"
+              key={activeTab} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="space-y-6"
             >
               {(activeTab === 'promises' ? promises : activeTab === 'rules' ? rules : tasks).length === 0 ? (
-                <div className="text-center py-16 space-y-3 bg-white/50 border border-dashed border-border rounded-3xl">
-                  <Sparkles className="w-10 h-10 text-muted-foreground/30 mx-auto" />
-                  <p className="text-xs text-muted-foreground font-black">لا يوجد محتوى هنا بعد، ابدأ بالإضافة!</p>
+                <div className="text-center py-24 space-y-8 glass rounded-[3.5rem] border-white/10 opacity-30">
+                  <div className="w-20 h-20 glass-dark border-white/5 rounded-[2rem] flex items-center justify-center mx-auto">
+                    <Sparkles className="w-10 h-10" />
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] leading-relaxed">لم يتم تدوين أي عهد بعد..</p>
                 </div>
               ) : (
                 (activeTab === 'promises' ? promises : activeTab === 'rules' ? rules : tasks).map((item: any, idx) => (
                   <motion.div
-                    key={item.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
-                    className={`bg-white rounded-2xl p-4 shadow-xl shadow-black/5 border border-border group relative flex items-start gap-3 ${activeTab === 'tasks' && item.is_completed ? 'opacity-60 bg-muted/10' : ''}`}
+                    key={item.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className={`glass-dark rounded-[2.5rem] p-7 shadow-2xl shadow-black/5 border relative overflow-hidden flex items-start gap-5 group ${activeTab === 'tasks' && item.is_completed ? 'opacity-40 border-white/5' : 'border-white/10'}`}
                   >
+                    <div className="w-10 h-10 rounded-2xl glass-dark border-white/5 flex items-center justify-center text-primary/40 group-hover:text-primary transition-colors shrink-0">
+                      {activeTab === 'promises' ? <Heart className="w-4 h-4 fill-current" /> : activeTab === 'rules' ? <ShieldCheck className="w-4 h-4" /> : <Target className="w-4 h-4" />}
+                    </div>
+
                     <div className="flex-1 text-right">
-                      <p className={`text-xs font-black leading-relaxed ${activeTab === 'tasks' && item.is_completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                      <p className={`text-base font-bold leading-relaxed tracking-tight ${activeTab === 'tasks' && item.is_completed ? 'line-through opacity-50' : 'text-foreground'}`}>
                         {activeTab === 'promises' ? item.promise_text : activeTab === 'rules' ? item.rule_text : item.task_text}
                       </p>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-3 shrink-0">
                       {activeTab === 'tasks' && (
-                        <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleToggleTask(item.id)} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${item.is_completed ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'}`}>
-                          <CheckCircle2 className="w-4 h-4" />
+                        <motion.button
+                          whileTap={{ scale: 0.8 }}
+                          onClick={() => handleToggleTask(item.id)}
+                          className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${item.is_completed ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'glass border-white/10 text-muted-foreground/30'}`}
+                        >
+                          <CheckCircle2 className="w-5 h-5" />
                         </motion.button>
                       )}
-                      <motion.button whileTap={{ scale: 0.9 }} onClick={() => handleDelete(activeTab === 'promises' ? 'promises' : activeTab === 'rules' ? 'rules' : 'tasks', item.id)} className="w-8 h-8 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Trash2 className="w-3.5 h-3.5" />
+                      <motion.button
+                        whileTap={{ scale: 0.8 }}
+                        onClick={() => handleDelete(activeTab === 'promises' ? 'promises' : activeTab === 'rules' ? 'rules' : 'tasks', item.id)}
+                        className="w-10 h-10 rounded-2xl glass border-rose-500/10 text-rose-500/30 hover:text-rose-500 hover:bg-rose-500/10 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </motion.button>
                     </div>
                   </motion.div>
@@ -180,26 +208,40 @@ export function PromisesScreen({ onNavigate, userId, partnershipId }: PromisesSc
 
       <AnimatePresence>
         {showAddForm && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setShowAddForm(false)} />
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-8">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-2xl" onClick={() => setShowAddForm(false)} />
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-6 z-10 space-y-4"
+              initial={{ scale: 0.9, opacity: 0, y: 40 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 40 }}
+              className="relative w-full max-w-md glass border-white/30 rounded-[3.5rem] p-10 z-10 space-y-8 shadow-2xl"
             >
-              <div className="text-center space-y-1">
-                <h2 className="text-lg font-black text-foreground">إضافة جديدة</h2>
-                <p className="text-[10px] font-black text-muted-foreground">اكتب {activeTab === 'promises' ? 'وعداً' : activeTab === 'rules' ? 'قاعدة' : 'مهمة'} لشريكك</p>
+              <div className="text-center space-y-2">
+                <div className="w-16 h-16 glass-dark border-white/10 rounded-2xl flex items-center justify-center mx-auto text-primary">
+                  <Plus className="w-8 h-8" />
+                </div>
+                <h2 className="text-2xl font-black text-foreground tracking-tighter">إضافة بند للميثاق</h2>
+                <p className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em]">اكتب {activeTab === 'promises' ? 'وعداً' : activeTab === 'rules' ? 'قاعدة' : 'مهمة'} بعناية</p>
               </div>
 
               <textarea
                 value={formText} onChange={(e) => setFormText(e.target.value)} autoFocus
                 placeholder="..."
-                className="w-full min-h-[100px] bg-muted/30 border-none rounded-2xl p-4 font-black text-right outline-none resize-none text-sm placeholder:text-muted-foreground/50"
+                className="w-full min-h-[160px] glass-dark border-white/10 rounded-[2.5rem] p-8 font-bold text-right outline-none resize-none text-lg placeholder:text-muted-foreground/20 italic"
               />
 
-              <div className="flex gap-2.5">
-                <Button variant="outline" className="flex-1 h-11 rounded-xl font-bold text-sm" onClick={() => setShowAddForm(false)}>إلغاء</Button>
-                <Button disabled={!formText.trim()} onClick={handleAddItem} className="flex-1 h-11 bg-primary text-white rounded-xl font-black text-sm shadow-lg shadow-primary/30 disabled:opacity-50">إضافة</Button>
+              <div className="flex gap-4">
+                <button
+                  className="flex-1 h-16 rounded-[2rem] glass border-white/10 text-muted-foreground font-black text-xs uppercase tracking-widest hover:bg-white/5 transition-all"
+                  onClick={() => setShowAddForm(false)}
+                >
+                  تراجع
+                </button>
+                <Button
+                  disabled={!formText.trim()}
+                  onClick={handleAddItem}
+                  className="flex-[2] h-16 bg-primary text-white rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl shadow-primary/20 disabled:opacity-30 leading-none"
+                >
+                  إضافة للميثاق ✨
+                </Button>
               </div>
             </motion.div>
           </div>
