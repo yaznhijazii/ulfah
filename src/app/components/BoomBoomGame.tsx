@@ -68,16 +68,6 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
                         ...newData,
                         ...parsedState
                     }));
-
-                    // State transitions based on updates
-                    if (newData.status === 'setup' && gameState === 'lobby') setGameState('setup');
-                    if (newData.status === 'playing' && gameState === 'setup') setGameState('playing');
-                    if (newData.status === 'finished' && gameState !== 'finished') setGameState('finished');
-                    if (newData.status === 'setup' && gameState === 'finished') {
-                        // Rematch started
-                        setGameState('setup');
-                        setMyBooms([]);
-                    }
                 }
             )
             .subscribe();
@@ -85,7 +75,26 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [roomData?.id, gameState]);
+    }, [roomData?.id]);
+
+    // Sync gameState with roomData status and detect AI Mode
+    useEffect(() => {
+        if (roomData?.status) {
+            let status = roomData.status as string;
+            // Map DB status 'waiting' to UI state 'lobby'
+            if (status === 'waiting') status = 'lobby';
+
+            if (status !== gameState) {
+                setGameState(status as GameState);
+            }
+        }
+        // Recover AI mode from database state
+        if (roomData && (roomData as any).isAIMode !== undefined) {
+            if (isAIMode !== (roomData as any).isAIMode) {
+                setIsAIMode((roomData as any).isAIMode);
+            }
+        }
+    }, [roomData?.status, (roomData as any)?.isAIMode]);
 
     const generateRoomCode = () => {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -204,62 +213,93 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
 
     const confirmSetup = async () => {
         if (!roomData) return;
+        setLoading(true);
 
-        const isHost = userId === roomData.host_user_id;
-        const myGrid: GridCell[] = Array(roomData.grid_size).fill(null).map((_, i) => ({
-            id: i,
-            isBoom: myBooms.includes(i),
-            isRevealed: false
-        }));
+        try {
+            // Fetch LATEST state to avoid race conditions (overwriting partner's grid)
+            const { data: latestRoom, error: fetchError } = await supabase
+                .from('game_rooms')
+                .select('*')
+                .eq('id', roomData.id)
+                .single();
 
-        const updateKey = isHost ? 'host_grid' : 'guest_grid';
-        const otherGrid = isHost ? roomData.guest_grid : roomData.host_grid;
+            if (fetchError || !latestRoom) throw fetchError || new Error('Room not found');
 
-        // If AI mode, create AI grid automatically
-        let aiGrid: GridCell[] | null = null;
-        if (isAIMode && isHost) {
-            const maxBooms = roomData.grid_size === 6 ? 3 : 5;
-            const aiBooms: number[] = [];
-            while (aiBooms.length < maxBooms) {
-                const random = Math.floor(Math.random() * roomData.grid_size);
-                if (!aiBooms.includes(random)) aiBooms.push(random);
-            }
-            aiGrid = Array(roomData.grid_size).fill(null).map((_, i) => ({
+            const latestState = typeof latestRoom.game_state === 'string'
+                ? JSON.parse(latestRoom.game_state)
+                : latestRoom.game_state;
+
+            const isHost = userId === latestRoom.host_user_id;
+            const myGrid: GridCell[] = Array(latestRoom.grid_size).fill(null).map((_, i) => ({
                 id: i,
-                isBoom: aiBooms.includes(i),
+                isBoom: myBooms.includes(i),
                 isRevealed: false
             }));
-        }
 
-        // Check if both are ready
-        const isOpponentReady = (otherGrid && otherGrid.length > 0) || aiGrid !== null;
-        const nextStatus = isOpponentReady ? 'playing' : 'setup';
-        const nextTurn = isOpponentReady ? roomData.host_user_id : null;
+            const updateKey = isHost ? 'host_grid' : 'guest_grid';
+            const otherGridKey = isHost ? 'guest_grid' : 'host_grid';
 
-        const newGameState = {
-            ...roomData,
-            [updateKey]: myGrid,
-            ...(aiGrid ? { guest_grid: aiGrid } : {}),
-            ...(isOpponentReady ? { turn: roomData.host_user_id } : {})
-        };
+            // Check latest data for other grid
+            let otherGrid = latestState[otherGridKey];
 
-        await supabase
-            .from('game_rooms')
-            .update({
-                game_state: newGameState,
+            // If AI mode, create AI grid automatically
+            let aiGrid: GridCell[] | null = null;
+            if (isAIMode && isHost) {
+                const maxBooms = latestRoom.grid_size === 6 ? 3 : 5;
+                const aiBooms: number[] = [];
+                while (aiBooms.length < maxBooms) {
+                    const random = Math.floor(Math.random() * latestRoom.grid_size);
+                    if (!aiBooms.includes(random)) aiBooms.push(random);
+                }
+                aiGrid = Array(latestRoom.grid_size).fill(null).map((_, i) => ({
+                    id: i,
+                    isBoom: aiBooms.includes(i),
+                    isRevealed: false
+                }));
+                otherGrid = aiGrid;
+            }
+
+            // Check if both are ready using LATEST information
+            const isOpponentReady = (otherGrid && otherGrid.length > 0);
+            const nextStatus = isOpponentReady ? 'playing' : 'setup';
+
+            const newGameState = {
+                ...latestState,
+                [updateKey]: myGrid,
+                ...(aiGrid ? { guest_grid: aiGrid, isAIMode: true } : {}),
+                ...(isOpponentReady ? { turn: latestRoom.host_user_id } : {})
+            };
+
+            const { error: updateError } = await supabase
+                .from('game_rooms')
+                .update({
+                    game_state: newGameState,
+                    status: nextStatus
+                })
+                .eq('id', latestRoom.id);
+
+            if (updateError) throw updateError;
+
+            // Local Optimistic Update
+            setRoomData({
+                ...latestRoom,
+                ...newGameState,
                 status: nextStatus
-            })
-            .eq('id', roomData.id);
+            } as RoomData);
 
-        // Local Optimistic Update
-        setRoomData({
-            ...roomData,
-            [isHost ? 'host_grid' : 'guest_grid']: myGrid,
-            ...(aiGrid ? { guest_grid: aiGrid } : {}),
-            status: nextStatus,
-            turn: nextTurn
-        } as RoomData);
+            if (nextStatus === 'playing') {
+                setGameState('playing');
+            }
+
+        } catch (err: any) {
+            console.error('Setup Confirmation Error:', err);
+            setError('فشل في بدء اللعبة. حاول مرة أخرى.');
+        } finally {
+            setLoading(false);
+        }
     };
+
+
 
     const makeAIMove = async () => {
         if (!roomData || !isAIMode) return;
@@ -327,17 +367,14 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
         if (roomData.turn !== userId) return;
 
         const isHost = userId === roomData.host_user_id;
+        // If I am host, I hit the guest_grid. If I am guest, I hit host_grid.
         const targetGridKey = isHost ? 'guest_grid' : 'host_grid';
         const targetGrid = isHost ? [...roomData.guest_grid] : [...roomData.host_grid];
 
-        if (targetGrid[cellIndex].isRevealed) return;
-
-        // Reveal logic
-        targetGrid[cellIndex].isRevealed = true;
-        targetGrid[cellIndex].revealedBy = userId;
+        // Logic: Deep clone the specific cell to avoid state mutation
+        targetGrid[cellIndex] = { ...targetGrid[cellIndex], isRevealed: true, revealedBy: userId };
 
         const isBoom = targetGrid[cellIndex].isBoom;
-
         const totalBooms = targetGrid.filter(c => c.isBoom).length;
         const totalSafe = targetGrid.length - totalBooms;
 
@@ -355,22 +392,29 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
             status = 'finished';
         }
 
-        const nextTurn = isHost ? roomData.guest_user_id : roomData.host_user_id;
+        // Correct next turn logic: use the value from roomData if component state might be stale
+        const effectiveAIMode = isAIMode || (roomData as any).isAIMode;
+        const nextTurn = winner ? null : (effectiveAIMode ? 'AI' : (isHost ? roomData.guest_user_id : roomData.host_user_id));
 
         const newGameState = {
             ...roomData,
             [targetGridKey]: targetGrid,
-            turn: nextTurn || userId,
+            turn: nextTurn,
             winner: winner
         };
 
-        await supabase
+        const { error: updateError } = await supabase
             .from('game_rooms')
             .update({
                 game_state: newGameState,
                 status: status
             })
             .eq('id', roomData.id);
+
+        if (updateError) {
+            console.error('Update Cell Error:', updateError);
+            setError('تعذر تحديث اللعبة. تأكد من اتصال الإنترنت.');
+        }
     };
 
     const requestRematch = async () => {

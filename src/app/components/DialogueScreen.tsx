@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -60,6 +60,42 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
         punishment: '',
         assignee: 'me' as 'me' | 'partner'
     });
+
+    const filteredDialogues = useMemo(() => {
+        return [...dialogues]
+            .filter(d => {
+                if (dialogueFilterType === 'all') return true;
+
+                // Determine assignee type: prefer direct column, fallback to agreement
+                let assigneeType = d.assignee;
+                const ag = agreements.find(a => a.origin_dialogue_id === d.id);
+
+                if (!assigneeType && ag) {
+                    assigneeType = ag.assignee;
+                }
+
+                if (!assigneeType) return false;
+
+                if (dialogueFilterType === 'both') return assigneeType === 'both';
+
+                const creator = d.created_by_user_id;
+                let realAssigneeId = '';
+
+                if (assigneeType === 'me') realAssigneeId = creator;
+                else if (assigneeType === 'partner') realAssigneeId = (creator === userId ? partnerId : userId) || '';
+
+                // Strict check based on real ID
+                if (dialogueFilterType === 'me') return realAssigneeId === userId;
+                if (dialogueFilterType === 'partner') return realAssigneeId !== userId && realAssigneeId !== '' && realAssigneeId !== null;
+
+                return true;
+            })
+            .sort((a, b) => {
+                const dateA = new Date(a.dialogue_date).getTime();
+                const dateB = new Date(b.dialogue_date).getTime();
+                return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+            });
+    }, [dialogues, agreements, dialogueFilterType, sortOrder, userId, partnerId]);
 
     useEffect(() => {
         if (partnershipId) {
@@ -328,7 +364,7 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
             </header>
 
             <div className="flex-1 px-4 py-8 overflow-y-auto pb-32 scrollbar-hide">
-                <AnimatePresence mode="wait">
+                <AnimatePresence>
                     {activeTab === 'constitution' ? (
                         <motion.div
                             key="constitution"
@@ -381,118 +417,84 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
                                     )}
 
                                     {/* Dialogue Card Content */}
+                                    {filteredDialogues.map((d, i) => {
+                                        // Random but deterministic gradient
+                                        const gradients = [
+                                            "from-blue-500/[0.03] to-purple-500/[0.03]",
+                                            "from-rose-500/[0.03] to-orange-500/[0.03]",
+                                            "from-emerald-500/[0.03] to-teal-500/[0.03]",
+                                            "from-amber-500/[0.03] to-yellow-500/[0.03]",
+                                            "from-indigo-500/[0.03] to-cyan-500/[0.03]"
+                                        ];
+                                        const grad = gradients[i % gradients.length];
 
-                                    {[...dialogues]
-                                        .filter(d => {
-                                            if (dialogueFilterType === 'all') return true;
+                                        // Assignee Badge Logic
+                                        const ag = agreements.find(a => a.origin_dialogue_id === d.id);
+                                        let assigneeLabel = '';
+                                        let assigneeColor = 'text-gray-400';
 
-                                            // Determine assignee type: prefer direct column, fallback to agreement
-                                            let assigneeType = d.assignee;
-                                            const ag = agreements.find(a => a.origin_dialogue_id === d.id);
+                                        if (ag && ag.assignee) {
+                                            if (ag.assignee === 'both') {
+                                                assigneeLabel = 'عهد مشترك';
+                                                assigneeColor = 'text-purple-500';
+                                            } else {
+                                                const creator = d.created_by_user_id;
+                                                let realAssigneeId = '';
+                                                if (ag.assignee === 'me') realAssigneeId = creator;
+                                                else if (ag.assignee === 'partner') realAssigneeId = (creator === userId ? partnerId : userId) || '';
 
-                                            if (!assigneeType && ag) {
-                                                assigneeType = ag.assignee;
-                                            }
-
-                                            if (!assigneeType) return false;
-
-                                            if (dialogueFilterType === 'both') return assigneeType === 'both';
-
-                                            const creator = d.created_by_user_id;
-                                            let realAssigneeId = '';
-
-                                            if (assigneeType === 'me') realAssigneeId = creator;
-                                            else if (assigneeType === 'partner') realAssigneeId = (creator === userId ? partnerId : userId) || '';
-
-                                            // Strict check based on real ID
-                                            if (dialogueFilterType === 'me') return realAssigneeId === userId;
-                                            if (dialogueFilterType === 'partner') return realAssigneeId !== userId && realAssigneeId !== '' && realAssigneeId !== null;
-
-                                            return true;
-                                        })
-                                        .sort((a, b) => {
-                                            const dateA = new Date(a.dialogue_date).getTime();
-                                            const dateB = new Date(b.dialogue_date).getTime();
-                                            return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
-                                        })
-                                        .map((d, i) => {
-                                            // Random but deterministic gradient
-                                            const gradients = [
-                                                "from-blue-500/[0.03] to-purple-500/[0.03]",
-                                                "from-rose-500/[0.03] to-orange-500/[0.03]",
-                                                "from-emerald-500/[0.03] to-teal-500/[0.03]",
-                                                "from-amber-500/[0.03] to-yellow-500/[0.03]",
-                                                "from-indigo-500/[0.03] to-cyan-500/[0.03]"
-                                            ];
-                                            const grad = gradients[i % gradients.length];
-
-                                            // Assignee Badge Logic
-                                            const ag = agreements.find(a => a.origin_dialogue_id === d.id);
-                                            let assigneeLabel = '';
-                                            let assigneeColor = 'text-gray-400';
-
-                                            if (ag && ag.assignee) {
-                                                if (ag.assignee === 'both') {
-                                                    assigneeLabel = 'عهد مشترك';
-                                                    assigneeColor = 'text-purple-500';
-                                                } else {
-                                                    const creator = d.created_by_user_id;
-                                                    let realAssigneeId = '';
-                                                    if (ag.assignee === 'me') realAssigneeId = creator;
-                                                    else if (ag.assignee === 'partner') realAssigneeId = (creator === userId ? partnerId : userId) || '';
-
-                                                    if (realAssigneeId === userId) {
-                                                        assigneeLabel = `عهد عليّ (${names.me})`;
-                                                        assigneeColor = 'text-blue-500';
-                                                    } else if (realAssigneeId) {
-                                                        assigneeLabel = `عهد على ${names.partner}`;
-                                                        assigneeColor = 'text-rose-500';
-                                                    }
+                                                if (realAssigneeId === userId) {
+                                                    assigneeLabel = `عهد عليّ (${names.me})`;
+                                                    assigneeColor = 'text-blue-500';
+                                                } else if (realAssigneeId) {
+                                                    assigneeLabel = `عهد على ${names.partner}`;
+                                                    assigneeColor = 'text-rose-500';
                                                 }
                                             }
+                                        }
 
-                                            return (
-                                                <motion.div
-                                                    key={d.id}
-                                                    layoutId={`dialogue-card-${d.id}`}
-                                                    initial={{ opacity: 0, scale: 0.9 }}
-                                                    animate={{ opacity: 1, scale: 1 }}
-                                                    transition={{ delay: i * 0.05 }}
-                                                    onClick={() => setSelectedDialogue(d)}
-                                                    className="relative group cursor-pointer active:scale-95"
-                                                >
-                                                    <div className={`relative bg-gradient-to-br ${grad} bg-white dark:bg-[#0a0505]/80 backdrop-blur-md border border-white dark:border-white/5 rounded-[3.2rem] p-6 overflow-hidden flex flex-col justify-between h-[165px] shadow-2xl shadow-blue-900/[0.03] group-hover:shadow-blue-500/[0.06] transition-all duration-700`}>
-                                                        {/* Subtly Decorative Shape */}
-                                                        <div className={`absolute -bottom-10 -left-10 w-40 h-40 bg-current opacity-[0.03] rounded-full blur-3xl group-hover:opacity-[0.06] transition-opacity`} />
+                                        return (
+                                            <motion.div
+                                                key={d.id}
+                                                layoutId={`dialogue-card-${d.id}`}
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ delay: i * 0.05 }}
+                                                onClick={() => setSelectedDialogue(d)}
+                                                className="relative group cursor-pointer active:scale-95"
+                                            >
+                                                <div className={`relative bg-gradient-to-br ${grad} bg-white dark:bg-[#0a0505]/80 backdrop-blur-md border border-white dark:border-white/5 rounded-[3.2rem] p-6 overflow-hidden flex flex-col justify-between h-[165px] shadow-2xl shadow-blue-900/[0.03] group-hover:shadow-blue-500/[0.06] transition-all duration-700`}>
+                                                    {/* Subtly Decorative Shape */}
+                                                    <div className={`absolute -bottom-10 -left-10 w-40 h-40 bg-current opacity-[0.03] rounded-full blur-3xl group-hover:opacity-[0.06] transition-opacity`} />
 
-                                                        <div className="flex justify-between items-start relative z-10">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-10 h-10 bg-white/40 dark:bg-white/5 border border-white/20 dark:border-white/5 rounded-full flex items-center justify-center text-foreground/50 transition-all shadow-sm">
-                                                                    <MessageCircle className="w-5 h-5 opacity-70" />
-                                                                </div>
-                                                                {assigneeLabel && (
-                                                                    <span className={`text-[9px] font-black ${assigneeColor} bg-white/50 dark:bg-black/20 px-2 py-1 rounded-full border border-white/20`}>{assigneeLabel}</span>
-                                                                )}
+                                                    <div className="flex justify-between items-start relative z-10">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-10 h-10 bg-white/40 dark:bg-white/5 border border-white/20 dark:border-white/5 rounded-full flex items-center justify-center text-foreground/50 transition-all shadow-sm">
+                                                                <MessageCircle className="w-5 h-5 opacity-70" />
                                                             </div>
-
-                                                            <div className="px-3 py-1.5 bg-white/40 dark:bg-white/5 border border-white/20 dark:border-white/5 rounded-full shadow-sm">
-                                                                <span className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em]">
-                                                                    {d.dialogue_date?.slice(5).replace('-', '_')}
-                                                                </span>
-                                                            </div>
+                                                            {assigneeLabel && (
+                                                                <span className={`text-[9px] font-black ${assigneeColor} bg-white/50 dark:bg-black/20 px-2 py-1 rounded-full border border-white/20`}>{assigneeLabel}</span>
+                                                            )}
                                                         </div>
 
-                                                        <div className="space-y-2 text-right relative z-10">
-                                                            <h3 className="font-black text-base leading-[1.2] line-clamp-2 tracking-tight text-foreground/80 group-hover:text-foreground transition-colors">{d.title}</h3>
-                                                            <div className="flex items-center gap-1.5 justify-end opacity-30 group-hover:opacity-50 transition-all">
-                                                                <p className="text-[9px] font-black uppercase tracking-widest line-clamp-1">{d.problem || d.description || 'تأسيس حوار'}</p>
-                                                                <div className="w-1 h-1 rounded-full bg-foreground/40" />
-                                                            </div>
+                                                        <div className="px-3 py-1.5 bg-white/40 dark:bg-white/5 border border-white/20 dark:border-white/5 rounded-full shadow-sm">
+                                                            <span className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em]">
+                                                                {d.dialogue_date?.slice(5).replace('-', '_')}
+                                                            </span>
                                                         </div>
                                                     </div>
-                                                </motion.div>
-                                            );
-                                        })}
+
+                                                    <div className="space-y-2 text-right relative z-10">
+                                                        <h3 className="font-black text-base leading-[1.2] line-clamp-2 tracking-tight text-foreground/80 group-hover:text-foreground transition-colors">{d.title}</h3>
+                                                        <div className="flex items-center gap-1.5 justify-end opacity-30 group-hover:opacity-50 transition-all">
+                                                            <p className="text-[9px] font-black uppercase tracking-widest line-clamp-1">{d.problem || d.description || 'تأسيس حوار'}</p>
+                                                            <div className="w-1 h-1 rounded-full bg-foreground/40" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </motion.div>
@@ -535,65 +537,73 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
                                     if (filterType === 'partner') return c.owner_user_id !== userId;
                                     return true;
                                 })
-                                .map((c, i) => (
-                                    <motion.div
-                                        key={c.id}
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: i * 0.1 }}
-                                        className="relative group bg-white dark:bg-[#0a0505]/60 rounded-[2.5rem] p-5 shadow-sm border border-black/5 dark:border-white/5 overflow-hidden hover:shadow-lg transition-all"
-                                    >
-                                        <div className="flex items-center justify-between mb-4 relative z-10">
-                                            <div className="flex items-center gap-3 text-right">
-                                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner ${c.status === 'failed' ? 'bg-rose-500/10 text-rose-500' : 'bg-blue-500/5 text-blue-500'}`}>
-                                                    {c.status === 'failed' ? <XCircle className="w-5 h-5" /> : <Flame className="w-5 h-5" />}
+                                .map((c, i) => {
+                                    const current = Number(c.current_count) || 0;
+                                    const target = Number(c.target_count) || 1;
+                                    const progress = Math.min(100, Math.max(0, (current / target) * 100));
+
+                                    return (
+                                        <motion.div
+                                            key={c.id}
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            transition={{ delay: i * 0.05 }}
+                                            className="relative group bg-white dark:bg-[#0a0505]/60 rounded-[2.5rem] p-5 shadow-sm border border-black/5 dark:border-white/5 overflow-hidden hover:shadow-lg transition-all"
+                                        >
+                                            <div className="flex items-center justify-between mb-4 relative z-10">
+                                                <div className="flex items-center gap-3 text-right">
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner ${c.status === 'failed' ? 'bg-rose-500/10 text-rose-500' : 'bg-blue-500/5 text-blue-500'}`}>
+                                                        {c.status === 'failed' ? <XCircle className="w-5 h-5" /> : <Flame className="w-5 h-5" />}
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-base font-black text-foreground tracking-tight leading-none mb-1">{c.title}</h3>
+                                                        <span className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest">{c.owner_user_id === userId ? names.me : names.partner}</span>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="text-base font-black text-foreground tracking-tight leading-none mb-1">{c.title}</h3>
-                                                    <span className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest">{c.owner_user_id === userId ? names.me : names.partner}</span>
-                                                </div>
+
+                                                {c.status !== 'failed' && (
+                                                    <div className="flex items-center gap-2">
+                                                        {isObserver(c.owner_user_id) && (
+                                                            <button onClick={() => setConfirmModal({ show: true, type: 'fail_commitment', data: c })} className="w-8 h-8 flex items-center justify-center bg-rose-500/5 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all"><AlertTriangle className="w-3.5 h-3.5" /></button>
+                                                        )}
+                                                        <button onClick={() => setConfirmModal({ show: true, type: 'delete_commitment', data: c })} className="w-8 h-8 flex items-center justify-center bg-black/5 dark:bg-white/5 text-muted-foreground/40 rounded-xl hover:bg-rose-500 hover:text-white transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                    </div>
+                                                )}
                                             </div>
 
-                                            {c.status !== 'failed' && (
-                                                <div className="flex items-center gap-2">
-                                                    {isObserver(c.owner_user_id) && (
-                                                        <button onClick={() => setConfirmModal({ show: true, type: 'fail_commitment', data: c })} className="w-8 h-8 flex items-center justify-center bg-rose-500/5 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all"><AlertTriangle className="w-3.5 h-3.5" /></button>
-                                                    )}
-                                                    <button onClick={() => setConfirmModal({ show: true, type: 'delete_commitment', data: c })} className="w-8 h-8 flex items-center justify-center bg-black/5 dark:bg-white/5 text-muted-foreground/40 rounded-xl hover:bg-rose-500 hover:text-white transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                            {c.status === 'failed' ? (
+                                                <div className="bg-rose-500/5 border border-rose-500/10 rounded-[1.8rem] p-4 text-center">
+                                                    <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest block mb-1">كفارة الغياب</span>
+                                                    <p className="text-sm font-bold text-foreground/80">{c.punishment || 'المودة والاعتذار'}</p>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-end justify-between gap-4">
+                                                    <div className="flex-1 space-y-2">
+                                                        <div className="flex justify-between items-end px-1">
+                                                            <span className="text-[10px] font-black text-blue-500/60">{Math.round(progress)}%</span>
+                                                            <span className="text-sm font-black text-blue-600">{current}<span className="text-[10px] opacity-40">/{target}</span></span>
+                                                        </div>
+                                                        <div className="h-2 w-full bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
+                                                            <div style={{ width: `${progress}%` }} className="h-full bg-blue-500 rounded-full transition-all duration-500" />
+                                                        </div>
+                                                    </div>
+                                                    <Button
+                                                        onClick={() => handleMarkProgress(c.id, current, target)}
+                                                        disabled={current >= target || c.owner_user_id !== userId}
+                                                        className={`h-10 px-5 rounded-2xl font-black text-[10px] shadow-lg ${current >= target
+                                                            ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20 disabled:opacity-100'
+                                                            : c.owner_user_id !== userId
+                                                                ? 'bg-muted text-muted-foreground shadow-none'
+                                                                : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'
+                                                            }`}
+                                                    >
+                                                        {current >= target ? 'مكتمل' : c.owner_user_id !== userId ? 'للشريك' : 'إتمام'}
+                                                    </Button>
                                                 </div>
                                             )}
-                                        </div>
-
-                                        {c.status === 'failed' ? (
-                                            <div className="bg-rose-500/5 border border-rose-500/10 rounded-[1.8rem] p-4 text-center">
-                                                <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest block mb-1">كفارة الغياب</span>
-                                                <p className="text-sm font-bold text-foreground/80">{c.punishment || 'المودة والاعتذار'}</p>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-end justify-between gap-4">
-                                                <div className="flex-1 space-y-2">
-                                                    <div className="flex justify-between items-end px-1">
-                                                        <span className="text-[10px] font-black text-blue-500/60">{Math.round((c.current_count / c.target_count) * 100)}%</span>
-                                                        <span className="text-sm font-black text-blue-600">{c.current_count}<span className="text-[10px] opacity-40">/{c.target_count}</span></span>
-                                                    </div>
-                                                    <div className="h-2 w-full bg-black/5 dark:bg-white/5 rounded-full overflow-hidden"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, (c.current_count / c.target_count) * 100)}%` }} className="h-full bg-blue-500 rounded-full" /></div>
-                                                </div>
-                                                <Button
-                                                    onClick={() => handleMarkProgress(c.id, c.current_count, c.target_count)}
-                                                    disabled={c.current_count >= c.target_count || c.owner_user_id !== userId}
-                                                    className={`h-10 px-5 rounded-2xl font-black text-[10px] shadow-lg ${c.current_count >= c.target_count
-                                                        ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20 disabled:opacity-100'
-                                                        : c.owner_user_id !== userId
-                                                            ? 'bg-muted text-muted-foreground shadow-none'
-                                                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'
-                                                        }`}
-                                                >
-                                                    {c.current_count >= c.target_count ? 'مكتمل' : c.owner_user_id !== userId ? 'للشريك' : 'إتمام'}
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </motion.div>
-                                ))}
+                                        </motion.div>
+                                    );
+                                })}
                         </motion.div>
                     )}
                 </AnimatePresence>

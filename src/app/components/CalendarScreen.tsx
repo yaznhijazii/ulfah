@@ -32,6 +32,139 @@ interface CalendarScreenProps {
   isDarkMode?: boolean;
 }
 
+// Memoized Memory Item for performance
+const MemoryItem = ({ item, idx, viewMode, onDelete, onOpenGallery, getRelativeTime, monthNames }: any) => {
+  return (
+    <div className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-12 relative items-start w-full`}>
+      {viewMode === 'timeline' && (
+        <div className="flex flex-col items-center w-12 shrink-0 pt-1 relative z-10 text-center">
+          <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] opacity-80">{monthNames[item.date.getMonth()]}</span>
+          <span className="text-3xl font-black text-foreground tracking-tighter my-1">{item.date.getDate()}</span>
+          <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} className="mt-4 w-3 h-3 rounded-full border-[3px] border-background shadow-lg bg-rose-500" />
+        </div>
+      )}
+
+      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex-1 min-w-0 w-full mb-4">
+        <div className="glass rounded-[3rem] overflow-hidden border-white/20 group transition-all duration-700 hover:shadow-2xl">
+          {item.images && item.images.length > 0 && (
+            <div className="relative overflow-hidden bg-muted/5 cursor-pointer" onClick={() => onOpenGallery(item.images!, 0)}>
+              {item.images.length === 1 ? (
+                <motion.img
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  viewport={{ once: true }}
+                  src={item.images[0].image_url}
+                  loading={idx === 0 ? "eager" : "lazy"}
+                  decoding="async"
+                  fetchPriority={idx === 0 ? "high" : "auto"}
+                  className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-[2s]"
+                />
+              ) : item.images.length === 2 ? (
+                <div className="grid grid-cols-2 gap-0.5 h-48">
+                  {item.images.map((img: any, imgIdx: number) => (
+                    <motion.img
+                      key={imgIdx}
+                      initial={{ opacity: 0 }}
+                      whileInView={{ opacity: 1 }}
+                      viewport={{ once: true }}
+                      src={img.image_url}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover"
+                      onClick={(e) => { e.stopPropagation(); onOpenGallery(item.images!, imgIdx); }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-0.5 h-48">
+                  {item.images.slice(0, 3).map((img: any, imgIdx: number) => (
+                    <motion.img
+                      key={imgIdx}
+                      initial={{ opacity: 0 }}
+                      whileInView={{ opacity: 1 }}
+                      viewport={{ once: true }}
+                      src={img.image_url}
+                      loading="lazy"
+                      decoding="async"
+                      className={`w-full h-full object-cover ${imgIdx === 2 && item.images!.length > 3 ? 'brightness-50' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); onOpenGallery(item.images!, imgIdx); }}
+                    />
+                  ))}
+                  {item.images.length > 3 && (
+                    <div className="absolute bottom-0 right-0 w-1/3 h-full flex items-center justify-center pointer-events-none">
+                      <span className="text-white text-2xl font-black drop-shadow-lg">+{item.images.length - 3}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {item.images.length > 1 && (
+                <div className="absolute bottom-3 left-3 bg-black/60 border border-white/10 text-white px-3 py-1.5 rounded-lg text-[8px] font-black flex items-center gap-2 backdrop-blur-md">
+                  <ImageIcon className="w-3 h-3 text-primary" />
+                  <span>{item.images.length} صور - انقر للعرض</span>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="p-8 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 text-right">
+                <History className="w-4 h-4 text-rose-500/40" />
+                <h3 className="font-black text-xl text-foreground tracking-tight">{item.title}</h3>
+              </div>
+              <button onClick={() => onDelete(item.id, 'memory')} className="w-10 h-10 flex items-center justify-center glass border-white/10 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/10"><Trash2 className="w-4 h-4" /></button>
+            </div>
+            <p className="text-[13px] text-muted-foreground font-bold leading-[1.7] opacity-80 text-right">{item.description}</p>
+            <div className="pt-6 flex items-center justify-between border-t border-white/10">
+              <div className="flex items-center gap-2.5 text-muted-foreground/60">
+                <Clock className="w-3.5 h-3.5" />
+                <span className="text-[9px] font-black uppercase tracking-widest">{getRelativeTime(item.date)}</span>
+              </div>
+              <div className="w-10 h-10 rounded-xl glass border-white/20 flex items-center justify-center text-rose-500 shadow-inner group-hover:scale-110 transition-transform"><Heart className="w-5 h-5 fill-rose-500/10" /></div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// Memoized Event Item
+const EventItem = ({ item, idx, viewMode, onDelete, getRelativeTime, monthNames }: any) => {
+  return (
+    <div className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-12 relative items-start w-full`}>
+      {viewMode === 'timeline' && (
+        <div className="flex flex-col items-center w-12 shrink-0 pt-1 relative z-10 text-center">
+          <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] opacity-80">{monthNames[item.date.getMonth()]}</span>
+          <span className="text-3xl font-black text-foreground tracking-tighter my-1">{item.date.getDate()}</span>
+          <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} className="mt-4 w-3 h-3 rounded-full border-[3px] border-background shadow-lg bg-primary" />
+        </div>
+      )}
+
+      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex-1 min-w-0 w-full mb-4">
+        <div className="glass rounded-[2.5rem] p-6 border-white/20 flex items-center justify-between group hover:shadow-xl transition-all duration-500">
+          <div className="flex items-center gap-6">
+            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-2xl ${item.event_type === 'special' ? 'bg-primary shadow-primary/20' : 'bg-muted/10 text-muted-foreground'}`}>
+              {item.event_type === 'special' ? <Sparkles className="w-7 h-7" /> : <CalendarIcon className="w-7 h-7" />}
+            </div>
+            <div className="text-right">
+              <h3 className="font-black text-lg text-foreground mb-1 tracking-tight">{item.title}</h3>
+              <div className="flex flex-col gap-1.5">
+                {item.event_time && <span className="text-[9px] font-black text-muted-foreground/40 flex items-center gap-2 justify-end uppercase tracking-widest"><Clock className="w-3 h-3" />{item.event_time}</span>}
+                {item.location && <span className="text-[9px] font-black text-muted-foreground/40 flex items-center gap-2 justify-end uppercase tracking-widest"><MapPin className="w-3 h-3" />{item.location}</span>}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-4 shrink-0">
+            <button onClick={() => onDelete(item.id, 'event')} className="w-9 h-9 flex items-center justify-center glass border-white/10 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/10"><Trash2 className="w-3.5 h-3.5" /></button>
+            <span className="px-5 py-2.5 glass border-primary/20 rounded-xl text-[9px] font-black text-primary uppercase tracking-widest">{getRelativeTime(item.date)}</span>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }: CalendarScreenProps) {
   const [events, setEvents] = useState<any[]>([]);
   const [memories, setMemories] = useState<any[]>([]);
@@ -109,7 +242,19 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
   }, [partnershipId, limit]);
 
   const loadTimelineData = async () => {
-    setLoading(true);
+    if (!partnershipId) return;
+
+    // Phase 1: ULTRA-QUICK Load (Latest items only, very few columns)
+    const [quickEvents, quickMemories] = await Promise.all([
+      supabase.from('calendar_events').select('id, title, event_date, event_time, location, event_type').eq('partnership_id', partnershipId).order('event_date', { ascending: false }).limit(3),
+      supabase.from('memories').select('id, title, memory_date, description, images:memory_images(image_url)').eq('partnership_id', partnershipId).order('memory_date', { ascending: false }).limit(3)
+    ]);
+
+    if (quickEvents.data) setEvents(quickEvents.data);
+    if (quickMemories.data) setMemories(quickMemories.data);
+    setLoading(false);
+
+    // Phase 2: FULL Initial Load (up to limit)
     const [eventsResult, memoriesResult] = await Promise.all([
       supabase.from('calendar_events').select('*').eq('partnership_id', partnershipId).order('event_date', { ascending: false }).limit(limit),
       supabase.from('memories').select('*, images:memory_images(image_url)').eq('partnership_id', partnershipId).order('memory_date', { ascending: false }).limit(limit)
@@ -118,12 +263,11 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
     if (eventsResult.data) setEvents(eventsResult.data);
     if (memoriesResult.data) {
       setMemories(memoriesResult.data);
-      // If we got less than limit, no more items to load
       setHasMore(memoriesResult.data.length >= limit);
     }
-    setLoading(false);
+
     setLoadingMore(false);
-    setInitialLoadDone(true); // Mark initial load as complete
+    setInitialLoadDone(true);
   };
 
   const fetchEvents = async () => {
@@ -327,113 +471,33 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
               </div>
             )}
 
-            {filteredItems.map((item, idx) => (
-              <div key={item.id} className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-12 relative items-start`}>
-                {viewMode === 'timeline' && (
-                  <div className="flex flex-col items-center w-12 shrink-0 pt-1 relative z-10 text-center">
-                    <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] opacity-80">{monthNames[item.date.getMonth()]}</span>
-                    <span className="text-3xl font-black text-foreground tracking-tighter my-1">{item.date.getDate()}</span>
-                    <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} className={`mt-4 w-3 h-3 rounded-full border-[3px] border-background shadow-lg ${item.type === 'event' ? 'bg-primary' : 'bg-rose-500'}`} />
-                  </div>
-                )}
-
-                <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex-1 min-w-0 w-full mb-4">
-                  {item.type === 'memory' ? (
-                    <div className="glass rounded-[3rem] overflow-hidden border-white/20 group transition-all duration-700 hover:shadow-2xl">
-                      {item.images && item.images.length > 0 && (
-                        <div className="relative overflow-hidden bg-muted/5 cursor-pointer" onClick={() => openGallery(item.images!, 0)}>
-                          {item.images.length === 1 ? (
-                            <motion.img
-                              initial={{ opacity: 0 }}
-                              whileInView={{ opacity: 1 }}
-                              src={item.images[0].image_url}
-                              loading="lazy"
-                              className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-[2s]"
-                            />
-                          ) : item.images.length === 2 ? (
-                            <div className="grid grid-cols-2 gap-0.5 h-48">
-                              {item.images.map((img: any, imgIdx: number) => (
-                                <motion.img
-                                  key={imgIdx}
-                                  initial={{ opacity: 0 }}
-                                  whileInView={{ opacity: 1 }}
-                                  src={img.image_url}
-                                  loading="lazy"
-                                  className="w-full h-full object-cover"
-                                  onClick={(e) => { e.stopPropagation(); openGallery(item.images!, imgIdx); }}
-                                />
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-3 gap-0.5 h-48">
-                              {item.images.slice(0, 3).map((img: any, imgIdx: number) => (
-                                <motion.img
-                                  key={imgIdx}
-                                  initial={{ opacity: 0 }}
-                                  whileInView={{ opacity: 1 }}
-                                  src={img.image_url}
-                                  loading="lazy"
-                                  className={`w-full h-full object-cover ${imgIdx === 2 && item.images!.length > 3 ? 'brightness-50' : ''}`}
-                                  onClick={(e) => { e.stopPropagation(); openGallery(item.images!, imgIdx); }}
-                                />
-                              ))}
-                              {item.images.length > 3 && (
-                                <div className="absolute bottom-0 right-0 w-1/3 h-full flex items-center justify-center pointer-events-none">
-                                  <span className="text-white text-2xl font-black drop-shadow-lg">+{item.images.length - 3}</span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {item.images.length > 1 && (
-                            <div className="absolute bottom-3 left-3 bg-black/60 border border-white/10 text-white px-3 py-1.5 rounded-lg text-[8px] font-black flex items-center gap-2 backdrop-blur-md">
-                              <ImageIcon className="w-3 h-3 text-primary" />
-                              <span>{item.images.length} صور - انقر للعرض</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <div className="p-8 space-y-5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 text-right">
-                            <History className="w-4 h-4 text-rose-500/40" />
-                            <h3 className="font-black text-xl text-foreground tracking-tight">{item.title}</h3>
-                          </div>
-                          <button onClick={() => deleteItem(item.id, 'memory')} className="w-10 h-10 flex items-center justify-center glass border-white/10 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/10"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                        <p className="text-[13px] text-muted-foreground font-bold leading-[1.7] opacity-80 text-right">{item.description}</p>
-                        <div className="pt-6 flex items-center justify-between border-t border-white/10">
-                          <div className="flex items-center gap-2.5 text-muted-foreground/60">
-                            <Clock className="w-3.5 h-3.5" />
-                            <span className="text-[9px] font-black uppercase tracking-widest">{getRelativeTime(item.date)}</span>
-                          </div>
-                          <div className="w-10 h-10 rounded-xl glass border-white/20 flex items-center justify-center text-rose-500 shadow-inner group-hover:scale-110 transition-transform"><Heart className="w-5 h-5 fill-rose-500/10" /></div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="glass rounded-[2.5rem] p-6 border-white/20 flex items-center justify-between group hover:shadow-xl transition-all duration-500">
-                      <div className="flex items-center gap-6">
-                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-2xl ${item.event_type === 'special' ? 'bg-primary shadow-primary/20' : 'bg-muted/10 text-muted-foreground'}`}>
-                          {item.event_type === 'special' ? <Sparkles className="w-7 h-7" /> : <CalendarIcon className="w-7 h-7" />}
-                        </div>
-                        <div className="text-right">
-                          <h3 className="font-black text-lg text-foreground mb-1 tracking-tight">{item.title}</h3>
-                          <div className="flex flex-col gap-1.5">
-                            {item.event_time && <span className="text-[9px] font-black text-muted-foreground/40 flex items-center gap-2 justify-end uppercase tracking-widest"><Clock className="w-3 h-3" />{item.event_time}</span>}
-                            {item.location && <span className="text-[9px] font-black text-muted-foreground/40 flex items-center gap-2 justify-end uppercase tracking-widest"><MapPin className="w-3 h-3" />{item.location}</span>}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-4 shrink-0">
-                        <button onClick={() => deleteItem(item.id, 'event')} className="w-9 h-9 flex items-center justify-center glass border-white/10 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/10"><Trash2 className="w-3.5 h-3.5" /></button>
-                        <span className="px-5 py-2.5 glass border-primary/20 rounded-xl text-[9px] font-black text-primary uppercase tracking-widest">{getRelativeTime(item.date)}</span>
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              </div>
-            ))}
+            {filteredItems.map((item, idx) => {
+              if (item.type === 'memory') {
+                return (
+                  <MemoryItem
+                    key={item.id}
+                    item={item}
+                    idx={idx}
+                    viewMode={viewMode}
+                    onDelete={deleteItem}
+                    onOpenGallery={openGallery}
+                    getRelativeTime={getRelativeTime}
+                    monthNames={monthNames}
+                  />
+                );
+              }
+              return (
+                <EventItem
+                  key={item.id}
+                  item={item}
+                  idx={idx}
+                  viewMode={viewMode}
+                  onDelete={deleteItem}
+                  getRelativeTime={getRelativeTime}
+                  monthNames={monthNames}
+                />
+              );
+            })}
 
             {/* Infinite scroll trigger - only shows after initial data is loaded */}
             {hasMore && initialLoadDone && (

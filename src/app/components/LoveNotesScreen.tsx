@@ -46,7 +46,13 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
     }, [partnershipId]);
 
     const fetchNotes = async () => {
-        if (!partnershipId) return;
+        if (!partnershipId) {
+            console.log("Fetch Notes: No Partnership ID provided");
+            return;
+        }
+
+        console.log("Fetching notes for partnership:", partnershipId);
+
         const { data, error } = await supabase
             .from('love_notes')
             .select(`
@@ -56,7 +62,13 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
             .eq('partnership_id', partnershipId)
             .order('created_at', { ascending: false });
 
-        if (!error && data) {
+        if (error) {
+            console.error("Fetch Notes Error:", error);
+            return;
+        }
+
+        console.log("Notes fetched successfully:", data);
+        if (data) {
             setNotes(data);
         }
     };
@@ -66,28 +78,53 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
         const isLiked = likes.includes(userId);
         let newLikes = isLiked ? likes.filter(id => id !== userId) : [...likes, userId];
 
-        setNotes(notes.map(n => n.id === noteId ? { ...n, likes: newLikes } : n));
+        // Optimistic update
+        setNotes(prev => prev.map(n => n.id === noteId ? { ...n, likes: newLikes } : n));
 
-        await supabase.from('love_notes').update({ likes: newLikes }).eq('id', noteId);
+        try {
+            const { error } = await supabase.from('love_notes').update({ likes: newLikes }).eq('id', noteId);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Like error:', err);
+            // Revert on error
+            setNotes(prev => prev.map(n => n.id === noteId ? { ...n, likes: likes } : n));
+        }
+    };
+
+    const handleDelete = async (noteId: string) => {
+        if (!confirm('هل أنت متأكد من حذف هذه الخاطرة؟')) return;
+
+        try {
+            const { error } = await supabase.from('love_notes').delete().eq('id', noteId);
+            if (error) throw error;
+            setNotes(prev => prev.filter(n => n.id !== noteId));
+        } catch (err) {
+            console.error('Delete error:', err);
+            alert('حدث خطأ أثناء الحذف');
+        }
     };
 
     const handleSaveNote = async () => {
         if (!newNote.trim() || !partnershipId) return;
-        setLoading(true);
+        try {
+            const { error } = await supabase.from('love_notes').insert({
+                partnership_id: partnershipId,
+                author_id: userId,
+                content: newNote.trim(),
+                font_style: selectedFont
+            });
 
-        const { error } = await supabase.from('love_notes').insert({
-            partnership_id: partnershipId,
-            author_id: userId,
-            content: newNote,
-            font_style: selectedFont
-        });
+            if (error) throw error;
 
-        if (!error) {
             setNewNote('');
             setIsWriting(false);
             fetchNotes();
+        } catch (err: any) {
+            console.error('Save note error:', err);
+            alert('فشل حفظ الخاطرة: ' + err.message);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const NoteCard = ({ note, index }: { note: Note, index: number }) => {
@@ -102,7 +139,7 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
                 className="glass rounded-[3rem] p-8 border-white/50 mb-8 max-w-md mx-auto w-full relative group bg-white/40 overflow-hidden"
             >
                 {/* Decorative Elements */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors" />
+                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors pointer-events-none" />
 
                 <div className="flex items-center justify-between mb-8 relative z-10">
                     <div className="flex items-center gap-4 text-right">
@@ -120,6 +157,16 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
                             <span className="text-[9px] font-black text-primary/40 tracking-[0.3em] uppercase">سليل المودة</span>
                         </div>
                     </div>
+                    {isAuthor && (
+                        <motion.button
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => handleDelete(note.id)}
+                            className="w-10 h-10 rounded-xl glass border-white/40 flex items-center justify-center text-rose-500/40 hover:text-rose-500 transition-all ml-2"
+                            title="حذف الخاطرة"
+                        >
+                            <Repeat className="w-5 h-5 rotate-45" /> {/* Using Repeat as a cross/delete icon for style or Trash if you want */}
+                        </motion.button>
+                    )}
                     <div className="w-10 h-10 rounded-2xl glass border-white/40 flex items-center justify-center text-primary/20">
                         <Sparkles className="w-5 h-5" />
                     </div>
@@ -158,8 +205,8 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
         <div className="flex-1 bg-background flex flex-col relative h-full overflow-hidden mood-love">
             {/* Romantic Red Atmospheric Aura */}
             <div className="fixed inset-0 pointer-events-none -z-10">
-                <div className="absolute top-[-20%] left-[-10%] w-[100%] h-[70%] bg-rose-500/10 blur-[180px] rounded-full opacity-60" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[80%] h-[50%] bg-rose-500/5 blur-[120px] rounded-full opacity-40" />
+                <div className="absolute top-[-20%] left-[-10%] w-[100%] h-[70%] bg-rose-500/10 blur-[180px] rounded-full opacity-60 pointer-events-none" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[80%] h-[50%] bg-rose-500/5 blur-[120px] rounded-full opacity-40 pointer-events-none" />
             </div>
 
             <header className="px-8 pt-10 pb-6 flex items-center justify-between sticky top-0 bg-background/40 backdrop-blur-3xl z-30">
@@ -193,7 +240,7 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
                             exit={{ opacity: 0, scale: 0.9, y: 30 }}
                             className="glass rounded-[3.5rem] p-10 border-white/80 shadow-[0_40px_100px_rgba(0,0,0,0.1)] bg-white/40 relative overflow-hidden"
                         >
-                            <div className="absolute top-0 right-0 p-10 opacity-[0.03] pointer-events-none">
+                            <div className="absolute top-0 right-0 p-10 opacity-[0.03] pointer-events-none select-none">
                                 <Feather className="w-40 h-40 text-primary" />
                             </div>
 

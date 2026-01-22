@@ -37,10 +37,10 @@ function App() {
   });
   const [partnershipId, setPartnershipId] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Priority: Time-based theming (Natural Cycle) as requested
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved === 'dark';
     const hour = new Date().getHours();
-    const isNight = hour < 6 || hour >= 18;
-    return isNight;
+    return hour < 6 || hour >= 18;
   });
 
   useEffect(() => {
@@ -57,10 +57,37 @@ function App() {
     if (userId) {
       localStorage.setItem('ulfah_userId', userId);
       loadPartnershipId();
+      requestNotificationPermission();
     } else {
       localStorage.removeItem('ulfah_userId');
     }
   }, [userId]);
+
+  const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) {
+      console.log('This browser does not support notifications.');
+      return;
+    }
+
+    // Only ask if we haven't asked before in this session/browser
+    const hasAsked = localStorage.getItem('ulfah_notifications_asked');
+    if (hasAsked) return;
+
+    if (Notification.permission === 'default') {
+      try {
+        const permission = await Notification.requestPermission();
+        localStorage.setItem('ulfah_notifications_asked', 'true');
+        if (permission === 'granted') {
+          console.log('Notification permission granted');
+        }
+      } catch (error) {
+        console.error('Error requesting notification permission:', error);
+      }
+    } else {
+      // If already granted or denied, don't ask but mark as asked
+      localStorage.setItem('ulfah_notifications_asked', 'true');
+    }
+  };
 
   const loadPartnershipId = async () => {
     if (!userId) return;
@@ -147,9 +174,9 @@ function App() {
     <div className={`min-h-screen bg-background mesh-gradient flex justify-center font-sans text-foreground antialiased selection:bg-mood-home/20 relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
       {/* Animated Background Blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-float" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] bg-mood-adventure/10 rounded-full blur-[120px] animate-float-delayed" />
-        <div className="absolute top-[20%] right-[-5%] w-[30%] h-[30%] bg-mood-love/10 rounded-full blur-[100px] animate-float-slow" />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[60px] animate-float" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[45%] h-[45%] bg-mood-adventure/10 rounded-full blur-[60px] animate-float-delayed" />
+        <div className="absolute top-[20%] right-[-5%] w-[30%] h-[30%] bg-mood-love/10 rounded-full blur-[50px] animate-float-slow" />
       </div>
 
       <div className="w-full max-w-[480px] bg-background/60 backdrop-blur-xl h-screen relative border-x border-border/20 overflow-hidden flex flex-col z-10 transition-all duration-300 shadow-2xl">

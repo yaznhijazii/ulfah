@@ -41,7 +41,9 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
         .eq('partnership_id', partnershipId)
         .order('created_at', { ascending: false });
 
-      if (!error && data) setCommitments(data);
+      if (!error) {
+        setCommitments(data || []);
+      }
     } catch (err) {
       console.error('Error loading commitments:', err);
     } finally {
@@ -72,7 +74,7 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
   const handleDelete = async (id: string) => {
     try {
       const { error } = await supabase.from('commitments').delete().eq('id', id);
-      if (!error) setCommitments(commitments.filter(c => c.id !== id));
+      if (!error) setCommitments(prev => prev.filter(c => c.id !== id));
     } catch (err) {
       console.error('Error deleting commitment:', err);
     }
@@ -86,7 +88,7 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
     const newCount = Math.min(commitment.current_count + 1, commitment.target_count);
     try {
       const { error } = await supabase.from('commitments').update({ current_count: newCount }).eq('id', id);
-      if (!error) setCommitments(commitments.map(c => c.id === id ? { ...c, current_count: newCount } : c));
+      if (!error) setCommitments(prev => prev.map(c => c.id === id ? { ...c, current_count: newCount } : c));
     } catch (err) {
       console.error('Error updating commitment:', err);
     }
@@ -112,7 +114,7 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
         .single();
 
       if (!error && data) {
-        setCommitments([data, ...commitments]);
+        setCommitments(prev => [data, ...prev]);
         setShowAddForm(false);
         setFormData({ title: '', description: '', target_count: 5, period_type: 'weekly', punishment: '' });
       }
@@ -134,8 +136,8 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
     );
   }
 
-  const activeCommitments = commitments.filter(c => c.is_active);
-  const completedCount = commitments.filter(c => c.status === 'completed').length;
+  const activeCommitments = commitments?.filter(c => c.is_active) || [];
+  const completedCount = commitments?.filter(c => c.status === 'completed').length || 0;
   const streakDays = 7;
 
   return (
@@ -186,6 +188,7 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
           </div>
         </div>
 
+
         <div className="space-y-6">
           <div className="flex items-center justify-between px-1">
             <h2 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">قائمة المواثيق</h2>
@@ -204,66 +207,68 @@ export function CommitmentsScreen({ onBack, userId, partnershipId, isDarkMode }:
             </div>
           ) : (
             <div className="space-y-5">
-              {activeCommitments.map((commitment, idx) => (
-                <motion.div
-                  key={commitment.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  className="bg-card rounded-[2.5rem] p-6 shadow-xl shadow-black/[0.02] border border-border/50 relative overflow-hidden group"
-                >
-                  <div className="flex items-start justify-between mb-5 relative z-10">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-blue-500/5 rounded-2xl flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
-                        <Heart className="w-6 h-6" />
+              {activeCommitments.map((commitment) => {
+                const current = Number(commitment.current_count) || 0;
+                const target = Number(commitment.target_count) || 1;
+                const progress = Math.min(100, Math.max(0, (current / target) * 100));
+
+                return (
+                  <div
+                    key={commitment.id}
+                    className="bg-card rounded-[2.5rem] p-6 shadow-xl shadow-black/[0.02] border border-border/50 relative overflow-hidden group transition-all hover:scale-[1.01]"
+                  >
+                    <div className="flex items-start justify-between mb-5 relative z-10">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 bg-blue-500/5 rounded-2xl flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+                          <Heart className="w-6 h-6" />
+                        </div>
+                        <div className="text-right">
+                          <h3 className="font-black text-xl text-foreground mb-1 leading-tight">{commitment.title}</h3>
+                          <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black border uppercase tracking-widest ${getStatusColor(commitment.status)}`}>
+                            {getStatusText(commitment.status)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <h3 className="font-black text-xl text-foreground mb-1 leading-tight">{commitment.title}</h3>
-                        <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black border uppercase tracking-widest ${getStatusColor(commitment.status)}`}>
-                          {getStatusText(commitment.status)}
+                      <button
+                        onClick={() => { setSelectedCommitment(commitment.id); setShowDeleteConfirm(true); }}
+                        className="w-10 h-10 flex items-center justify-center bg-destructive/10 text-destructive rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive/20"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="bg-muted/30 rounded-2xl p-4 mb-5 border border-border/10">
+                      <div className="flex justify-between items-end mb-2">
+                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">مستوى التقدم</span>
+                        <span className="text-xs font-black text-foreground">
+                          {current} من {target}
                         </span>
                       </div>
+                      <div className="h-2 bg-muted rounded-full overflow-hidden">
+                        <div
+                          style={{ width: `${progress}%` }}
+                          className="h-full bg-blue-500 transition-all duration-1000 ease-out"
+                        />
+                      </div>
                     </div>
-                    <button
-                      onClick={() => { setSelectedCommitment(commitment.id); setShowDeleteConfirm(true); }}
-                      className="w-10 h-10 flex items-center justify-center bg-destructive/10 text-destructive rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-destructive/20"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
 
-                  <div className="bg-muted/30 rounded-2xl p-4 mb-5 border border-border/10">
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">مستوى التقدم</span>
-                      <span className="text-xs font-black text-foreground">
-                        {commitment.current_count} من {commitment.target_count}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(commitment.current_count / commitment.target_count) * 100}%` }}
-                        className="h-full bg-blue-500"
-                      />
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex -space-x-2 flex-row-reverse">
+                        <div className="w-8 h-8 rounded-full bg-accent text-accent-foreground border-2 border-card flex items-center justify-center text-[10px] font-black">Y</div>
+                        <div className="w-8 h-8 rounded-full bg-blue-500 text-white border-2 border-card flex items-center justify-center text-[10px] font-black">M</div>
+                      </div>
+                      <Button
+                        onClick={() => handleMarkComplete(commitment.id)}
+                        disabled={current >= target}
+                        className="flex-1 h-12 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 border-none rounded-2xl font-black text-xs transition-all active:scale-95 disabled:opacity-30 shadow-none dark:text-blue-400"
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        تسجيل إنجاز
+                      </Button>
                     </div>
                   </div>
-
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex -space-x-2 flex-row-reverse">
-                      <div className="w-8 h-8 rounded-full bg-accent text-accent-foreground border-2 border-card flex items-center justify-center text-[10px] font-black">Y</div>
-                      <div className="w-8 h-8 rounded-full bg-blue-500 text-white border-2 border-card flex items-center justify-center text-[10px] font-black">M</div>
-                    </div>
-                    <Button
-                      onClick={() => handleMarkComplete(commitment.id)}
-                      disabled={commitment.current_count >= commitment.target_count}
-                      className="flex-1 h-12 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 border-none rounded-2xl font-black text-xs transition-all active:scale-95 disabled:opacity-30"
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      تسجيل إنجاز
-                    </Button>
-                  </div>
-                </motion.div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

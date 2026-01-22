@@ -54,6 +54,9 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     const [nudgeActive, setNudgeActive] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
     const [partnership, setPartnership] = useState<any>(null);
+    const [moodLoading, setMoodLoading] = useState(false);
+    const [selectedMoodId, setSelectedMoodId] = useState<string | null>(null);
+    const [partnerMood, setPartnerMood] = useState<any>(null);
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -159,7 +162,9 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
             supabase.from('partnerships').select('*, user1:user1_id(avatar_url, last_seen, latitude, longitude), user2:user2_id(avatar_url, last_seen, latitude, longitude)').eq('id', partnershipId).single(),
             supabase.from('calendar_events').select('*').eq('partnership_id', partnershipId).gte('event_date', today).order('event_date', { ascending: true }).limit(1),
             supabase.from('calendar_events').select('*').eq('partnership_id', partnershipId).lt('event_date', today).not('image_url', 'is', null).order('event_date', { ascending: false }).limit(1),
-            supabase.from('mood_logs').select('id').eq('user_id', userId).eq('mood_date', today).maybeSingle()
+            supabase.from('mood_logs').select('mood').eq('user_id', userId).eq('mood_date', today).maybeSingle(),
+            // Get partner's mood
+            partnershipId ? supabase.from('partnerships').select('user1_id, user2_id').eq('id', partnershipId).single() : Promise.resolve({ data: null })
         ]);
 
         let combinedEvents: any[] = [];
@@ -170,6 +175,15 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
         if (partnershipRes.status === 'fulfilled' && partnershipRes.value.data) {
             const p = partnershipRes.value.data;
             setPartnership(p);
+
+            // Get Partner ID
+            const partnerId = p.user1_id === userId ? p.user2_id : p.user1_id;
+
+            // Fetch partner's mood for today
+            const { data: pMood } = await supabase.from('mood_logs').select('mood').eq('user_id', partnerId).eq('mood_date', today).maybeSingle();
+            if (pMood) setPartnerMood(pMood.mood);
+            else setPartnerMood(null);
+
             const start = new Date(p.relationship_start_date || p.created_at);
             const now = new Date();
             const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -182,18 +196,15 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
             const partnerData = partner as any;
             setPartnerTracking({ last_seen: partnerData?.last_seen, lat: partnerData?.latitude, lng: partnerData?.longitude });
 
-            if (partnerData?.latitude && partnerData?.longitude && myLocation.lat && myLocation.lng) {
-                const d = calculateDistance(myLocation.lat, myLocation.lng, partnerData.latitude, partnerData.longitude);
-                setDistance(d);
-                const R = 6371;
-                const dLat = (partnerData.latitude - myLocation.lat) * Math.PI / 180;
-                const dLon = (partnerData.longitude - myLocation.lng) * Math.PI / 180;
-                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(myLocation.lat * Math.PI / 180) * Math.cos(partnerData.latitude * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                setDistKm(R * c);
+            if (partnerData?.latitude && partnerData?.longitude) {
+                // Distance calculation moved to separate useEffect
             }
         }
-        if (moodRes.status === 'fulfilled' && moodRes.value.data) setShowMoodPrompt(false);
+        if (moodRes.status === 'fulfilled' && moodRes.value.data) {
+            setShowMoodPrompt(false);
+            const savedMoodId = (moodRes.value.data as any).mood;
+            setSelectedMoodId(savedMoodId);
+        }
 
         // Fetch Adventure Jar Balance
         const { data: jar } = await supabase.from('finance_jars').select('current_amount').eq('partnership_id', partnershipId).eq('title', 'حصالة المغامرات').maybeSingle();
@@ -207,7 +218,20 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
             const interval = setInterval(() => { updateMyStatus(); loadHomeData(); }, 60000);
             return () => clearInterval(interval);
         }
-    }, [partnershipId, userId, myLocation.lat]);
+    }, [partnershipId, userId]);
+
+    useEffect(() => {
+        if (partnerTracking.lat && partnerTracking.lng && myLocation.lat && myLocation.lng) {
+            const d = calculateDistance(myLocation.lat, myLocation.lng, partnerTracking.lat, partnerTracking.lng);
+            setDistance(d);
+            const R = 6371;
+            const dLat = (partnerTracking.lat - myLocation.lat) * Math.PI / 180;
+            const dLon = (partnerTracking.lng - myLocation.lng) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(myLocation.lat * Math.PI / 180) * Math.cos(partnerTracking.lat * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            setDistKm(R * c);
+        }
+    }, [myLocation, partnerTracking]);
 
     const moods = [
         { id: 'happy', icon: Sun, label: 'مشرقة', color: 'text-amber-500', bg: 'bg-amber-500/10' },
@@ -217,10 +241,29 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     ];
 
     const handleMoodSelect = async (mood: string) => {
-        if (!userId) return;
-        setShowMoodPrompt(false);
-        const today = new Date().toISOString().split('T')[0];
-        await supabase.from('mood_logs').upsert({ user_id: userId, mood_date: today, mood: mood }, { onConflict: 'user_id,mood_date' });
+        if (!userId || moodLoading) return;
+
+        setMoodLoading(true);
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const { error } = await supabase.from('mood_logs').upsert(
+                { user_id: userId, mood_date: today, mood: mood },
+                { onConflict: 'user_id,mood_date' }
+            );
+
+            if (error) throw error;
+
+            setSelectedMoodId(mood);
+            setShowMoodPrompt(false);
+
+            // Refresh home data to get partner updates immediately
+            loadHomeData();
+        } catch (err: any) {
+            console.error('Mood Save Error:', err);
+            alert(`خطأ في الحفظ: ${err.message}\n\nتأكد من تشغيل V8 SQL Fix.`);
+        } finally {
+            setMoodLoading(false);
+        }
     };
 
     const calculateDaysUntil = (date: string) => {
@@ -283,12 +326,12 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                 <div className="absolute inset-0 bg-gradient-to-br from-[#f43f5e]/5 via-transparent to-amber-500/5 pointer-events-none overflow-hidden">
                                     <motion.div
                                         animate={{
-                                            scale: [1, 1.3, 1],
                                             rotate: [0, 45, 0],
                                             opacity: [0.3, 0.4, 0.3]
                                         }}
                                         transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
                                         className="absolute top-0 right-0 w-64 h-64 bg-rose-400/5 blur-[100px] rounded-full"
+                                        style={{ transform: "translateZ(0)", willChange: "transform, opacity" }}
                                     />
                                     {[...Array(6)].map((_, i) => (
                                         <motion.div
@@ -352,10 +395,10 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                                     strokeWidth="1.5"
                                                     strokeLinecap="round"
                                                     strokeDasharray="90 310"
-                                                    filter="url(#glow)"
                                                     animate={{ strokeDashoffset: [-400, 0] }}
                                                     transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-                                                    className="opacity-40"
+                                                    className="opacity-40 drop-shadow-[0_0_8px_rgba(244,63,94,0.6)]"
+                                                    style={{ willChange: "stroke-dashoffset" }}
                                                 />
                                                 {/* Flowing Particle Orbs - Slower & Faded */}
                                                 {[0, 1].map((i) => (
@@ -364,7 +407,6 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                                         r="2"
                                                         fill="#f43f5e"
                                                         fillOpacity="0.5"
-                                                        filter="url(#glow)"
                                                         initial={{ offsetDistance: "0%" }}
                                                         animate={{ offsetDistance: "100%" }}
                                                         transition={{
@@ -373,7 +415,11 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                                             ease: "linear",
                                                             delay: i * 6
                                                         }}
-                                                        style={{ offsetPath: "path('M 65 55 C 65 15, 15 15, 15 55 C 15 95, 65 95, 130 55 C 195 15, 245 15, 245 55 C 245 95, 195 95, 130 55 L 65 55')" }}
+                                                        style={{
+                                                            offsetPath: "path('M 65 55 C 65 15, 15 15, 15 55 C 15 95, 65 95, 130 55 C 195 15, 245 15, 245 55 C 245 95, 195 95, 130 55 L 65 55')",
+                                                            willChange: "offset-distance"
+                                                        }}
+                                                        className="drop-shadow-[0_0_5px_rgba(244,63,94,0.8)]"
                                                     />
                                                 ))}
                                             </svg>
@@ -564,211 +610,201 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                     </AnimatePresence>
                 </section>
 
-                {/* Experience Navigation */}
-                <section className="grid grid-cols-1 gap-6">
+                {/* Experience Dashboard - Split Grid for better reach */}
+                <section className="grid grid-cols-2 gap-5">
                     <motion.button
-                        whileHover={{ y: -6, scale: 1.01 }}
+                        whileHover={{ y: -4, scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => onNavigate('love_notes')}
-                        className="w-full group glass rounded-[3rem] p-8 border-white/50 flex items-center justify-between overflow-hidden shadow-2xl relative"
+                        className="group relative overflow-hidden glass rounded-[2.5rem] p-6 border-white/40 shadow-xl flex flex-col gap-4 text-right bg-white/10"
                     >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-mood/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-mood/10 transition-colors" />
-                        <div className="flex items-center gap-6 relative z-10 text-right">
-                            <div className="w-16 h-16 rounded-[2rem] bg-mood/5 border border-white/20 flex items-center justify-center text-mood group-hover:scale-110 group-hover:rotate-6 transition-all duration-700 shadow-xl shadow-mood/5">
-                                <Feather className="w-8 h-8" />
-                            </div>
-                            <div className="text-right space-y-1">
-                                <h3 className="text-xl font-black text-foreground tracking-tight">بريد الألفة</h3>
-                                <p className="text-[9px] font-black text-mood opacity-40 uppercase tracking-[0.4em]">كلمات تخلد في الذاكرة</p>
-                            </div>
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-mood/10 rounded-full blur-2xl -mr-12 -mt-12 group-hover:bg-mood/20 transition-all duration-700 pointer-events-none" />
+                        <div className="w-12 h-12 rounded-2xl bg-mood/10 border border-white/20 flex items-center justify-center text-mood shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                            <Feather className="w-6 h-6" />
                         </div>
-                        <ChevronLeft className="w-5 h-5 text-foreground/20 group-hover:translate-x-[-6px] transition-transform" />
+                        <div className="space-y-1">
+                            <h3 className="text-base font-black text-foreground tracking-tight">بريد الألفة</h3>
+                            <p className="text-[7px] font-black text-mood/40 uppercase tracking-[0.3em]">بوح القلوب</p>
+                        </div>
                     </motion.button>
 
                     <motion.button
-                        whileHover={{ y: -6, scale: 1.01 }}
+                        whileHover={{ y: -4, scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         onClick={() => onNavigate('adventure_bucket')}
-                        className="w-full group relative overflow-hidden glass rounded-[3rem] p-8 border-white/50 flex flex-col gap-8 shadow-2xl"
+                        className="group relative overflow-hidden glass rounded-[2.5rem] p-6 border-white/40 shadow-xl flex flex-col gap-4 text-right bg-white/10"
                     >
-                        <div className="absolute top-0 left-0 w-40 h-40 bg-amber-500/5 rounded-full blur-[80px] -ml-20 -mt-20 group-hover:bg-amber-500/10 transition-colors" />
-                        <div className="flex items-center justify-between relative z-10 w-full">
-                            <div className="flex items-center gap-6">
-                                <div className="w-16 h-16 rounded-[2rem] bg-amber-500/5 border border-white/20 flex items-center justify-center text-amber-500 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700 shadow-xl shadow-amber-500/5">
-                                    <Map className="w-8 h-8" />
-                                </div>
-                                <div className="text-right space-y-1">
-                                    <h3 className="text-xl font-black text-foreground tracking-tight">مغامراتنا الموعودة</h3>
-                                    <p className="text-[9px] font-black text-amber-600/40 uppercase tracking-[0.5em]">طلعات، سفرات، وأحلام مشتركة</p>
-                                </div>
-                            </div>
-                            <ChevronLeft className="w-5 h-5 text-foreground/20 group-hover:translate-x-[-6px] transition-transform" />
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl -mr-12 -mt-12 group-hover:bg-amber-500/20 transition-all duration-700 pointer-events-none" />
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-white/20 flex items-center justify-center text-amber-500 shadow-inner group-hover:scale-110 group-hover:-rotate-3 transition-all duration-500">
+                            <Map className="w-6 h-6" />
                         </div>
-
-                        <div className="flex items-center justify-between bg-white/20 dark:bg-black/40 backdrop-blur-xl rounded-[2rem] p-6 border border-white/60 dark:border-white/10 shadow-inner">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-amber-500/5 border border-white/20 flex items-center justify-center text-amber-500">
-                                    <Compass className="w-4 h-4" />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[8px] font-black text-amber-600/40 uppercase tracking-widest mb-0.5">رصيد المغامرات</span>
-                                    <span className="text-lg font-black text-foreground tracking-tighter">{adventureBalance.toLocaleString()} د.أ</span>
-                                </div>
-                            </div>
-                            <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500 group-hover:translate-x-[-4px] transition-transform">
-                                <Zap className="w-4 h-4 fill-amber-500/20" />
-                            </div>
+                        <div className="space-y-1">
+                            <h3 className="text-base font-black text-foreground tracking-tight">مغامراتنا</h3>
+                            <p className="text-[7px] font-black text-amber-600/40 uppercase tracking-[0.3em]">أحلام مشتركة</p>
                         </div>
                     </motion.button>
-
-
                 </section>
 
                 {/* Mood Sanctuary */}
-                <section className="glass rounded-[3rem] p-10 border-white/60 dark:border-white/10 shadow-2xl relative overflow-hidden bg-white/20 dark:bg-[#0a0505]/60">
-                    <div className="absolute top-0 left-0 w-40 h-40 bg-mood/5 rounded-full blur-[100px] -ml-20 -mt-20" />
-                    <div className="text-center mb-10 relative z-10">
-                        <h3 className="text-2xl font-black text-foreground mb-2 tracking-tighter">نزعة الروح</h3>
-                        <p className="text-[9px] font-black text-mood/40 uppercase tracking-[0.4em] leading-relaxed">بصمتك الوجدانية لهذا اليوم</p>
+                <section className="glass rounded-[3rem] p-6 border-white/60 dark:border-white/10 shadow-2xl relative overflow-hidden bg-white/20 dark:bg-black/40">
+                    <div className="absolute top-0 left-0 w-32 h-32 bg-mood/10 rounded-full blur-[80px] -ml-16 -mt-16 pointer-events-none" />
+                    <div className="absolute bottom-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-[80px] -mr-16 -mb-16 pointer-events-none" />
+                    <div className="flex items-center justify-between mb-4 px-2">
+                        <div className="w-10 h-10 rounded-xl bg-mood/5 border border-mood/10 flex items-center justify-center text-mood/60">
+                            <Heart className="w-5 h-5" fill="currentColor" />
+                        </div>
+                        <div className="text-center">
+                            <h3 className="text-lg font-black text-foreground tracking-tight">نزعة الروح</h3>
+                            <p className="text-[7px] font-black text-mood/40 uppercase tracking-[0.4em]">بصمتك اليومية</p>
+                        </div>
+                        <div className="w-10 h-10" />
                     </div>
 
                     <AnimatePresence mode="wait">
                         {showMoodPrompt ? (
-                            <motion.div key="prompt" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }} className="grid grid-cols-4 gap-6 relative z-10">
+                            <motion.div key="prompt" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="grid grid-cols-4 gap-4 px-2">
                                 {moods.map((m, idx) => {
                                     const Icon = m.icon;
+                                    const isSelected = selectedMoodId === m.id;
                                     return (
                                         <motion.button
                                             key={m.id}
+                                            disabled={moodLoading}
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: idx * 0.1 }}
+                                            transition={{ delay: idx * 0.05 }}
                                             onClick={() => handleMoodSelect(m.id)}
-                                            className="flex flex-col items-center gap-4 group/mood"
+                                            className="flex flex-col items-center gap-3 group/mood cursor-pointer pointer-events-auto"
                                         >
-                                            <div className={`w-16 h-16 rounded-[1.8rem] glass border-white shadow-2xl flex items-center justify-center ${m.color} transition-all duration-500 group-hover/mood:scale-110 group-hover/mood:-translate-y-2 group-hover/mood:shadow-mood/10`}>
-                                                <Icon className="w-7 h-7" />
+                                            <div className={`w-14 h-14 rounded-2xl glass border-white flex items-center justify-center ${m.color} transition-all duration-500 group-hover/mood:scale-110 group-hover/mood:-translate-y-1 ${isSelected ? 'ring-2 ring-primary bg-primary/5 ring-offset-2 ring-offset-transparent' : ''} pointer-events-none`}>
+                                                {moodLoading && isSelected ? (
+                                                    <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                                                ) : (
+                                                    <Icon className="w-6 h-6" />
+                                                )}
                                             </div>
-                                            <span className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-[0.2em]">{m.label}</span>
+                                            <span className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest">{m.label}</span>
                                         </motion.button>
                                     );
                                 })}
                             </motion.div>
                         ) : (
-                            <motion.div key="saved" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center py-12 gap-8 relative z-10">
-                                <div className="w-24 h-24 glass border-emerald-500/30 rounded-[2.5rem] flex items-center justify-center text-emerald-500 shadow-2xl shadow-emerald-500/10">
-                                    <ShieldCheck className="w-12 h-12" />
+                            <motion.div key="saved" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-6 py-2">
+                                <div className="flex items-center justify-center gap-10 relative">
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+
+                                    <div className="flex flex-col items-center gap-3 z-10">
+                                        <div className="w-16 h-16 glass border-primary/30 rounded-2xl flex items-center justify-center text-primary shadow-xl relative">
+                                            {selectedMoodId && moods.find(m => m.id === selectedMoodId)?.icon && (() => {
+                                                const Icon = moods.find(m => m.id === selectedMoodId)!.icon;
+                                                return <Icon className="w-8 h-8" />;
+                                            })()}
+                                            <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-5 h-5 rounded-md flex items-center justify-center text-[8px] text-white shadow-lg">✓</div>
+                                        </div>
+                                        <span className="text-[8px] font-black text-foreground/30 uppercase tracking-[0.2em]">أنا</span>
+                                    </div>
+
+                                    <div className="flex flex-col items-center gap-3 z-10">
+                                        {partnerMood ? (
+                                            <div className="w-16 h-16 glass border-rose-500/30 rounded-2xl flex items-center justify-center text-rose-500 shadow-xl relative">
+                                                {moods.find(m => m.id === partnerMood)?.icon && (() => {
+                                                    const Icon = moods.find(m => m.id === partnerMood)!.icon;
+                                                    return <Icon className="w-8 h-8" />;
+                                                })()}
+                                                <motion.div
+                                                    animate={{ scale: [1, 1.2, 1] }}
+                                                    transition={{ repeat: Infinity, duration: 2 }}
+                                                    className="absolute -top-1 -left-1 bg-white border border-rose-100 p-1 rounded-md shadow-sm"
+                                                >
+                                                    <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />
+                                                </motion.div>
+                                            </div>
+                                        ) : (
+                                            <div className="w-16 h-16 glass border-white/10 rounded-2xl flex items-center justify-center text-muted-foreground/10 border-dashed animate-pulse">
+                                                <User className="w-6 h-6 opacity-20" />
+                                            </div>
+                                        )}
+                                        <span className="text-[8px] font-black text-foreground/30 uppercase tracking-[0.2em]">الشريك</span>
+                                    </div>
                                 </div>
-                                <div className="text-center space-y-3">
-                                    <p className="text-2xl font-black text-foreground tracking-tight">سكنت مشاعرك</p>
-                                    <p className="text-[10px] font-black text-emerald-600/40 uppercase tracking-[0.3em]">تمت الموعودة بنجاح ✅</p>
+
+                                <div className="text-center space-y-0.5">
+                                    <p className="text-base font-black text-foreground tracking-tight">
+                                        {partnerMood ? 'تحالف القلوب ✨' : 'سكنت مشاعرك'}
+                                    </p>
+                                    <p className="text-[8px] font-black text-primary/40 uppercase tracking-[0.3em] max-w-[200px] mx-auto leading-tight text-center">
+                                        {partnerMood ? 'أنتما الآن في حالة اتصال وجداني تفيض بالمودة والسكينة' : 'تم تدوين بصمتك الوجدانية، بانتظار شريكك ليشاركك لحظته'}
+                                    </p>
                                 </div>
+
+                                <button
+                                    onClick={() => setShowMoodPrompt(true)}
+                                    className="px-6 py-2 glass border-white/60 rounded-xl text-[8px] font-black text-foreground/40 hover:text-primary transition-all uppercase tracking-[0.2em] shadow-sm active:scale-95"
+                                >
+                                    تحديث الحالة
+                                </button>
                             </motion.div>
                         )}
                     </AnimatePresence>
                 </section>
 
-                {/* Upcoming Events Journey */}
-                <section className="space-y-6 group/journey relative">
-                    {/* Background Journey Path decor - Thinner & more subtle */}
-                    <div className="absolute top-20 bottom-10 left-[2.2rem] w-[0.5px] bg-gradient-to-b from-mood/30 via-mood/5 to-transparent -translate-x-1/2 z-0" />
-
-                    <div className="flex items-center justify-between px-4 relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-mood/10 flex items-center justify-center text-mood shadow-inner border border-mood/5">
-                                <Compass className="w-5 h-5 animate-spin-slow" />
+                {/* Journey Timeline - Branded & elegant */}
+                <section className="space-y-6 relative">
+                    <div className="flex items-center justify-between px-2 relative z-10">
+                        <div className="flex items-center gap-3 text-right">
+                            <div className="w-10 h-10 rounded-xl bg-mood/5 flex items-center justify-center text-mood shadow-sm border border-mood/10">
+                                <Heart className="w-5 h-5" fill="currentColor" />
                             </div>
-                            <div className="text-right">
-                                <h3 className="text-xl font-black text-foreground tracking-tight">محطات المسير</h3>
-                                <p className="text-[7px] font-black text-muted-foreground/30 uppercase tracking-[0.3em]">رحلة تقارب القلوب</p>
+                            <div className="space-y-0">
+                                <h3 className="text-lg font-black text-foreground tracking-tight">محطات المسير</h3>
+                                <p className="text-[7px] font-black text-muted-foreground/30 uppercase tracking-[0.2em]">رحلة تقارب القلوب</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => onNavigate('calendar')}
-                                className="text-[10px] font-black text-[#f43f5e] px-6 py-3 bg-[#f43f5e]/5 border-2 border-[#f43f5e]/20 rounded-2xl uppercase tracking-[0.1em] transition-all hover:bg-[#f43f5e] hover:text-white shadow-sm"
-                            >
-                                جدول الأيام
-                            </button>
-                            <button
-                                onClick={() => onNavigate('calendar')}
-                                className="w-12 h-12 rounded-2xl bg-[#f43f5e] text-white flex items-center justify-center shadow-xl shadow-[#f43f5e]/20 hover:scale-110 active:scale-90 transition-all outline-none border-none"
-                            >
-                                <PlusCircle className="w-6 h-6" />
-                            </button>
-                        </div>
+                        <button
+                            onClick={() => onNavigate('calendar')}
+                            className="w-10 h-10 rounded-xl bg-mood text-white flex items-center justify-center shadow-lg shadow-mood/20 hover:scale-105 active:scale-95 transition-all outline-none border-none group"
+                        >
+                            <CalendarIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+                        </button>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         {upcomingEvents.length > 0 ? (
                             upcomingEvents.map((event, i) => {
                                 const days = calculateDaysUntil(event.event_date);
                                 const isPast = days < 0;
                                 return (
                                     <motion.div
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
+                                        initial={{ opacity: 0, x: 20 }}
+                                        viewport={{ once: true }}
+                                        whileInView={{ opacity: 1, x: 0 }}
                                         transition={{ delay: i * 0.1, duration: 0.6 }}
                                         key={event.id}
-                                        className="relative group block"
+                                        onClick={() => onNavigate('calendar')}
+                                        className="relative group cursor-pointer"
                                     >
-                                        <div className="glass rounded-[1.8rem] p-4 border-white/60 dark:border-white/10 flex items-center justify-between shadow-xl hover:shadow-mood/10 transition-all duration-700 bg-white/5 dark:bg-black/20 relative overflow-hidden group-hover:translate-x-[-4px]">
-                                            {/* Subtle Sweep Effect */}
-                                            <div className="absolute inset-0 bg-gradient-to-r from-mood/0 via-mood/5 to-mood/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out pointer-events-none" />
-
-                                            <div className="flex items-center gap-4 relative z-10">
-                                                {/* Station Marker */}
-                                                <div className="relative shrink-0">
-                                                    <div className="w-12 h-12 rounded-[1.2rem] bg-mood/5 border border-white/20 overflow-hidden flex items-center justify-center text-mood shadow-md group-hover:scale-110 transition-transform duration-500">
-                                                        {event.image_url ? (
-                                                            <img src={event.image_url} className="w-full h-full object-cover" alt="" />
-                                                        ) : (
-                                                            event.title.includes('ذكرى') ? <Gift className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />
-                                                        )}
-                                                    </div>
-                                                    {!isPast && (
-                                                        <motion.div
-                                                            animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0.8, 0.4] }}
-                                                            transition={{ duration: 2, repeat: Infinity }}
-                                                            className="absolute -top-1 -right-1 w-3 h-3 bg-mood rounded-full border-2 border-white z-20"
-                                                        />
+                                        <div className="glass rounded-3xl p-4 border-white/60 dark:border-white/10 flex items-center justify-between shadow-lg hover:shadow-mood/5 transition-all duration-500 bg-white/10">
+                                            <div className="flex items-center gap-4 text-right">
+                                                <div className="w-12 h-12 rounded-2xl bg-mood/5 border border-mood/10 overflow-hidden flex items-center justify-center text-mood relative">
+                                                    {event.image_url ? (
+                                                        <img src={event.image_url} className="w-full h-full object-cover" alt="" />
+                                                    ) : (
+                                                        <Heart className="w-5 h-5 opacity-40" fill="currentColor" />
                                                     )}
                                                 </div>
-
-                                                <div className="text-right space-y-0.5">
-                                                    <div className="flex items-center gap-2">
-                                                        <h4 className="text-base font-black text-foreground tracking-tight group-hover:text-mood transition-colors">{event.title}</h4>
-                                                        {isPast && (
-                                                            <span className="text-[6px] font-black bg-zinc-100 dark:bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded-md uppercase tracking-widest">مضت</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex items-center gap-1.5 text-[8px] font-black text-muted-foreground/30 uppercase tracking-[0.1em]">
-                                                        <CalendarIcon className="w-2.5 h-2.5" />
-                                                        <span>{new Date(event.event_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                                <div className="space-y-0.5">
+                                                    <h4 className="text-sm font-black text-foreground tracking-tight group-hover:text-mood transition-colors">{event.title}</h4>
+                                                    <div className="flex items-center gap-1.5 text-[8px] font-bold text-muted-foreground/30 uppercase tracking-widest">
+                                                        <span>{new Date(event.event_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</span>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {/* Compact Countdown Badge */}
-                                            <div className="relative shrink-0">
-                                                {!isPast && (
-                                                    <motion.div
-                                                        animate={{ scale: [1, 1.15, 1], opacity: [0.1, 0.25, 0.1] }}
-                                                        transition={{ duration: 4, repeat: Infinity }}
-                                                        className="absolute inset-0 bg-mood blur-xl rounded-full"
-                                                    />
-                                                )}
-                                                <div className={`
-                                                    relative z-10 h-14 min-w-[3.5rem] px-3 rounded-2xl flex flex-col items-center justify-center shadow-inner transition-all duration-500
-                                                    ${isPast ? 'bg-zinc-50 dark:bg-white/5 border border-zinc-100/50' : 'bg-gradient-to-br from-[#f43f5e] to-[#fb7185] shadow-lg shadow-mood/20'}
+                                            <div className="text-left">
+                                                <div className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-tight
+                                                    ${isPast ? 'bg-zinc-100 text-zinc-400' : 'bg-mood/5 text-mood'}
                                                 `}>
-                                                    <span className={`text-[7px] font-black uppercase tracking-tight mb-0.5 ${isPast ? 'text-zinc-400' : 'text-white/70'}`}>
-                                                        {isPast ? 'منذ' : 'المتبقي'}
-                                                    </span>
-                                                    <div className="flex items-baseline gap-0.5">
-                                                        <span className={`text-xl font-black leading-none ${isPast ? 'text-zinc-500' : 'text-white'}`}>
-                                                            {Math.abs(days)}
-                                                        </span>
-                                                        <span className={`text-[6px] font-black ${isPast ? 'text-zinc-300' : 'text-white/50'}`}>يوم</span>
-                                                    </div>
+                                                    {isPast ? 'مضت' : days === 0 ? 'اليوم' : `باقي ${days} يوم`}
                                                 </div>
                                             </div>
                                         </div>
@@ -776,14 +812,9 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                 );
                             })
                         ) : (
-                            <div className="glass rounded-[4rem] p-20 border-white/40 dark:border-white/10 text-center space-y-10 border-dashed group hover:border-mood/20 transition-all duration-1000 bg-white/10 dark:bg-black/40">
-                                <div className="w-24 h-24 rounded-[2.5rem] bg-white/10 border border-white/20 flex items-center justify-center mx-auto opacity-10 group-hover:opacity-30 group-hover:rotate-45 transition-all duration-700">
-                                    <PlusCircle className="w-12 h-12" />
-                                </div>
-                                <div className="space-y-4">
-                                    <p className="text-[11px] font-black text-muted-foreground/20 uppercase tracking-[0.4em]">أفقنا خالٍ من الوعود</p>
-                                    <button onClick={() => onNavigate('calendar')} className="text-[11px] font-black text-white bg-mood px-12 py-5 rounded-[2.5rem] shadow-2xl shadow-mood/20 hover:scale-105 active:scale-95 transition-all">بناء وعد جديد</button>
-                                </div>
+                            <div className="flex flex-col items-center justify-center py-10 opacity-10 gap-2">
+                                <Heart className="w-10 h-10" />
+                                <p className="text-[9px] font-black uppercase tracking-widest">لا توجد محطات</p>
                             </div>
                         )}
                     </div>
