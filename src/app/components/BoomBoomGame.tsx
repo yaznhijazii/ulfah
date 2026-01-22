@@ -43,6 +43,7 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
     const [myBooms, setMyBooms] = useState<number[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isAIMode, setIsAIMode] = useState(false);
 
     // Audio effects (optional, placeholders)
     const playSound = (type: 'pop' | 'boom' | 'win') => {
@@ -93,8 +94,9 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
         return result;
     };
 
-    const createRoom = async () => {
+    const createRoom = async (withAI = false) => {
         setLoading(true);
+        setIsAIMode(withAI);
         const code = generateRoomCode();
 
         const initialGridState = {
@@ -102,7 +104,8 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
             guest_grid: [],
             turn: null,
             winner: null,
-            rematch_requests: []
+            rematch_requests: [],
+            isAIMode: withAI
         };
 
         const { data, error } = await supabase
@@ -111,7 +114,8 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
                 room_code: code,
                 game_type: 'boom-boom',
                 host_user_id: userId,
-                status: 'waiting',
+                guest_user_id: withAI ? null : null,
+                status: withAI ? 'setup' : 'waiting',
                 game_state: initialGridState,
                 grid_size: 6 // default
             })
@@ -134,7 +138,7 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
             grid_size: 6,
             ...initialGridState
         });
-        setGameState('lobby');
+        setGameState(withAI ? 'setup' : 'lobby');
         setLoading(false);
     };
 
@@ -173,7 +177,10 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
             return;
         }
 
-        const parsedState = updatedRoom.game_state;
+        const parsedState = typeof updatedRoom.game_state === 'string'
+            ? JSON.parse(updatedRoom.game_state)
+            : updatedRoom.game_state;
+
         setRoomData({
             id: updatedRoom.id,
             room_code: updatedRoom.room_code,
@@ -208,18 +215,34 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
         const updateKey = isHost ? 'host_grid' : 'guest_grid';
         const otherGrid = isHost ? roomData.guest_grid : roomData.host_grid;
 
+        // If AI mode, create AI grid automatically
+        let aiGrid: GridCell[] | null = null;
+        if (isAIMode && isHost) {
+            const maxBooms = roomData.grid_size === 6 ? 3 : 5;
+            const aiBooms: number[] = [];
+            while (aiBooms.length < maxBooms) {
+                const random = Math.floor(Math.random() * roomData.grid_size);
+                if (!aiBooms.includes(random)) aiBooms.push(random);
+            }
+            aiGrid = Array(roomData.grid_size).fill(null).map((_, i) => ({
+                id: i,
+                isBoom: aiBooms.includes(i),
+                isRevealed: false
+            }));
+        }
+
         // Check if both are ready
-        const isOpponentReady = otherGrid && otherGrid.length > 0;
+        const isOpponentReady = (otherGrid && otherGrid.length > 0) || aiGrid !== null;
         const nextStatus = isOpponentReady ? 'playing' : 'setup';
-        const nextTurn = isOpponentReady ? roomData.host_user_id : null; // Host starts
+        const nextTurn = isOpponentReady ? roomData.host_user_id : null;
 
         const newGameState = {
-            ...roomData, // keep existing state props
+            ...roomData,
             [updateKey]: myGrid,
+            ...(aiGrid ? { guest_grid: aiGrid } : {}),
             ...(isOpponentReady ? { turn: roomData.host_user_id } : {})
         };
 
-        // Separate table columns update vs JSON update
         await supabase
             .from('game_rooms')
             .update({
@@ -232,10 +255,72 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
         setRoomData({
             ...roomData,
             [isHost ? 'host_grid' : 'guest_grid']: myGrid,
+            ...(aiGrid ? { guest_grid: aiGrid } : {}),
             status: nextStatus,
             turn: nextTurn
         } as RoomData);
     };
+
+    const makeAIMove = async () => {
+        if (!roomData || !isAIMode) return;
+        if (roomData.status !== 'playing') return;
+
+        // AI plays as guest (black)
+        const targetGrid = [...roomData.host_grid];
+        const unrevealedCells = targetGrid
+            .map((cell, idx) => ({ cell, idx }))
+            .filter(({ cell }) => !cell.isRevealed);
+
+        if (unrevealedCells.length === 0) return;
+
+        // Random pick
+        const randomCell = unrevealedCells[Math.floor(Math.random() * unrevealedCells.length)];
+        const cellIndex = randomCell.idx;
+
+        targetGrid[cellIndex].isRevealed = true;
+        targetGrid[cellIndex].revealedBy = 'AI';
+
+        const totalBooms = targetGrid.filter(c => c.isBoom).length;
+        const totalSafe = targetGrid.length - totalBooms;
+        const aiRevealedBooms = targetGrid.filter(c => c.isRevealed && c.isBoom).length;
+        const aiRevealedSafe = targetGrid.filter(c => c.isRevealed && !c.isBoom).length;
+
+        let winner = null;
+        let status = 'playing';
+
+        if (aiRevealedBooms === totalBooms) {
+            winner = userId; // AI loses, you win
+            status = 'finished';
+        } else if (aiRevealedSafe === totalSafe) {
+            winner = null; // AI wins
+            status = 'finished';
+        }
+
+        const newGameState = {
+            ...roomData,
+            host_grid: targetGrid,
+            turn: userId,
+            winner: winner
+        };
+
+        await supabase
+            .from('game_rooms')
+            .update({
+                game_state: newGameState,
+                status: status
+            })
+            .eq('id', roomData.id);
+    };
+
+    // AI auto-move
+    useEffect(() => {
+        if (isAIMode && roomData?.turn !== userId && roomData?.status === 'playing' && !roomData?.winner) {
+            const timer = setTimeout(() => {
+                makeAIMove();
+            }, 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [roomData?.turn, isAIMode, roomData?.status]);
 
     const handleCellClick = async (cellIndex: number) => {
         if (!roomData || roomData.status !== 'playing') return;
@@ -253,14 +338,6 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
 
         const isBoom = targetGrid[cellIndex].isBoom;
 
-        // Game Over Logic
-        // Win condition 1: Lose if you find all BOOMS (Wait, prompt says "Find all booms -> LOSE"? Usually finding booms makes you lose if they explode. 
-        // Prompt says: "اللي يلاقي كل بومات الطرف الثاني أول واحد → يخسر" (Who finds all opponent's booms first -> LOSES).
-        // "اللي يلاقي كل المكعبات الآمنة أول → يربح" (Who finds all safe cubes first -> WINS).
-        // OK, so: Safe cells are the goal. Booms are bad? Or Booms are just obstacles?
-        // Wait, "Who finds all booms first -> LOSES". This implies finding a boom is permanent count towards losing.
-
-        // Let's count
         const totalBooms = targetGrid.filter(c => c.isBoom).length;
         const totalSafe = targetGrid.length - totalBooms;
 
@@ -271,22 +348,19 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
         let status = 'playing';
 
         if (myRevealedBooms === totalBooms) {
-            // Found all booms => LOSE. So opponent wins.
             winner = isHost ? roomData.guest_user_id : roomData.host_user_id;
             status = 'finished';
         } else if (myRevealedSafe === totalSafe) {
-            // Found all safe cells => WIN.
             winner = userId;
             status = 'finished';
         }
 
-        // Switch turn
         const nextTurn = isHost ? roomData.guest_user_id : roomData.host_user_id;
 
         const newGameState = {
             ...roomData,
             [targetGridKey]: targetGrid,
-            turn: nextTurn,
+            turn: nextTurn || userId,
             winner: winner
         };
 
@@ -380,9 +454,14 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
                             )}
                         </AnimatePresence>
 
-                        <Button onClick={createRoom} disabled={loading} className="w-full h-16 rounded-2xl text-lg font-black shadow-lg shadow-primary/20 mb-4">
-                            {loading ? 'ثواني..' : 'إنشاء غرفة جديدة +'}
-                        </Button>
+                        <div className="space-y-3">
+                            <Button onClick={() => createRoom(false)} disabled={loading} className="w-full h-16 rounded-2xl text-lg font-black shadow-lg shadow-primary/20">
+                                {loading ? 'ثواني..' : '🎮 لعب مع شريكي'}
+                            </Button>
+                            <Button onClick={() => createRoom(true)} disabled={loading} variant="secondary" className="w-full h-16 rounded-2xl text-lg font-black shadow-lg">
+                                {loading ? 'ثواني..' : '🤖 لعب مع الكمبيوتر'}
+                            </Button>
+                        </div>
                     </motion.div>
 
                     <div className="relative">
@@ -508,9 +587,9 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
                                         setMyBooms(old => [...old, i]);
                                     }
                                 }}
-                                className={`aspect-square rounded-2xl flex items-center justify-center text-3xl transition-all shadow-sm ${myBooms.includes(i)
+                                className={`aspect-square rounded-2xl flex items-center justify-center text-3xl transition-all shadow-sm cursor-pointer ${myBooms.includes(i)
                                     ? 'bg-rose-500 text-white shadow-rose-500/30'
-                                    : 'bg-card border-2 border-border/50 hover:border-primary/50'
+                                    : 'bg-card border-2 border-border/50 hover:border-primary/50 hover:bg-primary/5'
                                     }`}
                             >
                                 {myBooms.includes(i) && <Bomb className="w-8 h-8 animate-pulse" />}

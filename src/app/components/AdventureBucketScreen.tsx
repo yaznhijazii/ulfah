@@ -206,7 +206,7 @@ export function AdventureBucketScreen({ onNavigate, userId, partnershipId }: Adv
                                 <Compass className="w-8 h-8 animate-spin-slow" />
                             </div>
                         </div>
-                        <div className="w-full h-2.5 glass-dark rounded-full relative overflow-hidden shadow-inner">
+                        <div className="w-full h-2.5 bg-black/5 border border-white/10 rounded-full relative overflow-hidden shadow-inner">
                             <motion.div
                                 className="absolute inset-y-0 right-0 bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)] rounded-full"
                                 initial={{ width: 0 }}
@@ -251,7 +251,7 @@ export function AdventureBucketScreen({ onNavigate, userId, partnershipId }: Adv
                             animate={{ opacity: 1 }}
                             className="text-center py-24 space-y-6 opacity-30"
                         >
-                            <div className="w-20 h-20 glass-dark border-white/5 rounded-[2.5rem] flex items-center justify-center mx-auto">
+                            <div className="w-20 h-20 bg-amber-500/5 border border-white/20 rounded-[2.5rem] flex items-center justify-center mx-auto">
                                 <Compass className="w-10 h-10" />
                             </div>
                             <p className="text-[10px] font-black uppercase tracking-[0.3em]">لا يوجد خطط هنا بعد..</p>
@@ -362,15 +362,15 @@ export function AdventureBucketScreen({ onNavigate, userId, partnershipId }: Adv
                             </div>
 
                             <div className="space-y-5">
-                                <div className="flex p-1 glass-dark rounded-2xl border-white/5">
+                                <div className="flex p-1 bg-white/10 rounded-2xl border border-white/20">
                                     <button onClick={() => setCategory('trip')} className={`flex-1 py-3 rounded-xl font-black text-xs transition-all ${category === 'trip' ? 'bg-white text-primary shadow-lg shadow-black/5' : 'text-muted-foreground/40'}`}>طلعة</button>
                                     <button onClick={() => setCategory('travel')} className={`flex-1 py-3 rounded-xl font-black text-xs transition-all ${category === 'travel' ? 'bg-white text-primary shadow-lg shadow-black/5' : 'text-muted-foreground/40'}`}>سفرة</button>
                                 </div>
 
                                 <div className="space-y-4">
-                                    <input placeholder="اسم الرحلة..." value={title} onChange={e => setTitle(e.target.value)} className="w-full h-14 glass-dark border-white/10 rounded-2xl px-6 text-right font-bold text-foreground focus:ring-4 ring-primary/10 outline-none" />
-                                    <input placeholder="المكان (اختياري)..." value={location} onChange={e => setLocation(e.target.value)} className="w-full h-14 glass-dark border-white/10 rounded-2xl px-6 text-right font-bold text-foreground focus:ring-4 ring-primary/10 outline-none" />
-                                    <input type="number" placeholder="كم التكلفة تقريباً؟" value={estimatedCost} onChange={e => setEstimatedCost(e.target.value)} className="w-full h-14 glass-dark border-white/10 rounded-2xl px-6 text-right font-bold text-foreground focus:ring-4 ring-primary/10 outline-none" />
+                                    <input placeholder="اسم الرحلة..." value={title} onChange={e => setTitle(e.target.value)} className="w-full h-14 bg-white/10 border border-white/20 rounded-2xl px-6 text-right font-bold text-foreground focus:ring-4 ring-primary/10 outline-none" />
+                                    <input placeholder="المكان (اختياري)..." value={location} onChange={e => setLocation(e.target.value)} className="w-full h-14 bg-white/10 border border-white/20 rounded-2xl px-6 text-right font-bold text-foreground focus:ring-4 ring-primary/10 outline-none" />
+                                    <input type="number" placeholder="كم التكلفة تقريباً؟" value={estimatedCost} onChange={e => setEstimatedCost(e.target.value)} className="w-full h-14 bg-white/10 border border-white/20 rounded-2xl px-6 text-right font-bold text-foreground focus:ring-4 ring-primary/10 outline-none" />
                                 </div>
 
                                 <div className="space-y-2">
@@ -380,7 +380,7 @@ export function AdventureBucketScreen({ onNavigate, userId, partnershipId }: Adv
                                             <button
                                                 key={level}
                                                 onClick={() => setBudgetLevel(level as any)}
-                                                className={`h-14 rounded-2xl border-2 transition-all font-black text-[10px] ${budgetLevel === level ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600' : 'border-white/5 glass-dark text-muted-foreground/30'}`}
+                                                className={`h-14 rounded-2xl border-2 transition-all font-black text-[10px] ${budgetLevel === level ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600' : 'border-white/20 bg-white/5 text-muted-foreground/30'}`}
                                             >
                                                 {level === 'low' ? 'بسيطة' : level === 'medium' ? 'متوسطة' : 'مكلفة'}
                                             </button>
@@ -391,7 +391,7 @@ export function AdventureBucketScreen({ onNavigate, userId, partnershipId }: Adv
                                 {status === 'planned' && (
                                     <div className="space-y-2">
                                         <p className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest text-right px-2">التاريخ والوقت</p>
-                                        <input type="datetime-local" value={plannedAt} onChange={e => setPlannedAt(e.target.value)} className="w-full h-14 glass-dark border-white/10 rounded-2xl px-6 text-right font-bold text-foreground focus:ring-4 ring-primary/10 outline-none" />
+                                        <input type="datetime-local" value={plannedAt} onChange={e => setPlannedAt(e.target.value)} className="w-full h-14 bg-white/10 border border-white/20 rounded-2xl px-6 text-right font-bold text-foreground focus:ring-4 ring-primary/10 outline-none" />
                                     </div>
                                 )}
                             </div>

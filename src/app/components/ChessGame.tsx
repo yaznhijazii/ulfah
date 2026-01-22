@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { Chess } from 'chess.js';
 import { supabase } from '../../lib/supabase';
-import { ArrowLeft, CheckCircle2, RotateCcw, Users, Trophy, Copy } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, RotateCcw, Users, Trophy, Copy, Bot } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface ChessGameProps {
@@ -12,21 +13,6 @@ interface ChessGameProps {
 
 type GameState = 'menu' | 'lobby' | 'playing' | 'finished';
 
-type PieceColor = 'w' | 'b';
-type PieceType = 'p' | 'r' | 'n' | 'b' | 'q' | 'k';
-type Piece = { type: PieceType; color: PieceColor } | null;
-
-const INITIAL_BOARD: Piece[][] = [
-    [{ type: 'r', color: 'b' }, { type: 'n', color: 'b' }, { type: 'b', color: 'b' }, { type: 'q', color: 'b' }, { type: 'k', color: 'b' }, { type: 'b', color: 'b' }, { type: 'n', color: 'b' }, { type: 'r', color: 'b' }],
-    [{ type: 'p', color: 'b' }, { type: 'p', color: 'b' }, { type: 'p', color: 'b' }, { type: 'p', color: 'b' }, { type: 'p', color: 'b' }, { type: 'p', color: 'b' }, { type: 'p', color: 'b' }, { type: 'p', color: 'b' }],
-    [null, null, null, null, null, null, null, null],
-    [null, null, null, null, null, null, null, null],
-    [null, null, null, null, null, null, null, null],
-    [null, null, null, null, null, null, null, null],
-    [{ type: 'p', color: 'w' }, { type: 'p', color: 'w' }, { type: 'p', color: 'w' }, { type: 'p', color: 'w' }, { type: 'p', color: 'w' }, { type: 'p', color: 'w' }, { type: 'p', color: 'w' }, { type: 'p', color: 'w' }],
-    [{ type: 'r', color: 'w' }, { type: 'n', color: 'w' }, { type: 'b', color: 'w' }, { type: 'q', color: 'w' }, { type: 'k', color: 'w' }, { type: 'b', color: 'w' }, { type: 'n', color: 'w' }, { type: 'r', color: 'w' }],
-];
-
 const PIECE_SYMBOLS: Record<string, string> = {
     'wp': '♟', 'wr': '♜', 'wn': '♞', 'wb': '♝', 'wq': '♛', 'wk': '♚',
     'bp': '♙', 'br': '♖', 'bn': '♘', 'bb': '♗', 'bq': '♕', 'bk': '♔'
@@ -36,12 +22,19 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
     const [gameState, setGameState] = useState<GameState>('menu');
     const [joinCode, setJoinCode] = useState('');
     const [roomData, setRoomData] = useState<any>(null);
-    const [selectedSquare, setSelectedSquare] = useState<{ r: number, c: number } | null>(null);
+    const [currentFen, setCurrentFen] = useState('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+    const [board, setBoard] = useState<any[][]>([]);
+    const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
+    const [validMoves, setValidMoves] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [isAIMode, setIsAIMode] = useState(false);
 
-    // Initial Board
-    const [board, setBoard] = useState<Piece[][]>(INITIAL_BOARD);
+    // Update board whenever FEN changes
+    useEffect(() => {
+        const chess = new Chess(currentFen);
+        setBoard(chess.board());
+    }, [currentFen]);
 
     // Presence / Realtime
     useEffect(() => {
@@ -55,13 +48,22 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
                     const newData = payload.new as any;
                     const parsedState = typeof newData.game_state === 'string' ? JSON.parse(newData.game_state) : newData.game_state;
 
-                    setRoomData(prev => ({ ...prev, ...newData, ...parsedState }));
+                    setRoomData(prev => ({ ...prev, ...newData, game_state: parsedState }));
 
-                    if (parsedState.board) setBoard(parsedState.board);
+                    if (parsedState.fen) {
+                        chess.load(parsedState.fen);
+                        setBoard(chess.board());
+                    }
+
+                    // Load AI mode from game state
+                    if (parsedState.isAIMode) setIsAIMode(true);
 
                     // Sync Status
-                    if (newData.status === 'playing' && (gameState === 'lobby' || gameState === 'menu')) setGameState('playing');
-                    if (newData.status === 'ready' && gameState === 'menu') setGameState('lobby');
+                    if (newData.status === 'playing') {
+                        setGameState('playing');
+                    } else if (newData.status === 'ready' && gameState !== 'lobby') {
+                        setGameState('lobby');
+                    }
                 }
             )
             .subscribe();
@@ -78,24 +80,25 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
         return result;
     };
 
-    const createRoom = async () => {
+    const createRoom = async (withAI = false) => {
         setLoading(true);
+        setIsAIMode(withAI);
         const code = generateRoomCode();
 
+        const initialFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
         const initialState = {
-            board: INITIAL_BOARD,
-            turn: 'w', // White starts
-            lastMove: null,
-            winner: null
+            fen: initialFen,
+            isAIMode: withAI
         };
 
         const { data, error } = await supabase.from('game_rooms').insert({
             room_code: code,
             game_type: 'chess',
             host_user_id: userId,
-            status: 'waiting',
+            guest_user_id: null,
+            status: withAI ? 'playing' : 'waiting',
             game_state: initialState,
-            grid_size: 6 // Not used for chess but column is required
+            grid_size: 6
         }).select().single();
 
         if (error) {
@@ -104,8 +107,9 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
             return;
         }
 
-        setRoomData({ ...data, ...initialState });
-        setGameState('lobby');
+        setRoomData({ ...data, game_state: initialState });
+        setCurrentFen(initialFen);
+        setGameState(withAI ? 'playing' : 'lobby');
         setLoading(false);
     };
 
@@ -118,7 +122,7 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
             .select('*')
             .eq('room_code', joinCode.toUpperCase())
             .eq('game_type', 'chess')
-            .neq('status', 'finished') // Allow joining if waiting or ready
+            .neq('status', 'finished')
             .single();
 
         if (searchError || !rooms) {
@@ -127,10 +131,9 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
             return;
         }
 
-        // Join as guest
         const { data: updatedRoom, error: joinError } = await supabase
             .from('game_rooms')
-            .update({ guest_user_id: userId, status: 'ready' }) // Set to ready
+            .update({ guest_user_id: userId, status: 'ready' })
             .eq('id', rooms.id)
             .select().single();
 
@@ -140,10 +143,16 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
             return;
         }
 
-        const parsedState = updatedRoom.game_state;
-        setRoomData({ ...updatedRoom, ...parsedState });
-        setBoard(parsedState.board || INITIAL_BOARD);
-        setGameState('lobby'); // Go to lobby first
+        const parsedState = typeof updatedRoom.game_state === 'string'
+            ? JSON.parse(updatedRoom.game_state)
+            : updatedRoom.game_state;
+
+        setRoomData({ ...updatedRoom, game_state: parsedState });
+        if (parsedState.fen) {
+            chess.load(parsedState.fen);
+            setBoard(chess.board());
+        }
+        setGameState('lobby');
         setLoading(false);
     };
 
@@ -152,99 +161,148 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
         await supabase.from('game_rooms').update({ status: 'playing' }).eq('id', roomData.id);
     };
 
-    const handleSquareClick = async (r: number, c: number) => {
+    const makeAIMove = async () => {
+        if (!roomData || !roomData.game_state) return;
+
+        const chess = new Chess(currentFen);
+        if (chess.turn() !== 'b' || !isAIMode) return;
+
+        const moves = chess.moves();
+        if (moves.length === 0) return;
+
+        // Random AI move
+        const randomMove = moves[Math.floor(Math.random() * moves.length)];
+        chess.move(randomMove);
+
+        const newState = {
+            fen: chess.fen(),
+            isAIMode: true
+        };
+
+        await supabase.from('game_rooms').update({
+            game_state: newState,
+            status: chess.isGameOver() ? 'finished' : 'playing'
+        }).eq('id', roomData.id);
+
+        setCurrentFen(chess.fen());
+    };
+
+    // AI auto-move
+    useEffect(() => {
+        const chess = new Chess(currentFen);
+        if (isAIMode && chess.turn() === 'b' && roomData?.status === 'playing' && !chess.isGameOver()) {
+            const timer = setTimeout(() => {
+                makeAIMove();
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [currentFen, isAIMode, roomData?.status]);
+
+    const handleSquareClick = async (square: string) => {
         if (roomData?.status !== 'playing') return;
 
-        // Determine player color
+        const chess = new Chess(currentFen);
         const isHost = userId === roomData.host_user_id;
         const myColor = isHost ? 'w' : 'b';
 
-        // Turn Enforcement
-        if (roomData.turn !== myColor) return;
+        if (chess.turn() !== myColor) return;
 
-        // 1. Select Piece
+        // If no piece selected
         if (!selectedSquare) {
-            const piece = board[r][c];
+            const piece = chess.get(square as any);
             if (piece && piece.color === myColor) {
-                setSelectedSquare({ r, c });
+                setSelectedSquare(square);
+                const moves = chess.moves({ square: square as any, verbose: true });
+                setValidMoves(moves.map(m => m.to));
             }
             return;
         }
 
-        // 2. Move Piece (Sandbox Logic)
-        // If clicking same square -> Deselect
-        if (selectedSquare.r === r && selectedSquare.c === c) {
+        // If clicking same square - deselect
+        if (selectedSquare === square) {
             setSelectedSquare(null);
+            setValidMoves([]);
             return;
         }
 
-        const targetPiece = board[r][c];
-        // If clicking own piece -> Switch selection
-        if (targetPiece && targetPiece.color === myColor) {
-            setSelectedSquare({ r, c });
-            return;
+        // Try to make move
+        try {
+            const move = chess.move({
+                from: selectedSquare as any,
+                to: square as any,
+                promotion: 'q' // Always promote to queen
+            });
+
+            if (move) {
+                setSelectedSquare(null);
+                setValidMoves([]);
+
+                const newState = {
+                    fen: chess.fen(),
+                    isAIMode: isAIMode
+                };
+
+                await supabase.from('game_rooms').update({
+                    game_state: newState,
+                    status: chess.isGameOver() ? 'finished' : 'playing'
+                }).eq('id', roomData.id);
+
+                setCurrentFen(chess.fen());
+            } else {
+                // Invalid move - try selecting new piece
+                const piece = chess.get(square as any);
+                if (piece && piece.color === myColor) {
+                    setSelectedSquare(square);
+                    const moves = chess.moves({ square: square as any, verbose: true });
+                    setValidMoves(moves.map(m => m.to));
+                }
+            }
+        } catch (e) {
+            setSelectedSquare(null);
+            setValidMoves([]);
         }
-
-        // Execute Move
-        const newBoard = JSON.parse(JSON.stringify(board));
-        const movingPiece = newBoard[selectedSquare.r][selectedSquare.c];
-        newBoard[r][c] = movingPiece;
-        newBoard[selectedSquare.r][selectedSquare.c] = null;
-
-        // Check for King Capture (Win Condition in Sandbox)
-        let winner = null;
-        if (targetPiece && targetPiece.type === 'k') {
-            winner = myColor;
-        }
-
-        const nextTurn = roomData.turn === 'w' ? 'b' : 'w';
-
-        setBoard(newBoard);
-        setSelectedSquare(null);
-
-        // Sync
-        await supabase.from('game_rooms').update({
-            game_state: {
-                ...roomData,
-                board: newBoard,
-                turn: nextTurn,
-                lastMove: { from: selectedSquare, to: { r, c } },
-                winner: winner
-            },
-            status: winner ? 'finished' : 'playing'
-        }).eq('id', roomData.id);
     };
 
     const resetGame = async () => {
-        // Reset board but keep players
-        const initialState = {
-            board: INITIAL_BOARD,
-            turn: 'w',
-            lastMove: null,
-            winner: null
+        const chess = new Chess();
+        const newState = {
+            fen: chess.fen(),
+            isAIMode: isAIMode
         };
 
         await supabase.from('game_rooms').update({
-            game_state: initialState,
+            game_state: newState,
             status: 'playing'
         }).eq('id', roomData.id);
+
+        setCurrentFen(chess.fen());
     };
 
-    // --- Render Helpers ---
+    // Render helpers
+    const chess = new Chess(currentFen);
     const isHost = roomData?.host_user_id === userId;
     const myColor = isHost ? 'w' : 'b';
-    const isMyTurn = roomData?.turn === myColor;
+    const isMyTurn = chess.turn() === myColor;
 
     // Flip board for black
     const renderBoard = myColor === 'w' ? board : [...board].reverse().map(row => [...row].reverse());
 
-    // Adjusted coords for click
-    const getRealCoords = (displayRow: number, displayCol: number) => {
-        if (myColor === 'w') return { r: displayRow, c: displayCol };
-        return { r: 7 - displayRow, c: 7 - displayCol };
+    const squareToCoords = (displayRow: number, displayCol: number) => {
+        // For white: display matches actual board
+        // For black: board is flipped, so we need to reverse the mapping
+        if (myColor === 'w') {
+            const file = String.fromCharCode(97 + displayCol); // a-h
+            const rank = 8 - displayRow; // 8-1
+            return file + rank;
+        } else {
+            // Black sees flipped board, so reverse both row and col
+            const file = String.fromCharCode(97 + (7 - displayCol)); // h-a
+            const rank = displayRow + 1; // 1-8
+            return file + rank;
+        }
     };
 
-    // --- UI ---
+    // UI
     if (gameState === 'menu') {
         return (
             <div className="flex flex-col h-full bg-background p-6">
@@ -256,7 +314,15 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
                     <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-foreground/5 rounded-[2.5rem] p-8 text-center border-2 border-foreground/10">
                         <div className="text-6xl mb-6">♚</div>
                         <h2 className="text-2xl font-black mb-2">تحدي الملوك</h2>
-                        <Button onClick={createRoom} disabled={loading} className="w-full h-16 rounded-2xl text-lg font-black shadow-lg mb-4">{loading ? '...' : 'إنشاء طاولة اللعب'}</Button>
+                        <p className="text-sm text-muted-foreground mb-6">شطرنج حقيقي بقواعد كاملة</p>
+                        <div className="space-y-3">
+                            <Button onClick={() => createRoom(false)} disabled={loading} className="w-full h-16 rounded-2xl text-lg font-black shadow-lg">
+                                {loading ? '...' : '🎮 لعب مع شريكي'}
+                            </Button>
+                            <Button onClick={() => createRoom(true)} disabled={loading} variant="secondary" className="w-full h-16 rounded-2xl text-lg font-black shadow-lg">
+                                {loading ? '...' : '🤖 لعب مع الكمبيوتر'}
+                            </Button>
+                        </div>
                     </motion.div>
                     <div className="space-y-4">
                         <input value={joinCode} onChange={(e) => setJoinCode(e.target.value.toUpperCase())} placeholder="كود الطاولة" className="w-full h-16 rounded-2xl bg-muted/50 border-2 border-border px-6 text-center text-xl font-black tracking-widest uppercase" maxLength={6} />
@@ -277,18 +343,12 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
                 <div className="bg-card w-full max-w-xs rounded-[2.5rem] p-8 border-2 border-dashed border-primary/30 relative mb-12">
                     <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">كود الغرفة</p>
                     <p className="text-4xl font-black tracking-widest text-foreground">{roomData?.room_code}</p>
-                    <Button
-                        size="icon"
-                        variant="ghost"
-                        className="absolute bottom-4 right-4 text-primary hover:bg-primary/10"
-                        onClick={() => navigator.clipboard.writeText(roomData?.room_code || '')}
-                    >
+                    <Button size="icon" variant="ghost" className="absolute bottom-4 right-4 text-primary hover:bg-primary/10" onClick={() => navigator.clipboard.writeText(roomData?.room_code || '')}>
                         <Copy className="w-5 h-5" />
                     </Button>
                 </div>
 
                 <div className="w-full max-w-xs space-y-4 mb-8">
-                    {/* Host */}
                     <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border border-border">
                         <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-black">أنا</div>
                         <div className="text-right flex-1">
@@ -297,24 +357,19 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
                         </div>
                     </div>
 
-                    {/* Guest */}
                     <div className={`flex items-center gap-4 p-4 rounded-2xl border ${opponentJoined ? 'bg-muted/30 border-border' : 'bg-muted/10 border-dashed border-border/50 opacity-50'}`}>
                         <div className="w-10 h-10 rounded-full bg-muted-foreground flex items-center justify-center text-white font-black">
-                            {opponentJoined ? 'هو' : '?'}
+                            {opponentJoined ? (roomData?.game_state?.isAIMode ? '🤖' : 'هو') : '?'}
                         </div>
                         <div className="text-right flex-1">
-                            <p className="font-bold text-sm">{opponentJoined ? 'المنافس (أسود)' : 'بانتظار المنافس...'}</p>
-                            {opponentJoined && <p className="text-[10px] text-emerald-500 font-black flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> انضم</p>}
+                            <p className="font-bold text-sm">{opponentJoined ? (roomData?.game_state?.isAIMode ? 'الكمبيوتر (أسود)' : 'المنافس (أسود)') : 'بانتظار المنافس...'}</p>
+                            {opponentJoined && <p className="text-[10px] text-emerald-500 font-black flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {roomData?.game_state?.isAIMode ? 'جاهز' : 'انضم'}</p>}
                         </div>
                     </div>
                 </div>
 
                 {isHost ? (
-                    <Button
-                        disabled={!opponentJoined}
-                        onClick={startGame}
-                        className="w-full h-16 rounded-2xl text-lg font-black shadow-lg shadow-primary/20"
-                    >
+                    <Button disabled={!opponentJoined} onClick={startGame} className="w-full h-16 rounded-2xl text-lg font-black shadow-lg shadow-primary/20">
                         {opponentJoined ? 'ابدأ اللعب ⚔️' : 'ننتظر الخصم...'}
                     </Button>
                 ) : (
@@ -334,7 +389,7 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
                 </div>
                 <div className="text-xl font-black opacity-20">VS</div>
                 <div className={`flex items-center gap-2 flex-row-reverse ${!isMyTurn ? 'opacity-100' : 'opacity-40'}`}>
-                    <div className="w-8 h-8 rounded-full bg-muted-foreground flex items-center justify-center text-white text-xs font-black">هو</div>
+                    <div className="w-8 h-8 rounded-full bg-muted-foreground flex items-center justify-center text-white text-xs font-black">{isAIMode ? '🤖' : 'هو'}</div>
                     {!isMyTurn && <span className="text-xs font-black text-muted-foreground">يفكر...</span>}
                 </div>
             </div>
@@ -342,34 +397,33 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
             {/* Board */}
             <div className="flex-1 flex items-center justify-center">
                 <div className="grid grid-cols-8 gap-0.5 bg-[#403d39] p-1 rounded-lg shadow-2xl w-full max-w-[400px] aspect-square relative">
-                    {roomData?.game_state?.winner && (
+                    {chess.isGameOver() && (
                         <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-white rounded-lg">
                             <Trophy className="w-16 h-16 text-yellow-400 mb-4 animate-bounce" />
-                            <h2 className="text-3xl font-black mb-4">{roomData.game_state.winner === myColor ? 'خلاص كسبت! 🎉' : 'خسرت يا بطل 😅'}</h2>
+                            <h2 className="text-3xl font-black mb-4">
+                                {chess.isCheckmate() ? (isMyTurn ? 'خسرت! 😅' : 'كسبت! 🎉') :
+                                    chess.isDraw() ? 'تعادل! 🤝' : 'انتهت اللعبة'}
+                            </h2>
                             <Button onClick={resetGame} size="sm" variant="secondary" className="font-black"><RotateCcw className="w-4 h-4 mr-2" /> لعب مجدداً</Button>
                         </div>
                     )}
 
                     {renderBoard.map((row, r) =>
                         row.map((piece, c) => {
-                            const realCoords = getRealCoords(r, c);
-                            const isSelected = selectedSquare?.r === realCoords.r && selectedSquare?.c === realCoords.c;
+                            const square = squareToCoords(r, c);
+                            const isSelected = selectedSquare === square;
+                            const isValidMove = validMoves.includes(square);
                             const isBlackSquare = (r + c) % 2 === 1;
-
-                            // Highlight last move
-                            const lastMove = roomData?.game_state?.lastMove;
-                            const isLastMoveSrc = lastMove?.from.r === realCoords.r && lastMove?.from.c === realCoords.c;
-                            const isLastMoveDst = lastMove?.to.r === realCoords.r && lastMove?.to.c === realCoords.c;
 
                             return (
                                 <div
                                     key={`${r}-${c}`}
-                                    onClick={() => handleSquareClick(realCoords.r, realCoords.c)}
+                                    onClick={() => handleSquareClick(square)}
                                     className={`
                                         w-full h-full flex items-center justify-center text-3xl sm:text-4xl select-none cursor-pointer transition-colors relative
                                         ${isBlackSquare ? 'bg-[#b58863]' : 'bg-[#f0d9b5]'}
                                         ${isSelected ? 'ring-4 ring-inset ring-blue-500/50 bg-blue-400/30' : ''}
-                                        ${(isLastMoveSrc || isLastMoveDst) && !isSelected ? 'bg-yellow-200/50' : ''}
+                                        ${isValidMove ? 'ring-2 ring-inset ring-green-500/50' : ''}
                                     `}
                                 >
                                     {c === 0 && <span className={`absolute top-0.5 left-0.5 text-[8px] font-bold opacity-50 ${isBlackSquare ? 'text-[#f0d9b5]' : 'text-[#b58863]'}`}>{8 - r}</span>}
@@ -379,14 +433,12 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
                                         <motion.span
                                             initial={{ scale: 0.8 }}
                                             animate={{ scale: 1 }}
-                                            className={`
-                                                relative z-10 drop-shadow-sm
-                                                ${piece.color === 'w' ? 'text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]' : 'text-black drop-shadow-[0_1px_0px_rgba(255,255,255,0.5)]'}
-                                            `}
+                                            className={`relative z-10 drop-shadow-sm ${piece.color === 'w' ? 'text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]' : 'text-black drop-shadow-[0_1px_0px_rgba(255,255,255,0.5)]'}`}
                                         >
                                             {PIECE_SYMBOLS[`${piece.color}${piece.type}`]}
                                         </motion.span>
                                     )}
+                                    {isValidMove && !piece && <div className="w-3 h-3 rounded-full bg-green-500/50" />}
                                 </div>
                             );
                         })

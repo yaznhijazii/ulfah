@@ -219,8 +219,8 @@ export function FinanceScreen({ userId, partnershipId, isDarkMode, onNavigate }:
                     <button
                         onClick={() => setActiveTab('jars')}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-[10px] font-black transition-all duration-500 uppercase tracking-widest ${activeTab === 'jars'
-                            ? 'bg-teal-600 text-white shadow-xl shadow-teal-500/20'
-                            : 'bg-white/40 text-teal-700/30'
+                            ? 'bg-teal-600 text-white shadow-xl shadow-teal-600/20'
+                            : 'bg-white/40 dark:bg-white/5 text-teal-700/40 dark:text-white/40 border border-white/20'
                             }`}
                     >
                         <PiggyBank className="w-3.5 h-3.5" />
@@ -229,8 +229,8 @@ export function FinanceScreen({ userId, partnershipId, isDarkMode, onNavigate }:
                     <button
                         onClick={() => setActiveTab('distribution')}
                         className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-full text-[10px] font-black transition-all duration-500 uppercase tracking-widest ${activeTab === 'distribution'
-                            ? 'bg-teal-600 text-white shadow-xl shadow-teal-500/20'
-                            : 'bg-white/40 text-teal-700/30'
+                            ? 'bg-teal-600 text-white shadow-xl shadow-teal-600/20'
+                            : 'bg-white/40 dark:bg-white/5 text-teal-700/40 dark:text-white/40 border border-white/20'
                             }`}
                     >
                         <Wallet className="w-3.5 h-3.5" />
@@ -322,7 +322,7 @@ export function FinanceScreen({ userId, partnershipId, isDarkMode, onNavigate }:
                                             >
                                                 <div className="flex justify-between items-start mb-8">
                                                     <div className="flex items-center gap-4">
-                                                        <div className={`w-14 h-14 rounded-2xl glass-dark border-white/10 flex items-center justify-center ${jar.title === 'حصالة المغامرات' ? 'text-amber-500' : 'text-primary'} group-hover:scale-110 transition-transform`}>
+                                                        <div className={`w-14 h-14 rounded-2xl ${jar.title === 'حصالة المغامرات' ? 'bg-amber-500/5' : 'bg-primary/5'} border border-white/20 flex items-center justify-center ${jar.title === 'حصالة المغامرات' ? 'text-amber-500' : 'text-primary'} group-hover:scale-110 transition-transform`}>
                                                             {jar.title === 'حصالة المغامرات' ? <Compass className="w-6 h-6" /> : <Target className="w-6 h-6" />}
                                                         </div>
                                                         <div>
@@ -541,7 +541,7 @@ function JarContributionModal({ isOpen, onClose, jarTitle, onContribute }: { isO
                         dir="rtl"
                     >
                         <div className="text-center mb-8">
-                            <div className="w-16 h-16 glass-dark border-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 text-teal-600 shadow-xl">
+                            <div className="w-16 h-16 bg-teal-500/5 border border-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-teal-600 shadow-xl">
                                 <PiggyBank className="w-8 h-8" />
                             </div>
                             <h3 className="text-xl font-black tracking-tighter mb-1">{jarTitle}</h3>
@@ -1098,7 +1098,7 @@ function SalaryDistributionView({ userId, partnershipId, isDarkMode }: { userId:
                             >
                                 <div className="flex items-center justify-between gap-4">
                                     <div className="flex items-center gap-4 flex-1">
-                                        <div className={`w-14 h-14 rounded-2xl glass-dark border-white/5 flex items-center justify-center transition-all duration-500 group-hover:bg-teal-600/10 ${item.jarId ? 'text-amber-500' : 'text-teal-600'}`}>
+                                        <div className={`w-14 h-14 rounded-2xl ${item.jarId ? 'bg-amber-500/5' : 'bg-teal-500/5'} border border-white/20 flex items-center justify-center transition-all duration-500 group-hover:bg-teal-600/10 ${item.jarId ? 'text-amber-500' : 'text-teal-600'}`}>
                                             {item.jarId ? <Target className="w-7 h-7" /> : <Coins className="w-7 h-7" />}
                                         </div>
                                         <div className="flex flex-col min-w-0">
@@ -1144,7 +1144,7 @@ function SalaryDistributionView({ userId, partnershipId, isDarkMode }: { userId:
                                             <span className="font-black">{(item.amount - item.spent).toLocaleString()} د.أ</span>
                                         </div>
                                     </div>
-                                    <div className="h-2 w-full glass-dark border-white/5 rounded-full overflow-hidden">
+                                    <div className="h-2 w-full bg-black/5 border border-white/10 rounded-full overflow-hidden">
                                         <motion.div
                                             initial={{ width: 0 }}
                                             animate={{ width: `${Math.min((item.spent / item.amount) * 100, 100)}%` }}

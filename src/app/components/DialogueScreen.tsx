@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, MessageCircle, ShieldCheck, Plus, Sparkles, Trash2, AlertCircle, AlertTriangle, Target, Flame, Heart, XCircle, CheckCircle2, User, Users } from 'lucide-react';
+import {
+    ArrowLeft, MessageCircle, ShieldCheck, Plus, Sparkles,
+    Trash2, AlertCircle, AlertTriangle, Target, Flame,
+    Heart, XCircle, CheckCircle2, User, Users
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface DialogueScreenProps {
@@ -13,7 +17,7 @@ interface DialogueScreenProps {
 
 type Tab = 'constitution' | 'commitments';
 
-export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: DialogueScreenProps) {
+export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreenProps) {
     const [activeTab, setActiveTab] = useState<Tab>('constitution');
 
     // UI States
@@ -23,6 +27,11 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
     const [names, setNames] = useState<{ me: string, partner: string }>({ me: 'أنا', partner: 'الشريك' });
     const [partnerId, setPartnerId] = useState<string | null>(null);
     const [selectedDialogue, setSelectedDialogue] = useState<any>(null);
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    const [filterType, setFilterType] = useState<'all' | 'me' | 'partner' | 'both'>('all');
+    const [dialogueFilterType, setDialogueFilterType] = useState<'all' | 'me' | 'partner' | 'both'>('all');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [confirmModal, setConfirmModal] = useState<{ show: boolean, type: string, data: any } | null>(null);
 
     // Data States
     const [dialogues, setDialogues] = useState<any[]>([]);
@@ -47,13 +56,10 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
     const [commitmentForm, setCommitmentForm] = useState({
         title: '',
         target_count: 5,
-        period_type: 'weekly',
+        period_type: 'weekly' as 'daily' | 'weekly' | 'monthly',
         punishment: '',
         assignee: 'me' as 'me' | 'partner'
     });
-
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [confirmModal, setConfirmModal] = useState<{ show: boolean, type: 'breach' | 'delete_agreement' | 'delete_dialogue' | 'delete_commitment' | 'fail_commitment', data: any } | null>(null);
 
     useEffect(() => {
         if (partnershipId) {
@@ -62,32 +68,15 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
         }
     }, [partnershipId, activeTab]);
 
-    const loadNames = async () => {
-        if (!partnershipId || !userId) return;
-        try {
-            const { data: p } = await supabase
-                .from('partnerships')
-                .select('user1_id, user2_id, user1_details:user1_id(name), user2_details:user2_id(name)')
-                .eq('id', partnershipId)
-                .single();
-
-            if (p) {
-                const isUser1 = p.user1_id === userId;
-                setPartnerId(isUser1 ? p.user2_id : p.user1_id);
-                const user1Name = Array.isArray(p.user1_details) ? p.user1_details[0]?.name : (p.user1_details as any)?.name;
-                const user2Name = Array.isArray(p.user2_details) ? p.user2_details[0]?.name : (p.user2_details as any)?.name;
-                setNames({ me: isUser1 ? user1Name : user2Name || 'أنا', partner: isUser1 ? user2Name : user1Name || 'الشريك' });
-            }
-        } catch (err) { console.error(err); }
-    };
 
     const loadData = async () => {
+        if (!partnershipId) return;
         setLoading(true);
         try {
             const [dRes, aRes, cRes] = await Promise.all([
                 supabase.from('dialogues').select('*').eq('partnership_id', partnershipId).order('dialogue_date', { ascending: false }),
-                supabase.from('agreements').select('*').eq('partnership_id', partnershipId).order('created_at', { ascending: false }),
-                supabase.from('commitments').select('*').eq('partnership_id', partnershipId).order('created_at', { ascending: false })
+                supabase.from('agreements').select('*').eq('partnership_id', partnershipId),
+                supabase.from('commitments').select('*').eq('partnership_id', partnershipId).eq('is_active', true)
             ]);
 
             if (dRes.data) setDialogues(dRes.data);
@@ -97,78 +86,61 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
         setLoading(false);
     };
 
+    const loadNames = async () => {
+        if (!partnershipId) return;
+        try {
+            const { data } = await supabase.from('partnerships').select('user1_id, user2_id').eq('id', partnershipId).single();
+            if (data) {
+                const otherId = data.user1_id === userId ? data.user2_id : data.user1_id;
+                setPartnerId(otherId);
+                const { data: profiles } = await supabase.from('profiles').select('id, full_name').in('id', [userId, otherId]);
+                if (profiles) {
+                    const me = profiles.find(p => p.id === userId)?.full_name || 'أنا';
+                    const partner = profiles.find(p => p.id === otherId)?.full_name || 'الشريك';
+                    setNames({ me, partner });
+                }
+            }
+        } catch (err) { console.error(err); }
+    };
+
+
     const handleSaveDialogue = async () => {
-        if (!dialogueForm.title || !dialogueForm.solution) {
-            alert('يرجى إكمال العنوان والحل');
-            return;
-        }
         setIsSubmitting(true);
         try {
-            // 1. Save the dialogue
             const { data: dialogue, error: dError } = await supabase.from('dialogues').insert({
                 partnership_id: partnershipId,
                 title: dialogueForm.title,
                 dialogue_date: dialogueForm.date,
-                description: dialogueForm.problem,
                 problem: dialogueForm.problem,
                 my_opinion: dialogueForm.my_opinion,
                 partner_opinion: dialogueForm.partner_opinion,
                 final_agreement: dialogueForm.solution,
-                created_by_user_id: userId
+                created_by_user_id: userId,
+                assignee: dialogueForm.assignee
             }).select().single();
 
-            if (dError) {
-                console.error('Dialogue Insert Error:', dError);
-                // Fallback: try inserting without created_by_user_id if column is missing
-                const { data: dFallback, error: dError2 } = await supabase.from('dialogues').insert({
-                    partnership_id: partnershipId,
-                    title: dialogueForm.title,
-                    dialogue_date: dialogueForm.date,
-                    problem: dialogueForm.problem,
-                    my_opinion: dialogueForm.my_opinion,
-                    partner_opinion: dialogueForm.partner_opinion,
-                    final_agreement: dialogueForm.solution
-                }).select().single();
+            if (dError) throw dError;
 
-                if (dError2) throw dError2;
-                if (dFallback) {
-                    await createLinkedAgreement(dFallback);
-                }
-            } else if (dialogue) {
-                await createLinkedAgreement(dialogue);
+            if (dialogue) {
+                // Create agreement
+                await supabase.from('agreements').insert({
+                    partnership_id: partnershipId,
+                    origin_dialogue_id: dialogue.id,
+                    title: dialogue.final_agreement,
+                    assignee: dialogueForm.assignee,
+                    duration: 'open'
+                });
             }
+
+            setShowAddDialogue(false);
+            setDialogueForm({ title: '', date: new Date().toISOString().split('T')[0], problem: '', my_opinion: '', partner_opinion: '', solution: '', assignee: 'both' });
+            setDialogueStep(1);
+            loadData();
         } catch (err: any) {
             console.error(err);
-            alert('حدث خطأ أثناء الحفظ: ' + (err.message || 'مشكلة في الاتصال بقاعدة البيانات'));
+            alert('خطأ في حفظ الحوار: ' + (err.message || 'مشكلة في قاعدة البيانات'));
         }
         setIsSubmitting(false);
-    };
-
-    const createLinkedAgreement = async (dialogue: any) => {
-        const { error: aError } = await supabase.from('agreements').insert({
-            partnership_id: partnershipId,
-            title: dialogue.final_agreement,
-            assignee: dialogueForm.assignee,
-            duration: 'open',
-            created_by_user_id: userId,
-            origin_dialogue_id: dialogue.id
-        });
-
-        if (aError) {
-            console.warn('Agreement Insert Error (linking failed, trying fallback):', aError);
-            // Try without origin_dialogue_id and created_by if linking fails due to missing columns
-            await supabase.from('agreements').insert({
-                partnership_id: partnershipId,
-                title: dialogue.final_agreement,
-                assignee: dialogueForm.assignee,
-                duration: 'open'
-            });
-        }
-
-        setShowAddDialogue(false);
-        setDialogueForm({ title: '', date: new Date().toISOString().split('T')[0], problem: '', my_opinion: '', partner_opinion: '', solution: '', assignee: 'both' });
-        setDialogueStep(1);
-        loadData();
     };
 
     const handleSaveCommitment = async (e: React.FormEvent) => {
@@ -188,24 +160,19 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                 start_date: new Date().toISOString()
             };
 
-            // محاولة أولى مع created_by_user_id
             const { error: firstTryError } = await supabase.from('commitments').insert({
                 ...commitmentData,
                 created_by_user_id: userId
             });
 
             if (firstTryError) {
-                console.warn('First try failed, trying without created_by_user_id');
-                // محاولة ثانية بدون العمود إذا طلع مش موجود
                 const { error: secondTryError } = await supabase.from('commitments').insert(commitmentData);
-
                 if (secondTryError) throw secondTryError;
             }
 
             setShowAddCommitment(false);
             setCommitmentForm({ title: '', target_count: 5, period_type: 'weekly', punishment: '', assignee: 'me' });
             loadData();
-
         } catch (err: any) {
             console.error(err);
             alert('خطأ في حفظ الالتزام: ' + (err.message || 'مشكلة في قاعدة البيانات'));
@@ -220,8 +187,24 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                 breach_count: (agreement.breach_count || 0) + 1,
                 last_breach_at: new Date().toISOString()
             }).eq('id', agreement.id);
+
             if (!error) {
                 setConfirmModal(null);
+                loadData();
+            }
+        } catch (err) { console.error(err); }
+        setIsSubmitting(false);
+    };
+
+    const handleReduceBreach = async (agreement: any) => {
+        if ((agreement.breach_count || 0) <= 0) return;
+        setIsSubmitting(true);
+        try {
+            const { error } = await supabase.from('agreements').update({
+                breach_count: agreement.breach_count - 1
+            }).eq('id', agreement.id);
+
+            if (!error) {
                 loadData();
             }
         } catch (err) { console.error(err); }
@@ -288,15 +271,15 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
         setIsSubmitting(false);
     };
 
-    // Helper for multi-step form
     const nextStep = () => setDialogueStep(prev => Math.min(prev + 1, 5));
     const prevStep = () => setDialogueStep(prev => Math.max(prev - 1, 1));
 
     return (
-        <div className="flex-1 bg-background flex flex-col relative h-screen mood-dialogue">
-            {/* Pact Atmospheric Blue Aura */}
-            <div className="fixed inset-0 pointer-events-none -z-10">
-                <div className="absolute top-[-10%] right-[-10%] w-[100%] h-[60%] bg-blue-500/10 blur-[150px] rounded-full opacity-60" />
+        <div className="flex-1 bg-background flex flex-col relative h-screen mood-dialogue overflow-hidden">
+            {/* Atmospheric Background Auras */}
+            <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+                <div className="absolute top-[-10%] right-[-10%] w-[100%] h-[60%] bg-rose-500/5 blur-[150px] rounded-full opacity-60" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-[100%] h-[60%] bg-blue-500/5 blur-[150px] rounded-full opacity-40" />
             </div>
 
             {/* Header */}
@@ -305,20 +288,25 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                     <motion.button
                         whileTap={{ scale: 0.9 }}
                         onClick={onBack}
-                        className="w-12 h-12 flex items-center justify-center glass rounded-2xl border-white/60 shadow-xl text-foreground/40"
+                        className="w-12 h-12 flex items-center justify-center glass rounded-2xl border-white/60 dark:border-white/10 shadow-xl text-foreground/40 hover:bg-white/40 transition-all"
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </motion.button>
                     <div className="text-center">
                         <h1 className="text-xl font-black text-foreground tracking-tighter">ميثاق المودة</h1>
-                        <p className="text-[9px] font-black text-blue-600/40 uppercase tracking-[0.5em]">حواراتنا.. ومحطات اتفاقنا</p>
+                        <p className="text-[9px] font-black text-blue-600/40 uppercase tracking-[0.5em] mt-0.5">سجل الحوارات.. ومحطات الاتفاق</p>
                     </div>
-                    <div className="w-12 h-12 glass-dark border-blue-500/20 rounded-2xl flex items-center justify-center text-blue-500 shadow-xl shadow-blue-500/5">
-                        <ShieldCheck className="w-6 h-6" />
-                    </div>
+                    <motion.button
+                        whileHover={{ scale: 1.1, rotate: 90 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => activeTab === 'constitution' ? setShowAddDialogue(true) : setShowAddCommitment(true)}
+                        className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-2xl shadow-blue-500/40 relative overflow-hidden group border-4 border-white dark:border-[#0a0505]"
+                    >
+                        <Plus className="w-8 h-8 relative z-10" />
+                    </motion.button>
                 </div>
 
-                <div className="flex glass rounded-[2.8rem] border-white/80 p-1.5 shadow-2xl bg-white/40 ring-1 ring-black/[0.03] max-w-[320px] mx-auto relative overflow-hidden">
+                <div className="flex bg-white dark:bg-[#0a0505]/40 rounded-[2.8rem] border border-white/40 dark:border-white/5 p-1.5 shadow-2xl shadow-blue-900/5 max-w-[320px] mx-auto relative overflow-hidden backdrop-blur-xl">
                     {[
                         { id: 'constitution', label: 'جلسات الحوار', icon: MessageCircle },
                         { id: 'commitments', label: 'التزاماتنا', icon: Target }
@@ -328,11 +316,11 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
-                                className={`flex-1 flex items-center justify-center gap-3 py-3 rounded-[2.2rem] transition-all duration-700 relative z-10 ${isActive ? 'text-white' : 'text-blue-800/30 hover:text-blue-500'}`}
+                                className={`flex-1 flex items-center justify-center gap-3 py-3 rounded-[2.2rem] transition-all duration-700 relative z-10 ${isActive ? 'text-white' : 'text-blue-900/40 dark:text-white/30 hover:text-blue-600 dark:hover:text-white'}`}
                             >
-                                {isActive && <motion.div layoutId="pact-tab-pill" className="absolute inset-0 bg-blue-600 rounded-[2.2rem] shadow-2xl shadow-blue-500/20 z-[-1]" />}
-                                <tab.icon className={`w-4 h-4 transition-transform ${isActive ? 'rotate-12' : ''}`} />
-                                <span className="text-[10px] font-black uppercase tracking-widest">{tab.label}</span>
+                                {isActive && <motion.div layoutId="pact-tab-pill" className="absolute inset-0 bg-blue-600 rounded-[2.2rem] shadow-xl shadow-blue-600/20 z-[-1]" />}
+                                <tab.icon className={`w-3.5 h-3.5 transition-transform ${isActive ? 'rotate-12 scale-110' : 'opacity-40'}`} />
+                                <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'opacity-100' : 'opacity-60'}`}>{tab.label}</span>
                             </button>
                         );
                     })}
@@ -340,347 +328,331 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
             </header>
 
             <div className="flex-1 px-4 py-8 overflow-y-auto pb-32 scrollbar-hide">
-                {activeTab === 'constitution' ? (
-                    <div className="space-y-12">
-                        {/* New Dialogue Trigger */}
-                        <motion.button
-                            whileHover={{ y: -4 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setShowAddDialogue(true)}
-                            className="w-full relative overflow-hidden rounded-[3rem] p-1 group"
+                <AnimatePresence mode="wait">
+                    {activeTab === 'constitution' ? (
+                        <motion.div
+                            key="constitution"
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            className="space-y-6"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/30 via-blue-500/5 to-transparent blur-2xl opacity-50 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative glass border-white/20 py-10 px-8 rounded-[2.8rem] flex flex-col items-center justify-center gap-5 shadow-2xl">
-                                <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/20 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-500/5 group-hover:rotate-6 transition-transform">
-                                    <MessageCircle className="w-8 h-8 text-blue-500" />
+                            <div className="flex flex-col gap-4 px-2 mb-2">
+                                <div className="flex items-center justify-between">
+                                    <motion.button
+                                        whileTap={{ scale: 0.9 }}
+                                        onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                                        className="flex items-center gap-2 px-4 py-2 bg-white/40 dark:bg-black/20 border border-white/60 dark:border-white/5 rounded-full text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 hover:text-blue-500 transition-colors"
+                                    >
+                                        {sortOrder === 'desc' ? 'الأحدث أولاً' : 'الأقدم أولاً'}
+                                        <div className={`w-1.5 h-1.5 rounded-full bg-blue-500 transition-transform ${sortOrder === 'asc' ? 'rotate-180' : ''}`} />
+                                    </motion.button>
+                                    <span className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-[0.3em]">أرشيف السكينة</span>
                                 </div>
-                                <div className="text-center space-y-1">
-                                    <span className="text-xl font-black text-foreground tracking-tighter block">تأسيس جلسة حوار</span>
-                                    <p className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] max-w-[200px]">نتحاور بوعي.. لنرتقي بالعهد الذي بيننا</p>
+                                <div className="flex items-center gap-2 justify-end overflow-x-auto scrollbar-hide pb-2">
+                                    {[
+                                        { id: 'all', label: 'الكل' },
+                                        { id: 'me', label: names.me },
+                                        { id: 'partner', label: names.partner },
+                                        { id: 'both', label: 'مشترك' }
+                                    ].map((f) => (
+                                        <button
+                                            key={f.id}
+                                            onClick={() => setDialogueFilterType(f.id as any)}
+                                            className={`px-4 py-1.5 rounded-full text-[9px] font-black transition-all border ${dialogueFilterType === f.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-white/40 dark:bg-white/5 text-muted-foreground border-white/40 dark:border-white/5 hover:border-blue-500/50'}`}
+                                        >
+                                            {f.label}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-                        </motion.button>
 
-                        <div className="grid grid-cols-2 gap-5 px-2">
-                            {dialogues.length === 0 && !loading && (
-                                <div className="col-span-2 py-24 text-center space-y-6 opacity-20">
-                                    <div className="w-24 h-24 glass border-white/10 rounded-[3rem] flex items-center justify-center mx-auto">
-                                        <MessageCircle className="w-12 h-12" />
-                                    </div>
-                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] leading-relaxed">لم يتم تدوين أي جلسة حوار بعد..</p>
-                                </div>
-                            )}
+                            <div className="relative group/tray px-1">
+                                <div className="absolute inset-x-[-12px] inset-y-[-16px] bg-gradient-to-b from-blue-500/[0.03] to-indigo-500/[0.03] dark:from-white/[0.02] dark:to-transparent rounded-[4rem] border border-white/20 dark:border-white/5 shadow-2xl shadow-blue-900/[0.02] pointer-events-none -z-10" />
 
-                            {dialogues.map((d, i) => (
-                                <motion.div
-                                    key={d.id}
-                                    layoutId={`dialogue-card-${d.id}`}
-                                    initial={{ opacity: 0, y: 30 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: i * 0.05 }}
-                                    onClick={() => setSelectedDialogue(d)}
-                                    className="aspect-square glass border-white/10 rounded-[2.5rem] p-5 relative overflow-hidden group cursor-pointer hover:shadow-2xl transition-all duration-500 shadow-sm active:scale-95 flex flex-col justify-between"
-                                >
-                                    <div className="flex justify-between items-start">
-                                        <div className="w-11 h-11 glass-dark border-white/10 rounded-2xl flex items-center justify-center text-blue-500 shadow-inner">
-                                            <MessageCircle className="w-5 h-5" />
-                                        </div>
-                                        <div className="px-3 py-1.5 glass-dark border-white/5 rounded-xl">
-                                            <span className="text-[9px] font-black text-foreground/40 uppercase tracking-widest">{d.dialogue_date?.slice(5)}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2 text-right">
-                                        <h3 className="font-black text-lg leading-tight line-clamp-2 tracking-tight opacity-90">{d.title}</h3>
-                                        <div className="flex items-center gap-1.5">
-                                            <div className="w-1 h-1 rounded-full bg-blue-500" />
-                                            <p className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest line-clamp-1">
-                                                {d.problem || d.description}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </div>
-
-                ) : (
-                    <div className="space-y-12">
-                        {/* New Commitment Trigger */}
-                        <motion.button
-                            whileHover={{ y: -4 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => setShowAddCommitment(true)}
-                            className="w-full relative overflow-hidden rounded-[3rem] p-1 group"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-br from-amber-500/30 via-amber-500/5 to-transparent blur-2xl opacity-50 group-hover:opacity-100 transition-opacity" />
-                            <div className="relative glass border-white/20 py-10 px-8 rounded-[2.8rem] flex flex-col items-center justify-center gap-5 shadow-2xl">
-                                <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center shadow-xl shadow-amber-500/5 group-hover:rotate-6 transition-transform">
-                                    <Target className="w-8 h-8 text-amber-500" />
-                                </div>
-                                <div className="text-center space-y-2">
-                                    <span className="text-xl font-black text-foreground tracking-tighter block">تعهد والتزام جديد</span>
-                                    <p className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] max-w-[200px]">نبني أنفسنا معاً.. لنبني بيتاً من السكينة</p>
-                                </div>
-                            </div>
-                        </motion.button>
-
-                        <div className="space-y-10 px-2">
-                            {commitments.length === 0 && !loading && (
-                                <div className="py-24 text-center space-y-6 opacity-20">
-                                    <div className="w-24 h-24 glass border-white/10 rounded-[3rem] flex items-center justify-center mx-auto">
-                                        <Flame className="w-12 h-12" />
-                                    </div>
-                                    <p className="text-[11px] font-black uppercase tracking-[0.2em] leading-relaxed">لا توجد التزامات نشطة بعد..</p>
-                                </div>
-                            )}
-
-                            {commitments.map((c, i) => (
-                                <motion.div
-                                    key={c.id}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: i * 0.1 }}
-                                    className="relative group"
-                                >
-                                    <div className={`glass-dark rounded-[3rem] p-8 shadow-2xl shadow-black/[0.05] border relative overflow-hidden transition-all duration-500 ${c.status === 'failed' ? 'border-rose-500/20' : 'border-white/10'}`}>
-                                        <div className="flex items-center justify-between mb-8 relative z-10">
-                                            <div className="flex items-center gap-5 text-right">
-                                                <div className={`w-16 h-16 rounded-2xl glass-dark border-white/10 flex items-center justify-center shadow-inner ${c.status === 'failed' ? 'text-rose-500 animate-pulse' : 'text-blue-500'}`}>
-                                                    {c.status === 'failed' ? <XCircle className="w-8 h-8" /> : <Flame className="w-8 h-8" />}
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <h3 className="text-xl font-black text-foreground tracking-tighter">{c.title}</h3>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-2.5 h-2.5 rounded-full ${c.status === 'failed' ? 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]' : 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]'}`} />
-                                                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-[0.2em]">
-                                                            {c.owner_user_id === userId ? `أنا (${names.me})` : `${names.partner}`}
-                                                        </span>
-                                                    </div>
-                                                </div>
+                                <div className="grid grid-cols-2 gap-4 pb-12">
+                                    {dialogues.length === 0 && !loading && (
+                                        <div className="col-span-2 py-24 text-center space-y-6 opacity-20">
+                                            <div className="w-24 h-24 glass border-white/10 rounded-[3rem] flex items-center justify-center mx-auto">
+                                                <MessageCircle className="w-10 h-10" />
                                             </div>
-                                            <div className="flex items-center gap-4">
-                                                {c.status !== 'failed' && isObserver(c.owner_user_id) && (
-                                                    <motion.button
-                                                        whileHover={{ scale: 1.1 }}
-                                                        whileTap={{ scale: 0.9 }}
-                                                        onClick={() => setConfirmModal({ show: true, type: 'fail_commitment', data: c })}
-                                                        className="w-12 h-12 flex items-center justify-center glass border-rose-500/20 text-rose-500 rounded-2xl transition-all shadow-sm"
-                                                    >
-                                                        <AlertTriangle className="w-6 h-6" />
-                                                    </motion.button>
-                                                )}
-                                                <motion.button
-                                                    whileHover={{ scale: 1.1, rotate: 5 }}
-                                                    whileTap={{ scale: 0.9 }}
-                                                    onClick={() => setConfirmModal({ show: true, type: 'delete_commitment', data: c })}
-                                                    className="w-12 h-12 flex items-center justify-center glass border-white/10 text-muted-foreground/30 rounded-2xl transition-all hover:bg-rose-500/10 hover:text-rose-500"
+                                            <p className="text-[10px] font-black uppercase tracking-[0.3em] leading-relaxed">لم يتم تدوين حوار بعد..</p>
+                                        </div>
+                                    )}
+
+                                    {/* Dialogue Card Content */}
+
+                                    {[...dialogues]
+                                        .filter(d => {
+                                            if (dialogueFilterType === 'all') return true;
+
+                                            // Determine assignee type: prefer direct column, fallback to agreement
+                                            let assigneeType = d.assignee;
+                                            const ag = agreements.find(a => a.origin_dialogue_id === d.id);
+
+                                            if (!assigneeType && ag) {
+                                                assigneeType = ag.assignee;
+                                            }
+
+                                            if (!assigneeType) return false;
+
+                                            if (dialogueFilterType === 'both') return assigneeType === 'both';
+
+                                            const creator = d.created_by_user_id;
+                                            let realAssigneeId = '';
+
+                                            if (assigneeType === 'me') realAssigneeId = creator;
+                                            else if (assigneeType === 'partner') realAssigneeId = (creator === userId ? partnerId : userId) || '';
+
+                                            // Strict check based on real ID
+                                            if (dialogueFilterType === 'me') return realAssigneeId === userId;
+                                            if (dialogueFilterType === 'partner') return realAssigneeId !== userId && realAssigneeId !== '' && realAssigneeId !== null;
+
+                                            return true;
+                                        })
+                                        .sort((a, b) => {
+                                            const dateA = new Date(a.dialogue_date).getTime();
+                                            const dateB = new Date(b.dialogue_date).getTime();
+                                            return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+                                        })
+                                        .map((d, i) => {
+                                            // Random but deterministic gradient
+                                            const gradients = [
+                                                "from-blue-500/[0.03] to-purple-500/[0.03]",
+                                                "from-rose-500/[0.03] to-orange-500/[0.03]",
+                                                "from-emerald-500/[0.03] to-teal-500/[0.03]",
+                                                "from-amber-500/[0.03] to-yellow-500/[0.03]",
+                                                "from-indigo-500/[0.03] to-cyan-500/[0.03]"
+                                            ];
+                                            const grad = gradients[i % gradients.length];
+
+                                            // Assignee Badge Logic
+                                            const ag = agreements.find(a => a.origin_dialogue_id === d.id);
+                                            let assigneeLabel = '';
+                                            let assigneeColor = 'text-gray-400';
+
+                                            if (ag && ag.assignee) {
+                                                if (ag.assignee === 'both') {
+                                                    assigneeLabel = 'عهد مشترك';
+                                                    assigneeColor = 'text-purple-500';
+                                                } else {
+                                                    const creator = d.created_by_user_id;
+                                                    let realAssigneeId = '';
+                                                    if (ag.assignee === 'me') realAssigneeId = creator;
+                                                    else if (ag.assignee === 'partner') realAssigneeId = (creator === userId ? partnerId : userId) || '';
+
+                                                    if (realAssigneeId === userId) {
+                                                        assigneeLabel = `عهد عليّ (${names.me})`;
+                                                        assigneeColor = 'text-blue-500';
+                                                    } else if (realAssigneeId) {
+                                                        assigneeLabel = `عهد على ${names.partner}`;
+                                                        assigneeColor = 'text-rose-500';
+                                                    }
+                                                }
+                                            }
+
+                                            return (
+                                                <motion.div
+                                                    key={d.id}
+                                                    layoutId={`dialogue-card-${d.id}`}
+                                                    initial={{ opacity: 0, scale: 0.9 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    transition={{ delay: i * 0.05 }}
+                                                    onClick={() => setSelectedDialogue(d)}
+                                                    className="relative group cursor-pointer active:scale-95"
                                                 >
-                                                    <Trash2 className="w-5 h-5" />
-                                                </motion.button>
-                                            </div>
-                                        </div>
+                                                    <div className={`relative bg-gradient-to-br ${grad} bg-white dark:bg-[#0a0505]/80 backdrop-blur-md border border-white dark:border-white/5 rounded-[3.2rem] p-6 overflow-hidden flex flex-col justify-between h-[165px] shadow-2xl shadow-blue-900/[0.03] group-hover:shadow-blue-500/[0.06] transition-all duration-700`}>
+                                                        {/* Subtly Decorative Shape */}
+                                                        <div className={`absolute -bottom-10 -left-10 w-40 h-40 bg-current opacity-[0.03] rounded-full blur-3xl group-hover:opacity-[0.06] transition-opacity`} />
 
-                                        {c.status === 'failed' ? (
-                                            <motion.div
-                                                initial={{ y: 20, opacity: 0 }}
-                                                animate={{ y: 0, opacity: 1 }}
-                                                className="glass-dark border-rose-500/10 rounded-[3rem] p-10 text-center relative overflow-hidden"
-                                            >
-                                                <div className="absolute top-0 right-0 w-40 h-40 bg-rose-500/5 rounded-full blur-3xl -mr-20 -mt-20" />
-                                                <span className="text-[9px] font-black text-rose-500/40 uppercase tracking-[0.3em] block mb-4">كفارة الوعد</span>
-                                                <p className="text-xl font-black text-foreground tracking-tight flex items-center justify-center gap-3">
-                                                    <AlertCircle className="w-5 h-5 text-rose-500/30" />
-                                                    {c.punishment || 'لم يتم تحديد أثر'}
-                                                </p>
-                                                <div className="mt-8 inline-flex items-center gap-3 px-6 py-2 glass border-rose-500/20 rounded-full text-[9px] font-black text-rose-500 uppercase tracking-widest leading-none">
-                                                    تم تسجيل التقصير اليوم ⚠️
-                                                </div>
-                                            </motion.div>
-                                        ) : (
-                                            <div className="space-y-10">
-                                                <div className="glass-dark border-white/5 rounded-[2.5rem] p-6 shadow-inner shadow-black/5">
-                                                    <div className="flex items-center justify-between mb-4 px-2">
-                                                        <span className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-[0.2em]">مؤشر المداومة</span>
-                                                        <div className="flex items-baseline gap-2">
-                                                            <span className="text-3xl font-black text-blue-600 tracking-tighter leading-none">{c.current_count}</span>
-                                                            <span className="text-[9px] font-black text-muted-foreground/40 uppercase leading-none">/ {c.target_count}</span>
+                                                        <div className="flex justify-between items-start relative z-10">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-10 h-10 bg-white/40 dark:bg-white/5 border border-white/20 dark:border-white/5 rounded-full flex items-center justify-center text-foreground/50 transition-all shadow-sm">
+                                                                    <MessageCircle className="w-5 h-5 opacity-70" />
+                                                                </div>
+                                                                {assigneeLabel && (
+                                                                    <span className={`text-[9px] font-black ${assigneeColor} bg-white/50 dark:bg-black/20 px-2 py-1 rounded-full border border-white/20`}>{assigneeLabel}</span>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="px-3 py-1.5 bg-white/40 dark:bg-white/5 border border-white/20 dark:border-white/5 rounded-full shadow-sm">
+                                                                <span className="text-[9px] font-black text-foreground/30 uppercase tracking-[0.2em]">
+                                                                    {d.dialogue_date?.slice(5).replace('-', '_')}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="space-y-2 text-right relative z-10">
+                                                            <h3 className="font-black text-base leading-[1.2] line-clamp-2 tracking-tight text-foreground/80 group-hover:text-foreground transition-colors">{d.title}</h3>
+                                                            <div className="flex items-center gap-1.5 justify-end opacity-30 group-hover:opacity-50 transition-all">
+                                                                <p className="text-[9px] font-black uppercase tracking-widest line-clamp-1">{d.problem || d.description || 'تأسيس حوار'}</p>
+                                                                <div className="w-1 h-1 rounded-full bg-foreground/40" />
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div className="h-3 w-full glass-dark border-white/10 rounded-full overflow-hidden p-0.5">
-                                                        <motion.div
-                                                            initial={{ width: 0 }}
-                                                            animate={{ width: `${Math.min(100, (c.current_count / c.target_count) * 100)}%` }}
-                                                            className="h-full bg-blue-500 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.5)]"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <Button
-                                                    onClick={() => handleMarkProgress(c.id, c.current_count, c.target_count)}
-                                                    disabled={c.current_count >= c.target_count}
-                                                    className="w-full h-16 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-blue-500/20 relative overflow-hidden group/btn bg-blue-600 text-white transition-all transform hover:scale-[1.01] active:scale-95 disabled:opacity-30"
-                                                >
-                                                    {c.current_count >= c.target_count ? (
-                                                        <span className="flex items-center justify-center gap-3 leading-none">
-                                                            تم بلوغ الغاية بنجاح <CheckCircle2 className="w-6 h-6" />
-                                                        </span>
-                                                    ) : (
-                                                        <span className="flex items-center justify-center gap-3 tracking-[0.2em] leading-none">
-                                                            تسجيل إتمام الهمة <Plus className="w-6 h-6" />
-                                                        </span>
-                                                    )}
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Wizard Modal for New Dialogue */}
-            <AnimatePresence>
-                {showAddDialogue && (
-                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
+                                                </motion.div>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+                        </motion.div>
+                    ) : (
                         <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-black/60 backdrop-blur-xl"
-                            onClick={() => setShowAddDialogue(false)}
-                        />
-                        <motion.div
-                            initial={{ scale: 0.9, y: 40, opacity: 0 }}
-                            animate={{ scale: 1, y: 0, opacity: 1 }}
-                            exit={{ scale: 0.9, y: 40, opacity: 0 }}
-                            className="relative w-full max-w-md bg-card/70 backdrop-blur-2xl rounded-[3.5rem] p-10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] z-10 border border-white/20 overflow-hidden"
+                            key="commitments"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            className="space-y-6"
                         >
-                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
-
-                            {/* Step Indicators */}
-                            <div className="flex justify-center gap-2.5 mb-10">
-                                {[1, 2, 3, 4, 5].map(step => (
-                                    <div key={step} className={`h-1.5 rounded-full transition-all duration-500 ${step <= dialogueStep ? 'w-10 bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'w-2 bg-muted'}`} />
+                            <div className="flex items-center gap-2 justify-end overflow-x-auto scrollbar-hide pb-2 px-1">
+                                {[
+                                    { id: 'all', label: 'الكل' },
+                                    { id: 'me', label: names.me },
+                                    { id: 'partner', label: names.partner }
+                                ].map((f) => (
+                                    <button
+                                        key={f.id}
+                                        onClick={() => setFilterType(f.id as any)}
+                                        className={`px-4 py-1.5 rounded-full text-[9px] font-black transition-all border ${filterType === f.id ? 'bg-blue-500 text-white border-blue-500' : 'bg-white/40 dark:bg-white/5 text-muted-foreground border-white/40 dark:border-white/5 hover:border-blue-500/50'}`}
+                                    >
+                                        {f.label}
+                                    </button>
                                 ))}
                             </div>
 
+                            {commitments.length === 0 && !loading && (
+                                <div className="py-24 text-center space-y-6 opacity-20">
+                                    <div className="w-24 h-24 glass border-white/10 rounded-[3rem] flex items-center justify-center mx-auto"><Flame className="w-10 h-10" /></div>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.3em]">لا توجد التزامات نشطة..</p>
+                                </div>
+                            )}
+
+                            {commitments
+                                .filter(c => {
+                                    if (filterType === 'all') return true;
+                                    if (filterType === 'both') return false;
+                                    if (filterType === 'me') return c.owner_user_id === userId;
+                                    if (filterType === 'partner') return c.owner_user_id !== userId;
+                                    return true;
+                                })
+                                .map((c, i) => (
+                                    <motion.div
+                                        key={c.id}
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: i * 0.1 }}
+                                        className="relative group bg-white dark:bg-[#0a0505]/60 rounded-[2.5rem] p-5 shadow-sm border border-black/5 dark:border-white/5 overflow-hidden hover:shadow-lg transition-all"
+                                    >
+                                        <div className="flex items-center justify-between mb-4 relative z-10">
+                                            <div className="flex items-center gap-3 text-right">
+                                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner ${c.status === 'failed' ? 'bg-rose-500/10 text-rose-500' : 'bg-blue-500/5 text-blue-500'}`}>
+                                                    {c.status === 'failed' ? <XCircle className="w-5 h-5" /> : <Flame className="w-5 h-5" />}
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-base font-black text-foreground tracking-tight leading-none mb-1">{c.title}</h3>
+                                                    <span className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest">{c.owner_user_id === userId ? names.me : names.partner}</span>
+                                                </div>
+                                            </div>
+
+                                            {c.status !== 'failed' && (
+                                                <div className="flex items-center gap-2">
+                                                    {isObserver(c.owner_user_id) && (
+                                                        <button onClick={() => setConfirmModal({ show: true, type: 'fail_commitment', data: c })} className="w-8 h-8 flex items-center justify-center bg-rose-500/5 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all"><AlertTriangle className="w-3.5 h-3.5" /></button>
+                                                    )}
+                                                    <button onClick={() => setConfirmModal({ show: true, type: 'delete_commitment', data: c })} className="w-8 h-8 flex items-center justify-center bg-black/5 dark:bg-white/5 text-muted-foreground/40 rounded-xl hover:bg-rose-500 hover:text-white transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {c.status === 'failed' ? (
+                                            <div className="bg-rose-500/5 border border-rose-500/10 rounded-[1.8rem] p-4 text-center">
+                                                <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest block mb-1">كفارة الغياب</span>
+                                                <p className="text-sm font-bold text-foreground/80">{c.punishment || 'المودة والاعتذار'}</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-end justify-between gap-4">
+                                                <div className="flex-1 space-y-2">
+                                                    <div className="flex justify-between items-end px-1">
+                                                        <span className="text-[10px] font-black text-blue-500/60">{Math.round((c.current_count / c.target_count) * 100)}%</span>
+                                                        <span className="text-sm font-black text-blue-600">{c.current_count}<span className="text-[10px] opacity-40">/{c.target_count}</span></span>
+                                                    </div>
+                                                    <div className="h-2 w-full bg-black/5 dark:bg-white/5 rounded-full overflow-hidden"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, (c.current_count / c.target_count) * 100)}%` }} className="h-full bg-blue-500 rounded-full" /></div>
+                                                </div>
+                                                <Button
+                                                    onClick={() => handleMarkProgress(c.id, c.current_count, c.target_count)}
+                                                    disabled={c.current_count >= c.target_count || c.owner_user_id !== userId}
+                                                    className={`h-10 px-5 rounded-2xl font-black text-[10px] shadow-lg ${c.current_count >= c.target_count
+                                                        ? 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20 disabled:opacity-100'
+                                                        : c.owner_user_id !== userId
+                                                            ? 'bg-muted text-muted-foreground shadow-none'
+                                                            : 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/20'
+                                                        }`}
+                                                >
+                                                    {c.current_count >= c.target_count ? 'مكتمل' : c.owner_user_id !== userId ? 'للشريك' : 'إتمام'}
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                ))}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+
+            {/* Modals - Dialogue Wizard */}
+            <AnimatePresence>
+                {showAddDialogue && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-xl" onClick={() => setShowAddDialogue(false)} />
+                        <motion.div initial={{ scale: 0.9, y: 40, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} exit={{ scale: 0.9, y: 40, opacity: 0 }} className="relative w-full max-w-md bg-white dark:bg-[#0a0505] rounded-[3.5rem] p-10 shadow-2xl z-10 border border-white/20 overflow-hidden">
+                            <div className="flex justify-center gap-2 mb-10">
+                                {[1, 2, 3, 4, 5].map(step => (
+                                    <div key={step} className={`h-1.5 rounded-full transition-all duration-500 ${step <= dialogueStep ? 'w-10 bg-blue-500' : 'w-2 bg-muted'}`} />
+                                ))}
+                            </div>
                             <div className="min-h-[360px] flex flex-col">
                                 {dialogueStep === 1 && (
-                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex-1 space-y-6 text-right">
-                                        <div className="space-y-2">
-                                            <h3 className="text-3xl font-black text-foreground tracking-tight">شو المشكلة؟ 🧐</h3>
-                                            <p className="text-sm text-muted-foreground font-bold">لخصي الموضوع بعنوان ووصف بسيط</p>
-                                        </div>
-                                        <div className="space-y-4">
-                                            <input
-                                                className="w-full h-16 rounded-2xl bg-muted/40 border border-border/50 px-6 text-right font-bold text-foreground focus:ring-4 ring-primary/10 transition-all outline-none"
-                                                placeholder="عنوان الموضوع..."
-                                                value={dialogueForm.title}
-                                                onChange={e => setDialogueForm({ ...dialogueForm, title: e.target.value })}
-                                            />
-                                            <textarea
-                                                className="w-full h-36 rounded-3xl bg-muted/40 border border-border/50 p-6 text-right font-bold text-foreground resize-none focus:ring-4 ring-primary/10 transition-all outline-none"
-                                                placeholder="احكيلي شو اللي صار..."
-                                                value={dialogueForm.problem}
-                                                onChange={e => setDialogueForm({ ...dialogueForm, problem: e.target.value })}
-                                            />
-                                        </div>
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6 text-right">
+                                        <h3 className="text-3xl font-black">شو المشكلة؟ 🧐</h3>
+                                        <input className="w-full h-16 rounded-2xl bg-muted/40 px-6 text-right font-bold" placeholder="عنوان الموضوع..." value={dialogueForm.title} onChange={e => setDialogueForm({ ...dialogueForm, title: e.target.value })} />
+                                        <textarea className="w-full h-36 rounded-3xl bg-muted/40 p-6 text-right font-bold resize-none" placeholder="شوية تفاصيل..." value={dialogueForm.problem} onChange={e => setDialogueForm({ ...dialogueForm, problem: e.target.value })} />
                                     </motion.div>
                                 )}
                                 {dialogueStep === 2 && (
-                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex-1 space-y-6 text-right">
-                                        <div className="space-y-2">
-                                            <h3 className="text-3xl font-black text-foreground tracking-tight">رأيك أنتِ 🌸</h3>
-                                            <p className="text-sm text-muted-foreground font-bold">كيف شايفة الموضوع من زاويتك؟</p>
-                                        </div>
-                                        <textarea
-                                            className="w-full h-64 rounded-[2.5rem] bg-indigo-500/[0.03] border border-indigo-500/10 p-7 text-right font-bold text-foreground resize-none focus:ring-4 ring-indigo-500/10 transition-all outline-none italic"
-                                            placeholder="أنا بشوف إنه..."
-                                            value={dialogueForm.my_opinion}
-                                            onChange={e => setDialogueForm({ ...dialogueForm, my_opinion: e.target.value })}
-                                        />
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6 text-right">
+                                        <h3 className="text-3xl font-black">رأيك أنتِ 🌸</h3>
+                                        <textarea className="w-full h-64 rounded-[2.5rem] bg-indigo-500/5 p-7 text-right font-bold resize-none italic" placeholder="أنا بشوف إنه..." value={dialogueForm.my_opinion} onChange={e => setDialogueForm({ ...dialogueForm, my_opinion: e.target.value })} />
                                     </motion.div>
                                 )}
                                 {dialogueStep === 3 && (
-                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex-1 space-y-6 text-right">
-                                        <div className="space-y-2">
-                                            <h3 className="text-3xl font-black text-foreground tracking-tight">رأيه هو 🧔🏻‍♂️</h3>
-                                            <p className="text-sm text-muted-foreground font-bold">شو كان رده أو وجهة نظره؟</p>
-                                        </div>
-                                        <textarea
-                                            className="w-full h-64 rounded-[2.5rem] bg-amber-500/[0.03] border border-amber-500/10 p-7 text-right font-bold text-foreground resize-none focus:ring-4 ring-amber-500/10 transition-all outline-none italic"
-                                            placeholder="هو حكى إنه..."
-                                            value={dialogueForm.partner_opinion}
-                                            onChange={e => setDialogueForm({ ...dialogueForm, partner_opinion: e.target.value })}
-                                        />
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6 text-right">
+                                        <h3 className="text-3xl font-black">رأيه هو 🧔🏻‍♂️</h3>
+                                        <textarea className="w-full h-64 rounded-[2.5rem] bg-amber-500/5 p-7 text-right font-bold resize-none italic" placeholder="هو حكى إنه..." value={dialogueForm.partner_opinion} onChange={e => setDialogueForm({ ...dialogueForm, partner_opinion: e.target.value })} />
                                     </motion.div>
                                 )}
                                 {dialogueStep === 4 && (
-                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex-1 space-y-6 text-right">
-                                        <div className="space-y-2">
-                                            <h3 className="text-3xl font-black text-foreground tracking-tight">الحل والوعد 🤝</h3>
-                                            <p className="text-sm text-muted-foreground font-bold">على شو اتفقتوا بالنهاية؟</p>
-                                        </div>
-                                        <textarea
-                                            className="w-full h-64 rounded-[2.5rem] bg-emerald-500/[0.03] border border-emerald-500/10 p-7 text-right font-bold text-foreground resize-none focus:ring-4 ring-emerald-500/10 transition-all outline-none"
-                                            placeholder="اتفقنا إنه..."
-                                            value={dialogueForm.solution}
-                                            onChange={e => setDialogueForm({ ...dialogueForm, solution: e.target.value })}
-                                        />
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6 text-right">
+                                        <h3 className="text-3xl font-black">الحل والوعد 🤝</h3>
+                                        <textarea className="w-full h-64 rounded-[2.5rem] bg-emerald-500/5 p-7 text-right font-bold resize-none" placeholder="اتفقنا إنه..." value={dialogueForm.solution} onChange={e => setDialogueForm({ ...dialogueForm, solution: e.target.value })} />
                                     </motion.div>
                                 )}
                                 {dialogueStep === 5 && (
-                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex-1 space-y-6 text-right">
-                                        <div className="space-y-2">
-                                            <h3 className="text-3xl font-black text-foreground tracking-tight">مين المسؤول؟ 👤</h3>
-                                            <p className="text-sm text-muted-foreground font-bold">حددي مين لازم يلتزم بهذا الوعد</p>
-                                        </div>
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6 text-right">
+                                        <h3 className="text-3xl font-black">مين المسؤول؟ 👤</h3>
                                         <div className="space-y-3">
                                             {['me', 'partner', 'both'].map((type) => (
-                                                <motion.button
-                                                    key={type}
-                                                    whileHover={{ x: -4 }}
-                                                    whileTap={{ scale: 0.98 }}
-                                                    onClick={() => setDialogueForm({ ...dialogueForm, assignee: type as any })}
-                                                    className={`w-full p-6 rounded-3xl border-2 transition-all text-right flex items-center justify-between ${dialogueForm.assignee === type ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/5' : 'border-border/40 bg-muted/20 hover:bg-muted/40'}`}
-                                                >
-                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${dialogueForm.assignee === type ? 'border-blue-500' : 'border-muted-foreground/30'}`}>
-                                                        {dialogueForm.assignee === type && <div className="w-3 h-3 rounded-full bg-blue-500" />}
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-base font-black text-foreground">
-                                                            {type === 'me' ? names.me : type === 'partner' ? names.partner : 'كلينا'}
-                                                        </p>
-                                                        <p className="text-[10px] text-muted-foreground font-black opacity-70 uppercase">
-                                                            {type === 'me' ? 'أنا المسؤول' : type === 'partner' ? 'هو المسؤول' : 'مسؤولية مشتركة'}
-                                                        </p>
-                                                    </div>
-                                                </motion.button>
+                                                <button key={type} onClick={() => setDialogueForm({ ...dialogueForm, assignee: type as any })} className={`w-full p-6 rounded-3xl border-2 transition-all text-right flex items-center justify-between ${dialogueForm.assignee === type ? 'border-blue-500 bg-blue-500/10' : 'border-border/40 bg-muted/20'}`}>
+                                                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${dialogueForm.assignee === type ? 'border-blue-500' : 'border-muted-foreground/30'}`}>{dialogueForm.assignee === type && <div className="w-3 h-3 rounded-full bg-blue-500" />}</div>
+                                                    <div><p className="font-black">{type === 'me' ? names.me : type === 'partner' ? names.partner : 'كلينا'}</p></div>
+                                                </button>
                                             ))}
                                         </div>
                                     </motion.div>
                                 )}
                             </div>
-
-                            <div className="flex gap-4 mt-10">
-                                {dialogueStep > 1 && (
-                                    <button
-                                        onClick={prevStep}
-                                        className="h-16 px-8 rounded-2xl bg-muted/40 text-muted-foreground font-black text-sm hover:bg-muted/60 transition-colors"
-                                    >
-                                        رجوع
-                                    </button>
-                                )}
-                                <Button
-                                    onClick={dialogueStep === 5 ? handleSaveDialogue : nextStep}
-                                    disabled={isSubmitting}
-                                    className="flex-1 h-16 rounded-2xl font-black text-sm shadow-xl shadow-blue-500/20"
-                                >
-                                    {dialogueStep === 5 ? (isSubmitting ? 'جاري الحفظ...' : 'اعتماد وحفظ الوعد ✨') : 'التالي'}
-                                </Button>
+                            <div className="flex gap-4 mt-8">
+                                {dialogueStep > 1 && <button onClick={prevStep} className="h-16 px-8 rounded-2xl bg-muted/40 font-black">رجوع</button>}
+                                <Button onClick={dialogueStep === 5 ? handleSaveDialogue : nextStep} disabled={isSubmitting} className="flex-1 h-16 rounded-2xl font-black shadow-xl shadow-blue-500/20">{dialogueStep === 5 ? 'حفظ الميثاق ✨' : 'التالي'}</Button>
                             </div>
                         </motion.div>
                     </div>
@@ -692,248 +664,161 @@ export function DialogueScreen({ onBack, userId, partnershipId, isDarkMode }: Di
                 {showAddCommitment && (
                     <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-xl" onClick={() => setShowAddCommitment(false)} />
-                        <motion.div
-                            initial={{ scale: 0.9, y: 40, opacity: 0 }}
-                            animate={{ scale: 1, y: 0, opacity: 1 }}
-                            exit={{ scale: 0.9, y: 40, opacity: 0 }}
-                            className="relative w-full max-w-md bg-card/70 backdrop-blur-2xl rounded-[3.5rem] p-10 shadow-2xl z-10 border border-white/20"
-                        >
-                            <h2 className="text-3xl font-black mb-8 text-foreground text-right tracking-tight">التزام جديد 💪</h2>
+                        <motion.div initial={{ scale: 0.9, y: 40, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} exit={{ scale: 0.9, y: 40, opacity: 0 }} className="relative w-full max-w-md bg-white dark:bg-[#0a0505] rounded-[3.5rem] p-10 shadow-2xl z-10 border border-white/20">
+                            <h2 className="text-3xl font-black mb-8 text-right">التزام جديد 💪</h2>
                             <form onSubmit={handleSaveCommitment} className="space-y-6">
-                                <div className="space-y-2 text-right">
-                                    <label className="text-[11px] font-black text-muted-foreground uppercase mr-1 opacity-70">شو الالتزام؟</label>
-                                    <input required className="w-full h-16 rounded-2xl bg-muted/40 border border-border/50 px-6 text-right font-bold text-foreground focus:ring-4 ring-primary/10 transition-all outline-none" placeholder="مثلاً: جيم، قراءة..." value={commitmentForm.title} onChange={e => setCommitmentForm({ ...commitmentForm, title: e.target.value })} />
-                                </div>
-                                <div className="space-y-3 text-right">
-                                    <label className="text-[11px] font-black text-muted-foreground uppercase mr-1 opacity-70">مين صاحب الالتزام؟</label>
-                                    <div className="flex gap-3">
-                                        {['partner', 'me'].map((type) => (
-                                            <button
-                                                key={type}
-                                                type="button"
-                                                onClick={() => setCommitmentForm({ ...commitmentForm, assignee: type as any })}
-                                                className={`flex-1 h-14 rounded-2xl border-2 transition-all font-black text-sm ${commitmentForm.assignee === type ? 'border-blue-500 bg-blue-500/10 ring-4 ring-blue-500/5' : 'border-border/40 bg-muted/20 hover:bg-muted/40'}`}
-                                            >
-                                                {type === 'partner' ? names.partner : names.me}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2 text-right">
-                                    <label className="text-[11px] font-black text-muted-foreground uppercase mr-1 opacity-70">شو العقوبة إذا فشل؟ 😅</label>
-                                    <textarea required className="w-full h-28 rounded-[2rem] bg-muted/40 border border-border/50 p-6 text-right font-bold text-foreground resize-none focus:ring-4 ring-primary/10 transition-all outline-none" placeholder="عزيمة، مشوار، هدية..." value={commitmentForm.punishment} onChange={e => setCommitmentForm({ ...commitmentForm, punishment: e.target.value })} />
-                                </div>
-
+                                <div className="space-y-2 text-right"><label className="text-[10px] font-black uppercase opacity-40">شو الالتزام؟</label><input required className="w-full h-16 rounded-2xl bg-muted/40 px-6 text-right font-bold" placeholder="مثلاً: جيم، قراءة..." value={commitmentForm.title} onChange={e => setCommitmentForm({ ...commitmentForm, title: e.target.value })} /></div>
+                                <div className="space-y-2 text-right"><label className="text-[10px] font-black uppercase opacity-40">مين صاحب الالتزام؟</label><div className="flex gap-3">{['partner', 'me'].map(t => <button key={t} type="button" onClick={() => setCommitmentForm({ ...commitmentForm, assignee: t as any })} className={`flex-1 h-14 rounded-2xl border-2 font-black transition-all ${commitmentForm.assignee === t ? 'border-blue-500 bg-blue-500/10' : 'border-border/40'}`}>{t === 'partner' ? names.partner : names.me}</button>)}</div></div>
+                                <div className="space-y-2 text-right"><label className="text-[10px] font-black uppercase opacity-40">شو العقوبة؟ 😅</label><textarea required className="w-full h-28 rounded-[2rem] bg-muted/40 p-6 text-right font-bold resize-none" placeholder="شوكولاته، مشوار..." value={commitmentForm.punishment} onChange={e => setCommitmentForm({ ...commitmentForm, punishment: e.target.value })} /></div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2 text-right">
-                                        <label className="text-[11px] font-black text-muted-foreground uppercase mr-1 opacity-70">التكرار</label>
-                                        <select className="w-full h-14 rounded-2xl bg-muted/40 border border-border/50 px-5 text-right font-bold text-foreground focus:ring-4 ring-primary/10 appearance-none outline-none" value={commitmentForm.period_type} onChange={e => setCommitmentForm({ ...commitmentForm, period_type: e.target.value as any })}>
-                                            <option value="daily">يومي</option>
-                                            <option value="weekly">أسبوعي</option>
-                                            <option value="monthly">شهري</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2 text-right">
-                                        <label className="text-[11px] font-black text-muted-foreground uppercase mr-1 opacity-70">الهدف</label>
-                                        <input type="number" min="1" max="100" required className="w-full h-14 rounded-2xl bg-muted/40 border border-border/50 px-5 text-right font-bold text-foreground focus:ring-4 ring-primary/10 outline-none" value={commitmentForm.target_count} onChange={e => setCommitmentForm({ ...commitmentForm, target_count: parseInt(e.target.value) })} />
-                                    </div>
+                                    <div className="space-y-2 text-right"><label className="text-[10px] font-black uppercase opacity-40">التكرار</label><select className="w-full h-14 rounded-2xl bg-muted/40 px-5 text-right font-bold appearance-none outline-none" value={commitmentForm.period_type} onChange={e => setCommitmentForm({ ...commitmentForm, period_type: e.target.value as any })}><option value="daily">يومي</option><option value="weekly">أسبوعي</option><option value="monthly">شهري</option></select></div>
+                                    <div className="space-y-2 text-right"><label className="text-[10px] font-black uppercase opacity-40">الهدف</label><input type="number" required className="w-full h-14 rounded-2xl bg-muted/40 px-5 text-right font-bold" value={commitmentForm.target_count} onChange={e => setCommitmentForm({ ...commitmentForm, target_count: parseInt(e.target.value) })} /></div>
                                 </div>
-
-                                <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2rem] font-black shadow-2xl shadow-blue-500/20 mt-6 text-sm bg-blue-600">
-                                    {isSubmitting ? 'جاري الحفظ...' : 'تثبيت الالتزام 💪'}
-                                </Button>
+                                <Button type="submit" disabled={isSubmitting} className="w-full h-16 rounded-[2rem] font-black bg-blue-600 shadow-xl shadow-blue-500/20 mt-4">{isSubmitting ? 'جاري الحفظ...' : 'تثبيت الالتزام 💪'}</Button>
                             </form>
                         </motion.div>
                     </div>
                 )}
             </AnimatePresence>
 
-
-
             {/* Selected Dialogue Details Modal */}
             <AnimatePresence>
                 {selectedDialogue && (
                     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-background/80 backdrop-blur-xl"
-                            onClick={() => setSelectedDialogue(null)}
-                        />
-                        <motion.div
-                            layoutId={`dialogue-card-${selectedDialogue.id}`}
-                            initial={{ scale: 0.9, y: 50, opacity: 0 }}
-                            animate={{ scale: 1, y: 0, opacity: 1 }}
-                            exit={{ scale: 0.9, y: 50, opacity: 0 }}
-                            className="w-full h-full max-h-[85vh] overflow-y-auto bg-card border border-border/50 rounded-[3rem] shadow-2xl relative z-10 max-w-lg scrollbar-hide"
-                        >
-                            {/* Decorative Header */}
-                            <div className="sticky top-0 bg-card/80 backdrop-blur-xl p-6 border-b border-border/10 z-20 flex justify-between items-center">
-                                <button
-                                    onClick={() => setSelectedDialogue(null)}
-                                    className="w-10 h-10 bg-muted rounded-full flex items-center justify-center hover:bg-muted/80"
-                                >
-                                    <ArrowLeft className="w-4 h-4" />
-                                </button>
-                                <div className="flex items-center gap-2">
-                                    <div className="text-right">
-                                        <h3 className="font-black text-sm">{selectedDialogue.title}</h3>
-                                        <p className="text-[10px] text-muted-foreground font-bold">{selectedDialogue.dialogue_date}</p>
-                                    </div>
-                                    <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500">
-                                        <MessageCircle className="w-5 h-5" />
-                                    </div>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-background/60 backdrop-blur-3xl" onClick={() => setSelectedDialogue(null)} />
+                        <motion.div layoutId={`dialogue-card-${selectedDialogue.id}`} className="w-full h-full max-h-[90vh] overflow-y-auto bg-white/95 dark:bg-[#0a0505]/95 rounded-[4rem] shadow-4xl relative z-10 max-w-lg scrollbar-hide border border-white dark:border-white/10">
+                            <div className="sticky top-0 bg-white/10 backdrop-blur-2xl p-8 border-b border-black/5 flex justify-between items-center z-20">
+                                <button onClick={() => setSelectedDialogue(null)} className="w-12 h-12 bg-muted/40 rounded-2xl flex items-center justify-center"><ArrowLeft className="w-5 h-5" /></button>
+                                <div className="flex items-center gap-4 text-right">
+                                    <div><h3 className="font-black text-lg">{selectedDialogue.title}</h3><p className="text-[10px] text-blue-500 font-black uppercase tracking-widest">{selectedDialogue.dialogue_date}</p></div>
+                                    <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-500"><MessageCircle className="w-6 h-6" /></div>
                                 </div>
                             </div>
-
-                            <div className="p-8 space-y-8">
-                                {/* Visual Flow Journey - Reusing existing design */}
-                                <div className="space-y-8 relative">
-                                    {/* Journey Line */}
-                                    <div className="absolute top-4 right-[19px] bottom-10 w-0.5 bg-gradient-to-b from-rose-500/20 via-indigo-500/20 to-emerald-500/20 -z-10" />
-
-                                    {/* 1. The Issue */}
-                                    <div className="flex items-start gap-5">
-                                        <div className="w-10 h-10 rounded-full bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-rose-500/30 border-4 border-card relative z-10">
-                                            <AlertCircle className="w-5 h-5" />
-                                        </div>
-                                        <div className="bg-rose-500/[0.03] rounded-3xl p-6 w-full border border-rose-500/10 space-y-2">
-                                            <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest block opacity-70">نقطة الخلاف</span>
-                                            <p className="text-base font-bold text-foreground/90 leading-relaxed text-right">{selectedDialogue.problem || selectedDialogue.description}</p>
-                                        </div>
+                            <div className="p-10 space-y-12 pb-24 text-right">
+                                <div className="space-y-10 relative">
+                                    <div className="absolute top-4 right-[23px] bottom-10 w-1 bg-gradient-to-b from-rose-500/30 via-indigo-500/30 to-emerald-500/30 -z-10 rounded-full blur-[1px]" />
+                                    <div className="flex items-start gap-6">
+                                        <div className="w-12 h-12 rounded-2xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-lg relative z-10"><AlertCircle className="w-6 h-6" /></div>
+                                        <div className="flex-1"><span className="text-[10px] font-black text-rose-500 uppercase opacity-40">أصل المسألة</span><div className="bg-rose-500/5 p-7 rounded-[2.5rem] mt-2"><p className="font-bold leading-relaxed">{selectedDialogue.problem || selectedDialogue.description}</p></div></div>
                                     </div>
-
-                                    {/* 2. The Opinions */}
-                                    <div className="flex items-start gap-5">
-                                        <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/30 border-4 border-card relative z-10">
-                                            <MessageCircle className="w-5 h-5" />
-                                        </div>
+                                    <div className="flex items-start gap-6">
+                                        <div className="w-12 h-12 rounded-2xl bg-indigo-500 text-white flex items-center justify-center shrink-0 shadow-lg relative z-10"><MessageCircle className="w-6 h-6" /></div>
                                         <div className="space-y-4 w-full">
-                                            <div className="bg-indigo-500/[0.03] rounded-3xl p-6 border border-indigo-500/10 relative text-right">
-                                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-500/10 rounded-full blur-sm" />
-                                                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block mb-2">{names.me}</span>
-                                                <p className="text-sm font-bold text-foreground/80 leading-relaxed italic">"{selectedDialogue.my_opinion || '...'}"</p>
+                                            <div className="bg-indigo-500/5 rounded-[2rem] p-6">
+                                                <span className="text-[9px] font-black text-indigo-500 block mb-2">{names.me}</span>
+                                                <p className="font-bold italic opacity-80">"{selectedDialogue.my_opinion || '...'}"</p>
                                             </div>
-                                            <div className="bg-indigo-500/[0.03] rounded-3xl p-6 border border-indigo-500/10 relative text-right">
-                                                <div className="absolute -top-1 -left-1 w-4 h-4 bg-indigo-500/10 rounded-full blur-sm" />
-                                                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest block mb-2">{names.partner}</span>
-                                                <p className="text-sm font-bold text-foreground/80 leading-relaxed italic">"{selectedDialogue.partner_opinion || '...'}"</p>
+                                            <div className="bg-indigo-500/5 rounded-[2rem] p-6">
+                                                <span className="text-[9px] font-black text-indigo-500 block mb-2">{names.partner}</span>
+                                                <p className="font-bold italic opacity-80">"{selectedDialogue.partner_opinion || '...'}"</p>
                                             </div>
                                         </div>
                                     </div>
+                                    <div className="flex items-start gap-6">
+                                        <div className="flex flex-col items-center gap-2 relative z-10 shrink-0">
+                                            <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg"><ShieldCheck className="w-6 h-6" /></div>
 
-                                    {/* 3. The Decree (Agreement) */}
-                                    <div className="flex items-start gap-5">
-                                        <div className="w-10 h-10 rounded-full bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30 border-4 border-card relative z-10">
-                                            <ShieldCheck className="w-5 h-5" />
+                                            {/* Assignee Badge in Modal */}
+                                            {(() => {
+                                                let assigneeLabel = '';
+                                                let assigneeColor = 'bg-gray-100 text-gray-400';
+
+                                                // Try finding assignee from dialogue or agreement
+                                                const assigneeType = selectedDialogue.assignee;
+                                                const ag = agreements.find(a => (a.origin_dialogue_id === selectedDialogue.id) || (a.title === selectedDialogue.final_agreement));
+
+                                                let finalType = assigneeType;
+                                                if (!finalType && ag && ag.assignee) finalType = ag.assignee;
+
+                                                if (finalType) {
+                                                    if (finalType === 'both') {
+                                                        assigneeLabel = 'عهد مشترك';
+                                                        assigneeColor = 'bg-purple-500 text-white';
+                                                    } else {
+                                                        const creator = selectedDialogue.created_by_user_id;
+                                                        let realAssigneeId = '';
+
+                                                        // Resolve 'me'/'partner' relative to creator if needed
+                                                        // But usually 'me' means userId if created by me, etc.
+                                                        // Let's stick to the logic:
+                                                        if (finalType === 'me') realAssigneeId = creator;
+                                                        else if (finalType === 'partner') realAssigneeId = (creator === userId ? partnerId : userId) || '';
+
+                                                        if (realAssigneeId === userId) {
+                                                            assigneeLabel = 'عهد عليّ';
+                                                            assigneeColor = 'bg-blue-500 text-white';
+                                                        } else if (realAssigneeId) {
+                                                            assigneeLabel = 'عهد عليه/ا';
+                                                            assigneeColor = 'bg-rose-500 text-white';
+                                                        }
+                                                    }
+                                                }
+
+                                                if (assigneeLabel) {
+                                                    return <span className={`text-[8px] font-black py-1 px-2 rounded-lg ${assigneeColor} shadow-sm whitespace-nowrap`}>{assigneeLabel}</span>;
+                                                }
+                                                return null;
+                                            })()}
                                         </div>
-                                        <div className="bg-emerald-500/[0.06] rounded-[2rem] p-8 w-full border-2 border-emerald-500/10 relative overflow-hidden group/decree shadow-inner text-right">
-                                            <Sparkles className="absolute top-4 left-4 w-6 h-6 text-emerald-500/30 animate-pulse" />
-                                            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-emerald-500/5 rounded-full blur-3xl" />
-
-                                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] block mb-4">الاتفاق النهائي</span>
-                                            <p className="text-xl font-black text-foreground leading-snug tracking-tight">{selectedDialogue.final_agreement}</p>
+                                        <div className="bg-emerald-500/10 rounded-[3rem] p-10 w-full border-2 border-emerald-500/10">
+                                            <span className="text-[10px] font-black text-emerald-500 uppercase block mb-4">آية الاتفاق</span>
+                                            <p className="text-2xl font-black">{selectedDialogue.final_agreement || 'سكنٌ ومودة'}</p>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Linked Agreement Status */}
-                                <div className="pt-6 border-t border-border/10">
-                                    {(() => {
-                                        const ag = agreements.find(a =>
-                                            (a.origin_dialogue_id && a.origin_dialogue_id === selectedDialogue.id) ||
-                                            (a.title === selectedDialogue.final_agreement && a.partnership_id === selectedDialogue.partnership_id)
-                                        );
-
-                                        if (ag) {
-                                            return (
-                                                <div className="bg-muted/30 rounded-[2.5rem] p-6 text-right space-y-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
-                                                            <Target className="w-5 h-5" />
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="font-black text-sm">حالة الالتزام</h4>
-                                                            <p className="text-[10px] text-muted-foreground font-bold">متابعة تنفيذ الوعد</p>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex gap-3">
-                                                        <div className="flex-1 bg-background rounded-2xl p-4 border border-border/20 text-center">
-                                                            <span className="block text-2xl font-black text-foreground">{ag.breach_count || 0}</span>
-                                                            <span className="text-[10px] font-bold text-muted-foreground uppercase">مخالفة</span>
-                                                        </div>
-                                                        <Button
-                                                            variant="ghost"
-                                                            onClick={() => setConfirmModal({ show: true, type: 'breach', data: ag })}
-                                                            className="flex-1 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 h-auto rounded-2xl font-black text-xs"
-                                                        >
-                                                            تسجيل إخلاف
-                                                        </Button>
-                                                    </div>
+                                {(() => {
+                                    const ag = agreements.find(a => (a.origin_dialogue_id === selectedDialogue.id) || (a.title === selectedDialogue.final_agreement));
+                                    if (ag) return (
+                                        <div className="pt-10 border-t border-black/5 space-y-6">
+                                            <div className="bg-muted/20 dark:bg-white/5 rounded-[3rem] p-8 space-y-5">
+                                                <div className="flex items-center gap-4 justify-end">
+                                                    <div><h4 className="font-black text-lg">ميثاق التنفيذ</h4><p className="text-[10px] opacity-40">متابعة سريان الاتفاق</p></div>
+                                                    <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary"><Target className="w-6 h-6" /></div>
                                                 </div>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
-                                </div>
-
-                                {/* Delete Action */}
-                                <div className="pt-6">
-                                    <button
-                                        onClick={() => {
-                                            setConfirmModal({ show: true, type: 'delete_dialogue', data: selectedDialogue });
-                                            // Close details modal? No, wait for confirmation modal
-                                        }}
-                                        className="w-full h-14 flex items-center justify-center gap-2 text-rose-500 bg-rose-500/5 hover:bg-rose-500/10 rounded-2xl transition-colors font-black text-xs"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                        حذف هذه الجلسة نهائياً
-                                    </button>
-                                </div>
+                                                <div className="flex gap-4">
+                                                    <div className="flex-1 bg-white dark:bg-black/20 rounded-3xl p-5 border text-center relative group">
+                                                        <span className="block text-3xl font-black">{ag.breach_count || 0}</span>
+                                                        <span className="text-[10px] font-black opacity-40 uppercase">تجاوز للعهد</span>
+                                                        {ag.breach_count > 0 && <button onClick={() => handleReduceBreach(ag)} className="absolute top-2 left-2 w-6 h-6 bg-muted rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Plus className="w-3 h-3 rotate-45" /></button>}
+                                                    </div>
+                                                    <button onClick={() => setConfirmModal({ show: true, type: 'breach', data: ag })} className="flex-1 bg-rose-500/10 text-rose-500 rounded-3xl font-black text-xs uppercase hover:bg-rose-500 hover:text-white transition-all">تسجيل إخلاف ⚠️</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                    return null;
+                                })()}
+                                <button onClick={() => setConfirmModal({ show: true, type: 'delete_dialogue', data: selectedDialogue })} className="w-full py-6 text-rose-500/40 hover:text-rose-500 font-black text-[10px] uppercase">إلغاء أرشفة الجلسة</button>
                             </div>
                         </motion.div>
                     </div>
                 )}
             </AnimatePresence>
 
-            {/* Confirmation Modal - Reusing existing logic but ensure z-index is higher */}
+            {/* Confirmation Modal */}
             <AnimatePresence>
                 {confirmModal?.show && (
-                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-5">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-xl" onClick={() => setConfirmModal(null)} />
-                        <motion.div initial={{ scale: 0.9, y: 40, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} exit={{ scale: 0.9, y: 40, opacity: 0 }} className="relative w-full max-w-[320px] bg-card/80 backdrop-blur-2xl rounded-[3.5rem] p-10 shadow-2xl z-10 text-center border border-white/20">
-                            <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-inner ${confirmModal.type.includes('delete') ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                                {confirmModal.type.includes('delete') ? <Trash2 className="w-10 h-10" /> : <AlertTriangle className="w-10 h-10" />}
-                            </div>
-                            <h3 className="text-2xl font-black mb-3 text-foreground tracking-tight">
-                                {confirmModal.type === 'breach' && 'إبلاغ عن إخلاف؟'}
-                                {confirmModal.type === 'fail_commitment' && 'إبلاغ عن تقصير؟'}
-                                {confirmModal.type === 'delete_dialogue' && 'حذف الجلسة؟'}
-                                {confirmModal.type === 'delete_agreement' && 'حذف الوعد؟'}
-                                {confirmModal.type === 'delete_commitment' && 'حذف الالتزام؟'}
-                            </h3>
-                            <p className="text-sm font-bold text-muted-foreground mb-10 opacity-80 leading-relaxed px-2">
-                                {confirmModal.type === 'breach' && 'هل تم إخلاف الوعد فعلاً؟ سيتم تسجيل التجاوز في السجل.'}
-                                {confirmModal.type === 'fail_commitment' && 'هل يوجد تقصير في الالتزام؟ سيتم كشف العقوبة المتفق عليها.'}
-                                {confirmModal.type.includes('delete') && 'هل أنتِ متأكدة من الحذف؟ لا يمكن التراجع عن هذا الإجراء.'}
-                            </p>
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-5">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={() => setConfirmModal(null)} />
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-[320px] bg-white dark:bg-[#0a0505] rounded-[3rem] p-10 text-center z-10 border">
+                            <div className="w-20 h-20 rounded-3xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto mb-6"><AlertTriangle className="w-10 h-10" /></div>
+                            <h3 className="text-2xl font-black mb-4">هل أنت متأكد؟</h3>
+                            <p className="text-xs opacity-60 mb-8 uppercase font-black">هذا القرار قد يؤثر على سجل المودة.. هل نعتمد القرار؟</p>
                             <div className="flex flex-col gap-3">
-                                <Button variant="destructive" className="w-full h-14 rounded-2xl font-black text-sm shadow-xl shadow-rose-500/10" onClick={() => {
+                                <Button className="h-16 rounded-2xl bg-rose-600 font-black" onClick={() => {
                                     if (confirmModal.type === 'breach') handleBreach(confirmModal.data);
                                     else if (confirmModal.type === 'fail_commitment') handleCommitmentFail(confirmModal.data);
                                     else if (confirmModal.type === 'delete_dialogue') handleDeleteDialogue(confirmModal.data);
                                     else if (confirmModal.type === 'delete_agreement') handleDeleteAgreement(confirmModal.data);
                                     else if (confirmModal.type === 'delete_commitment') handleDeleteCommitment(confirmModal.data);
-                                }}>نعم، أنا متأكد</Button>
-                                <button className="w-full h-12 rounded-2xl font-black text-xs text-muted-foreground hover:bg-muted/30 transition-colors" onClick={() => setConfirmModal(null)}>تراجع</button>
+                                }}>نعم، اعتمد</Button>
+                                <button className="h-12 font-black text-[10px] opacity-40 uppercase" onClick={() => setConfirmModal(null)}>تراجع</button>
                             </div>
                         </motion.div>
                     </div>
                 )}
             </AnimatePresence>
-        </div >
+        </div>
     );
 }

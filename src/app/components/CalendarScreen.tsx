@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   ArrowLeft,
   Plus,
@@ -16,6 +16,8 @@ import {
   CalendarDays,
   History,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   LayoutGrid,
   Target
 } from 'lucide-react';
@@ -42,12 +44,55 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
   const [eventForm, setEventForm] = useState({ title: '', event_date: '', event_time: '', location: '', event_type: 'other' });
   const [memoryForm, setMemoryForm] = useState({ title: '', memory_date: new Date().toISOString().split('T')[0], description: '' });
   const [selectedImages, setSelectedImages] = useState<{ file: File, preview: string }[]>([]);
-  const [viewImage, setViewImage] = useState<string | null>(null);
-  const [limit, setLimit] = useState(15);
+
+  // Image gallery state - for viewing all images of a memory
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+  const [showGallery, setShowGallery] = useState(false);
+
+  const [limit, setLimit] = useState(6); // Reduced initial load for performance
+  const [hasMore, setHasMore] = useState(true);
+  const [initialLoadDone, setInitialLoadDone] = useState(false); // Track if first load completed
+  const [loadingMore, setLoadingMore] = useState(false); // Track if loading more (not initial)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const activeDateRef = useRef<HTMLButtonElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  // Open gallery with all images of a memory
+  const openGallery = useCallback((images: { image_url: string }[], startIndex: number = 0) => {
+    setGalleryImages(images.map(img => img.image_url));
+    setGalleryIndex(startIndex);
+    setShowGallery(true);
+  }, []);
+
+  // Navigate gallery
+  const nextImage = useCallback(() => {
+    setGalleryIndex(prev => (prev + 1) % galleryImages.length);
+  }, [galleryImages.length]);
+
+  const prevImage = useCallback(() => {
+    setGalleryIndex(prev => (prev - 1 + galleryImages.length) % galleryImages.length);
+  }, [galleryImages.length]);
+
+  // Intersection Observer for lazy loading more memories - only after initial load
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasMore || !initialLoadDone) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && !loadingMore && hasMore) {
+          setLoadingMore(true);
+          setLimit(prev => prev + 6);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(loadMoreRef.current);
+    return () => observer.disconnect();
+  }, [loading, hasMore, initialLoadDone, loadingMore]);
 
   useEffect(() => {
     if (activeDateRef.current) {
@@ -61,7 +106,7 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
     if (partnershipId) {
       loadTimelineData();
     }
-  }, [partnershipId]);
+  }, [partnershipId, limit]);
 
   const loadTimelineData = async () => {
     setLoading(true);
@@ -71,8 +116,14 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
     ]);
 
     if (eventsResult.data) setEvents(eventsResult.data);
-    if (memoriesResult.data) setMemories(memoriesResult.data);
+    if (memoriesResult.data) {
+      setMemories(memoriesResult.data);
+      // If we got less than limit, no more items to load
+      setHasMore(memoriesResult.data.length >= limit);
+    }
     setLoading(false);
+    setLoadingMore(false);
+    setInitialLoadDone(true); // Mark initial load as complete
   };
 
   const fetchEvents = async () => {
@@ -279,10 +330,10 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
             {filteredItems.map((item, idx) => (
               <div key={item.id} className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-12 relative items-start`}>
                 {viewMode === 'timeline' && (
-                  <div className="flex flex-col items-center w-14 shrink-0 pt-1 relative z-10 text-center">
-                    <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em]">{monthNames[item.date.getMonth()]}</span>
-                    <span className="text-4xl font-black text-foreground tracking-tighter my-2">{item.date.getDate()}</span>
-                    <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} className={`mt-6 w-5 h-5 rounded-full border-[4px] border-background shadow-xl ${item.type === 'event' ? 'bg-primary' : 'bg-rose-500'}`} />
+                  <div className="flex flex-col items-center w-12 shrink-0 pt-1 relative z-10 text-center">
+                    <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] opacity-80">{monthNames[item.date.getMonth()]}</span>
+                    <span className="text-3xl font-black text-foreground tracking-tighter my-1">{item.date.getDate()}</span>
+                    <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} className={`mt-4 w-3 h-3 rounded-full border-[3px] border-background shadow-lg ${item.type === 'event' ? 'bg-primary' : 'bg-rose-500'}`} />
                   </div>
                 )}
 
@@ -290,15 +341,56 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
                   {item.type === 'memory' ? (
                     <div className="glass rounded-[3rem] overflow-hidden border-white/20 group transition-all duration-700 hover:shadow-2xl">
                       {item.images && item.images.length > 0 && (
-                        <div className="aspect-[1.5] relative overflow-hidden bg-muted/5">
-                          <motion.img
-                            initial={{ opacity: 0 }}
-                            whileInView={{ opacity: 1 }}
-                            src={item.images[0].image_url}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[3s]"
-                            onClick={() => setViewImage(item.images![0].image_url)}
-                          />
-                          <div className="absolute bottom-6 left-6 glass-dark border-white/5 text-white px-4 py-2 rounded-xl text-[9px] font-black flex items-center gap-2.5 backdrop-blur-xl"><ImageIcon className="w-3.5 h-3.5 text-primary" /><span>{item.images.length} مشهد</span></div>
+                        <div className="relative overflow-hidden bg-muted/5 cursor-pointer" onClick={() => openGallery(item.images!, 0)}>
+                          {item.images.length === 1 ? (
+                            <motion.img
+                              initial={{ opacity: 0 }}
+                              whileInView={{ opacity: 1 }}
+                              src={item.images[0].image_url}
+                              loading="lazy"
+                              className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-[2s]"
+                            />
+                          ) : item.images.length === 2 ? (
+                            <div className="grid grid-cols-2 gap-0.5 h-48">
+                              {item.images.map((img: any, imgIdx: number) => (
+                                <motion.img
+                                  key={imgIdx}
+                                  initial={{ opacity: 0 }}
+                                  whileInView={{ opacity: 1 }}
+                                  src={img.image_url}
+                                  loading="lazy"
+                                  className="w-full h-full object-cover"
+                                  onClick={(e) => { e.stopPropagation(); openGallery(item.images!, imgIdx); }}
+                                />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 gap-0.5 h-48">
+                              {item.images.slice(0, 3).map((img: any, imgIdx: number) => (
+                                <motion.img
+                                  key={imgIdx}
+                                  initial={{ opacity: 0 }}
+                                  whileInView={{ opacity: 1 }}
+                                  src={img.image_url}
+                                  loading="lazy"
+                                  className={`w-full h-full object-cover ${imgIdx === 2 && item.images!.length > 3 ? 'brightness-50' : ''}`}
+                                  onClick={(e) => { e.stopPropagation(); openGallery(item.images!, imgIdx); }}
+                                />
+                              ))}
+                              {item.images.length > 3 && (
+                                <div className="absolute bottom-0 right-0 w-1/3 h-full flex items-center justify-center pointer-events-none">
+                                  <span className="text-white text-2xl font-black drop-shadow-lg">+{item.images.length - 3}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {item.images.length > 1 && (
+                            <div className="absolute bottom-3 left-3 bg-black/60 border border-white/10 text-white px-3 py-1.5 rounded-lg text-[8px] font-black flex items-center gap-2 backdrop-blur-md">
+                              <ImageIcon className="w-3 h-3 text-primary" />
+                              <span>{item.images.length} صور - انقر للعرض</span>
+                            </div>
+                          )}
                         </div>
                       )}
                       <div className="p-8 space-y-5">
@@ -343,9 +435,21 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
               </div>
             ))}
 
-            {timelineItems.length >= limit && (
-              <div className="flex justify-center pt-10">
-                <Button variant="outline" onClick={() => setLimit(prev => prev + 10)} className="rounded-[2.5rem] px-12 h-16 font-black text-[11px] border-primary/20 text-primary uppercase tracking-[0.3em] hover:bg-primary hover:text-white transition-all shadow-lg">تعقب الأثر الأقدم</Button>
+            {/* Infinite scroll trigger - only shows after initial data is loaded */}
+            {hasMore && initialLoadDone && (
+              <div ref={loadMoreRef} className="flex justify-center pt-8 pb-12">
+                {loadingMore && (
+                  <div className="flex items-center gap-3 text-muted-foreground/40">
+                    <div className="w-5 h-5 border-2 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">جاري تحميل المزيد...</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!hasMore && timelineItems.length > 0 && (
+              <div className="flex justify-center pt-8 pb-12">
+                <span className="text-[10px] font-black text-muted-foreground/20 uppercase tracking-widest">تم تحميل جميع الذكريات ✨</span>
               </div>
             )}
           </div>
@@ -405,39 +509,121 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
               <h2 className="text-3xl font-black mb-10 text-foreground tracking-tighter text-center">تخليد مشهد</h2>
               <form onSubmit={handleCreateMemory} className="space-y-10">
                 <div className="space-y-4">
-                  <label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">النافذة البصرية</label>
+                  <label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">النافذة البصرية (يمكنك اختيار أكثر من صورة)</label>
+
                   {selectedImages.length > 0 ? (
-                    <div className="aspect-[1.5] relative rounded-[3rem] overflow-hidden border-2 border-primary/20 shadow-2xl group">
-                      <img src={selectedImages[0].preview} className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => setSelectedImages([])} className="absolute top-8 right-8 glass-dark text-white rounded-2xl p-4 shadow-xl active:scale-90 transition-all"><X className="w-6 h-6" /></button>
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedImages.map((img, idx) => (
+                        <div key={idx} className="aspect-square relative rounded-2xl overflow-hidden border border-white/10 group">
+                          <img src={img.preview} className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => setSelectedImages(prev => prev.filter((_, i) => i !== idx))} className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-4 h-4" /></button>
+                        </div>
+                      ))}
+                      <label className="aspect-square rounded-2xl glass border-dashed border-2 border-white/10 flex items-center justify-center flex-col cursor-pointer hover:border-primary/40 transition-all text-muted-foreground/20 hover:text-primary">
+                        <Plus className="w-8 h-8" />
+                        <input type="file" multiple accept="image/*" className="hidden" onChange={e => {
+                          if (e.target.files) {
+                            Array.from(e.target.files).forEach(file => {
+                              const reader = new FileReader();
+                              reader.onload = (ev) => setSelectedImages(prev => [...prev, { file, preview: ev.target?.result as string }]);
+                              reader.readAsDataURL(file);
+                            });
+                          }
+                        }} />
+                      </label>
                     </div>
                   ) : (
-                    <label className="aspect-[1.5] rounded-[3rem] glass border-dashed border-2 border-white/10 flex items-center justify-center flex-col cursor-pointer hover:border-primary/40 transition-all text-muted-foreground/20 group">
-                      <Upload className="w-12 h-12 mb-4 group-hover:scale-110 group-hover:text-primary transition-all" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">استحضار مشهد من الذاكرة</span>
-                      <input type="file" accept="image/*" className="hidden" onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (ev) => setSelectedImages([{ file, preview: ev.target?.result as string }]);
-                          reader.readAsDataURL(file);
+                    <label className="aspect-[2/1] rounded-[2.5rem] glass border-dashed border-2 border-white/10 flex items-center justify-center flex-col cursor-pointer hover:border-primary/40 transition-all text-muted-foreground/20 group hover:bg-muted/5">
+                      <div className="w-16 h-16 rounded-2xl bg-muted/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><Upload className="w-6 h-6" /></div>
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">اختيار صور للذكرى</span>
+                      <input type="file" multiple accept="image/*" className="hidden" onChange={e => {
+                        if (e.target.files) {
+                          Array.from(e.target.files).forEach(file => {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => setSelectedImages(prev => [...prev, { file, preview: ev.target?.result as string }]);
+                            reader.readAsDataURL(file);
+                          });
                         }
                       }} />
                     </label>
                   )}
                 </div>
                 <div className="space-y-3"><label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">مسمى اللحظة</label><input required className="w-full h-18 glass rounded-2xl px-6 text-lg font-black border-white/10 text-foreground focus:border-primary transition-all" placeholder="عنوان يختصر الشعور..." value={memoryForm.title} onChange={e => setMemoryForm({ ...memoryForm, title: e.target.value })} /></div>
-                <div className="space-y-3"><label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">أثر مكتوب</label><textarea className="w-full h-40 glass rounded-[2.5rem] p-8 text-base font-black border-white/10 resize-none text-foreground focus:border-primary transition-all leading-relaxed" placeholder="كيف كانت دقات القلب حينها؟" value={memoryForm.description} onChange={e => setMemoryForm({ ...memoryForm, description: e.target.value })} /></div>
+                <div className="space-y-3"><label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">أثر مكتوب</label><textarea className="w-full h-32 glass rounded-[2rem] p-6 text-base font-bold border-white/10 resize-none text-foreground focus:border-primary transition-all leading-relaxed" placeholder="كيف كانت دقات القلب حينها؟" value={memoryForm.description} onChange={e => setMemoryForm({ ...memoryForm, description: e.target.value })} /></div>
                 <Button type="submit" disabled={isSubmitting} className="w-full h-18 rounded-[2.5rem] text-xl font-black shadow-2xl shadow-rose-500/20 bg-rose-500">حفظ في خزانة العمر</Button>
               </form>
             </motion.div>
           </div>
         )}
 
-        {viewImage && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-black/98 flex flex-col p-8 backdrop-blur-3xl">
-            <button onClick={() => setViewImage(null)} className="absolute top-10 right-10 w-16 h-16 glass-dark rounded-2xl flex items-center justify-center text-white z-50 transition-transform active:scale-95 border-white/10 shadow-2xl"><X className="w-8 h-8" /></button>
-            <div className="flex-1 flex items-center justify-center"><img src={viewImage} className="max-w-full max-h-full object-contain rounded-[4rem] shadow-2xl border border-white/5" /></div>
+        {showGallery && galleryImages.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/98 flex flex-col backdrop-blur-3xl"
+            onClick={() => setShowGallery(false)}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setShowGallery(false)}
+              className="absolute top-10 right-10 w-16 h-16 bg-black/40 border border-white/10 rounded-2xl flex items-center justify-center text-white z-50 transition-transform active:scale-95 shadow-2xl"
+            >
+              <X className="w-8 h-8" />
+            </button>
+
+            {/* Image counter */}
+            <div className="absolute top-10 left-10 bg-black/40 border border-white/10 px-5 py-3 rounded-2xl text-white text-sm font-black z-50">
+              {galleryIndex + 1} / {galleryImages.length}
+            </div>
+
+            {/* Main image */}
+            <div className="flex-1 flex items-center justify-center p-8" onClick={(e) => e.stopPropagation()}>
+              <motion.img
+                key={galleryIndex}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.2 }}
+                src={galleryImages[galleryIndex]}
+                className="max-w-full max-h-full object-contain rounded-[2rem] shadow-2xl border border-white/5"
+              />
+            </div>
+
+            {/* Navigation arrows */}
+            {galleryImages.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); prevImage(); }}
+                  className="absolute left-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-black/50 border border-white/10 rounded-full flex items-center justify-center text-white transition-all hover:bg-white/10 active:scale-95"
+                >
+                  <ChevronLeft className="w-7 h-7" />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); nextImage(); }}
+                  className="absolute right-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-black/50 border border-white/10 rounded-full flex items-center justify-center text-white transition-all hover:bg-white/10 active:scale-95"
+                >
+                  <ChevronRight className="w-7 h-7" />
+                </button>
+              </>
+            )}
+
+            {/* Thumbnail dots / mini previews */}
+            {galleryImages.length > 1 && (
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/50 border border-white/10 px-6 py-4 rounded-2xl backdrop-blur-md">
+                {galleryImages.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={(e) => { e.stopPropagation(); setGalleryIndex(idx); }}
+                    className={`transition-all ${idx === galleryIndex ? 'ring-2 ring-primary scale-110' : 'opacity-50 hover:opacity-100'}`}
+                  >
+                    <img
+                      src={img}
+                      className="w-12 h-12 object-cover rounded-lg"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

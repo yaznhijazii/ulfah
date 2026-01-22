@@ -37,7 +37,10 @@ function App() {
   });
   const [partnershipId, setPartnershipId] = useState<string | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem('theme') === 'dark';
+    // Priority: Time-based theming (Natural Cycle) as requested
+    const hour = new Date().getHours();
+    const isNight = hour < 6 || hour >= 18;
+    return isNight;
   });
 
   useEffect(() => {

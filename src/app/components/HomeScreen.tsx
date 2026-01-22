@@ -53,6 +53,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     const [showMap, setShowMap] = useState(false);
     const [nudgeActive, setNudgeActive] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
+    const [partnership, setPartnership] = useState<any>(null);
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -61,7 +62,20 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
         return 'مساء السكينة والمودة';
     };
 
+    const formatLastSeen = (lastSeen: string | null) => {
+        if (!lastSeen) return 'غير متوفر';
+        const date = new Date(lastSeen);
+        const now = new Date();
+        const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / 60000);
+
+        if (diffInMinutes < 2) return 'متصل الآن';
+        if (diffInMinutes < 60) return `نشط منذ ${diffInMinutes} دقيقة`;
+        if (diffInMinutes < 1440) return `نشط منذ ${Math.floor(diffInMinutes / 60)} ساعة`;
+        return `آخر ظهور: ${date.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}`;
+    };
+
     const handleNudge = async () => {
+        console.log("Nudge button clicked", { userId, partnershipId, hasPartnership: !!partnership });
         if (!userId || !partnershipId || !partnership) return;
         setNudgeActive(true);
         setTimeout(() => setNudgeActive(false), 2000);
@@ -71,7 +85,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
 
             // Calculate distance immediately to ensure accuracy
             let currentDistance = distance;
-            if (myLocation && partnership.user1 && partnership.user2) {
+            if (myLocation.lat && myLocation.lng && partnership.user1 && partnership.user2) {
                 const partner = partnership.user1_id === userId ? partnership.user2 : partnership.user1;
                 if (partner?.latitude && partner?.longitude) {
                     currentDistance = calculateDistance(myLocation.lat, myLocation.lng, partner.latitude, partner.longitude);
@@ -155,6 +169,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
 
         if (partnershipRes.status === 'fulfilled' && partnershipRes.value.data) {
             const p = partnershipRes.value.data;
+            setPartnership(p);
             const start = new Date(p.relationship_start_date || p.created_at);
             const now = new Date();
             const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -262,101 +277,213 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.9 }}
-                                className="relative glass rounded-[3rem] p-8 border-white/60 overflow-hidden shadow-2xl bg-white/40 dark:bg-white/5 transition-all duration-700"
+                                className="relative glass rounded-[3rem] p-8 border-white/60 dark:border-white/10 overflow-hidden shadow-2xl bg-white/40 dark:bg-[#0a0505]/60 transition-all duration-700"
                             >
-                                {/* Subtle Background Aura */}
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-mood/5 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2" />
+                                {/* Romantic Mesh & Floating Hearts Background - Fills Entire Card */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-[#f43f5e]/5 via-transparent to-amber-500/5 pointer-events-none overflow-hidden">
+                                    <motion.div
+                                        animate={{
+                                            scale: [1, 1.3, 1],
+                                            rotate: [0, 45, 0],
+                                            opacity: [0.3, 0.4, 0.3]
+                                        }}
+                                        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                                        className="absolute top-0 right-0 w-64 h-64 bg-rose-400/5 blur-[100px] rounded-full"
+                                    />
+                                    {[...Array(6)].map((_, i) => (
+                                        <motion.div
+                                            key={i}
+                                            initial={{ y: 140, x: Math.random() * 320, opacity: 0 }}
+                                            animate={{
+                                                y: -40,
+                                                opacity: [0, 0.3, 0],
+                                                scale: [0.5, 1, 0.8]
+                                            }}
+                                            transition={{
+                                                duration: 10 + Math.random() * 8,
+                                                repeat: Infinity,
+                                                delay: i * 2,
+                                                ease: "easeInOut"
+                                            }}
+                                            className="absolute text-rose-500/10"
+                                        >
+                                            <Heart size={12 + i * 4} fill="currentColor" />
+                                        </motion.div>
+                                    ))}
+                                </div>
 
-                                <div className="relative z-10 flex flex-col gap-8">
-                                    {/* Header: Centered Infinity Avatars */}
-                                    <div className="flex flex-col items-center gap-6">
-                                        <div className="flex items-center justify-center -space-x-4 relative">
-                                            <div className="absolute inset-0 bg-mood/20 blur-3xl rounded-full scale-150 opacity-20" />
+                                <div className="relative z-10 flex flex-col gap-4">
 
-                                            {/* Me Avatar */}
-                                            <div className="w-20 h-20 rounded-[2.2rem] border-[3px] border-white dark:border-white/10 shadow-2xl overflow-hidden bg-white/5 z-20">
-                                                {avatars.me ? <img src={avatars.me} className="w-full h-full object-cover" /> : <User className="w-full h-full p-5 text-[#f43f5e] opacity-20" />}
-                                                <div className="absolute top-2 right-2 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full shadow-sm" />
-                                            </div>
+                                    {/* Header: Centered Infinity Avatars with Vibrant Flow */}
+                                    <div className="flex flex-col items-center py-2 relative">
+                                        <div className="relative w-full max-w-[260px] h-28 flex items-center justify-center">
+                                            {/* Advanced Infinity Path SVG Animation */}
+                                            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" viewBox="0 0 260 110">
+                                                <defs>
+                                                    <filter id="glow">
+                                                        <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+                                                        <feMerge>
+                                                            <feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" />
+                                                        </feMerge>
+                                                    </filter>
+                                                    <linearGradient id="infinity-magical" x1="0%" y1="0%" x2="100%" y2="0%">
+                                                        <stop offset="0%" stopColor="#f43f5e" stopOpacity="0" />
+                                                        <stop offset="25%" stopColor="#f43f5e" stopOpacity="0.8" />
+                                                        <stop offset="50%" stopColor="#fb7185" stopOpacity="1" />
+                                                        <stop offset="75%" stopColor="#f43f5e" stopOpacity="0.8" />
+                                                        <stop offset="100%" stopColor="#f43f5e" stopOpacity="0" />
+                                                    </linearGradient>
+                                                </defs>
 
-                                            {/* Pulsing Core */}
-                                            <div className="w-12 h-12 rounded-full glass border-white dark:border-white/20 shadow-xl flex items-center justify-center z-30 bg-white/80 dark:bg-black/40">
+                                                {/* Ambient Path Trace */}
+                                                <path
+                                                    d="M 65 55 C 65 15, 15 15, 15 55 C 15 95, 65 95, 130 55 C 195 15, 245 15, 245 55 C 245 95, 195 95, 130 55 L 65 55"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="0.5"
+                                                    className="text-rose-500/5"
+                                                />
+
+                                                {/* Glowing Magical Flow - Slower & More Subtle */}
+                                                <motion.path
+                                                    d="M 65 55 C 65 15, 15 15, 15 55 C 15 95, 65 95, 130 55 C 195 15, 245 15, 245 55 C 245 95, 195 95, 130 55 L 65 55"
+                                                    fill="none"
+                                                    stroke="url(#infinity-magical)"
+                                                    strokeWidth="1.5"
+                                                    strokeLinecap="round"
+                                                    strokeDasharray="90 310"
+                                                    filter="url(#glow)"
+                                                    animate={{ strokeDashoffset: [-400, 0] }}
+                                                    transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+                                                    className="opacity-40"
+                                                />
+                                                {/* Flowing Particle Orbs - Slower & Faded */}
+                                                {[0, 1].map((i) => (
+                                                    <motion.circle
+                                                        key={i}
+                                                        r="2"
+                                                        fill="#f43f5e"
+                                                        fillOpacity="0.5"
+                                                        filter="url(#glow)"
+                                                        initial={{ offsetDistance: "0%" }}
+                                                        animate={{ offsetDistance: "100%" }}
+                                                        transition={{
+                                                            duration: 12,
+                                                            repeat: Infinity,
+                                                            ease: "linear",
+                                                            delay: i * 6
+                                                        }}
+                                                        style={{ offsetPath: "path('M 65 55 C 65 15, 15 15, 15 55 C 15 95, 65 95, 130 55 C 195 15, 245 15, 245 55 C 245 95, 195 95, 130 55 L 65 55')" }}
+                                                    />
+                                                ))}
+                                            </svg>
+
+                                            <div className="flex items-center justify-center -space-x-8 relative z-10 w-full pt-1">
                                                 <motion.div
-                                                    animate={{ scale: nudgeActive ? [1, 1.4, 1] : [1, 1.2, 1] }}
-                                                    transition={{ repeat: nudgeActive ? 0 : Infinity, duration: nudgeActive ? 0.3 : 2 }}
+                                                    animate={{
+                                                        y: [0, -5, 0],
+                                                        rotate: [-1, 2, -1]
+                                                    }}
+                                                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                                                    className="w-20 h-20 rounded-[2.2rem] border-[4px] border-white dark:border-white/20 shadow-2xl overflow-hidden bg-white/5 relative group"
                                                 >
-                                                    <Heart className="w-6 h-6 text-[#f43f5e] fill-current drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]" />
+                                                    {avatars.me ? <img src={avatars.me} className="w-full h-full object-cover transition-transform group-hover:scale-110" /> : <User className="w-full h-full p-4 text-[#f43f5e] opacity-20" />}
+                                                    <div className="absolute top-2.5 right-2.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full shadow-lg" />
+                                                </motion.div>
+
+                                                <div className="relative z-30 mx-[-6px]">
+                                                    <motion.div
+                                                        animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.1, 0.4] }}
+                                                        transition={{ duration: 2, repeat: Infinity }}
+                                                        className="absolute inset-0 bg-rose-400 blur-2xl rounded-full"
+                                                    />
+                                                    <div className="w-14 h-14 rounded-full glass border-white dark:border-white/20 shadow-2xl flex items-center justify-center bg-white/95 dark:bg-black/60 backdrop-blur-2xl">
+                                                        <motion.div
+                                                            animate={{
+                                                                scale: nudgeActive ? [1, 1.6, 1] : [1, 1.15, 1],
+                                                                rotate: nudgeActive ? [0, 20, -20, 0] : 0
+                                                            }}
+                                                            transition={{ repeat: nudgeActive ? 0 : Infinity, duration: nudgeActive ? 0.3 : 2 }}
+                                                        >
+                                                            <Heart className="w-7 h-7 text-[#f43f5e] fill-current drop-shadow-[0_0_12px_rgba(244,63,94,0.7)]" />
+                                                        </motion.div>
+                                                    </div>
+                                                </div>
+
+                                                <motion.div
+                                                    animate={{
+                                                        y: [0, 5, 0],
+                                                        rotate: [2, -1, 2]
+                                                    }}
+                                                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+                                                    className="w-20 h-20 rounded-[2.2rem] border-[4px] border-white dark:border-white/20 shadow-2xl overflow-hidden bg-white/5 relative group"
+                                                >
+                                                    {avatars.partner ? <img src={avatars.partner} className="w-full h-full object-cover transition-transform group-hover:scale-110" /> : <Heart className="w-full h-full p-4 text-[#f43f5e] opacity-10" />}
+                                                    <div className={`absolute top-2.5 left-2.5 w-3.5 h-3.5 ${isPartnerOnline() ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'} border-2 border-white rounded-full shadow-lg`} />
                                                 </motion.div>
                                             </div>
-
-                                            {/* Partner Avatar */}
-                                            <div className="w-20 h-20 rounded-[2.2rem] border-[3px] border-white dark:border-white/10 shadow-2xl overflow-hidden bg-white/5 z-10">
-                                                {avatars.partner ? <img src={avatars.partner} className="w-full h-full object-cover" /> : <Heart className="w-full h-full p-5 text-[#f43f5e] opacity-10" />}
-                                                {isPartnerOnline() && (
-                                                    <div className="absolute top-2 left-2 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full animate-pulse shadow-sm" />
-                                                )}
-                                            </div>
                                         </div>
 
-                                        <div className="text-center">
-                                            <h2 className="text-2xl font-black text-foreground tracking-tighter mb-1">
-                                                {distKm && distKm < 1 ? 'قرب الروح' : 'اتصال المودة'}
+                                        <div className="text-center mt-3">
+                                            <h2 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2 justify-center">
+                                                <span>{distKm && distKm < 1 ? 'قرب الروح' : 'اتصال المودة'}</span>
                                             </h2>
-                                            <p className="text-[10px] font-black text-[#f43f5e] uppercase tracking-[0.4em] opacity-60">أُلْفَة لا تنتهي</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Main Display: Days & Distance Duo */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="bg-white/20 dark:bg-white/10 border border-white/40 dark:border-white/10 p-6 rounded-[2.5rem] flex flex-col items-center gap-1 shadow-sm">
-                                            <span className="text-[9px] font-black text-[#f43f5e] uppercase tracking-widest mb-1 text-center opacity-60">رحلة العهد</span>
-                                            <div className="flex items-baseline gap-1">
-                                                <span className="text-4xl font-black text-foreground tracking-tighter">{daysTogether}</span>
-                                                <span className="text-[10px] font-black text-foreground/40">يوم</span>
-                                            </div>
-                                        </div>
-                                        <div className="bg-white/20 dark:bg-white/10 border border-white/40 dark:border-white/10 p-6 rounded-[2.5rem] flex flex-col items-center gap-1 shadow-sm">
-                                            <span className="text-[9px] font-black text-[#f43f5e] uppercase tracking-widest mb-1 text-center opacity-60">المسافة الآن</span>
-                                            <div className="flex items-baseline gap-1">
-                                                <span className="text-4xl font-black text-[#f43f5e] tracking-tighter">{distance?.split(' ')[0] || '--'}</span>
-                                                <span className="text-[10px] font-black text-[#f43f5e] opacity-60">{distance?.split(' ')[1] || 'كم'}</span>
+                                            <div className="flex items-center justify-center gap-2 mt-1">
+                                                <p className="text-[9px] font-black text-[#f43f5e] uppercase tracking-[0.4em] opacity-40">أُلْفَة لا تنتهي</p>
+                                                <div className="flex items-center gap-1.5 px-3 py-1 bg-white/40 dark:bg-white/10 rounded-full border border-rose-100 dark:border-white/10 shadow-sm">
+                                                    <span className="text-[9px] font-bold text-foreground/70">
+                                                        {formatLastSeen(partnerTracking.last_seen)}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Action Hub - Premium Pink with Labels */}
-                                    <div className="flex justify-between gap-4">
-                                        <div className="flex-1 flex flex-col items-center gap-2">
-                                            <motion.button
-                                                whileTap={{ scale: 0.96 }}
-                                                onClick={handleNudge}
-                                                className="w-full h-16 bg-[#f43f5e] text-white rounded-[2rem] font-black text-xs uppercase tracking-widest shadow-xl shadow-rose-200 flex items-center justify-center transition-all"
-                                            >
-                                                <Heart className={`w-6 h-6 ${nudgeActive ? 'fill-white animate-bounce' : 'fill-white/20'}`} />
-                                            </motion.button>
-                                            <span className="text-[8px] font-black text-[#f43f5e] uppercase tracking-[0.2em] opacity-40">تنبيه</span>
+                                    {/* Main Display: Days & Distance Duo - More Compact */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-white/30 dark:bg-white/5 border border-white/50 dark:border-white/10 p-4 rounded-[2rem] flex flex-col items-center shadow-sm backdrop-blur-md">
+                                            <span className="text-[7px] font-black text-[#f43f5e] uppercase tracking-widest mb-0.5 opacity-60">رحلة العهد</span>
+                                            <div className="flex items-baseline gap-0.5">
+                                                <span className="text-2xl font-black text-foreground tracking-tighter">{daysTogether}</span>
+                                                <span className="text-[8px] font-black text-foreground/40">يوم</span>
+                                            </div>
                                         </div>
+                                        <div className="bg-white/30 dark:bg-white/5 border border-white/50 dark:border-white/10 p-4 rounded-[2rem] flex flex-col items-center shadow-sm backdrop-blur-md">
+                                            <span className="text-[7px] font-black text-[#f43f5e] uppercase tracking-widest mb-0.5 opacity-60">المسافة الآن</span>
+                                            <div className="flex items-baseline gap-0.5">
+                                                <span className="text-2xl font-black text-[#f43f5e] tracking-tighter">{distance?.split(' ')[0] || '--'}</span>
+                                                <span className="text-[8px] font-black text-[#f43f5e] opacity-60">{distance?.split(' ')[1] || 'كم'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                                        <div className="flex flex-col items-center gap-2">
-                                            <button
-                                                onClick={() => setShowMap(true)}
-                                                className="w-16 h-16 bg-white dark:bg-white/10 border border-white/60 dark:border-white/10 rounded-[2rem] flex items-center justify-center text-[#f43f5e] shadow-lg hover:bg-rose-50 transition-colors"
-                                            >
-                                                <MapPin className="w-6 h-6" />
-                                            </button>
-                                            <span className="text-[8px] font-black text-[#f43f5e] uppercase tracking-[0.2em] opacity-40">الموقع</span>
-                                        </div>
+                                    {/* Action Hub - Compact & Innovative Buttons */}
+                                    <div className="flex items-center justify-between gap-3 pt-2">
+                                        <motion.button
+                                            whileTap={{ scale: 0.9 }}
+                                            onClick={() => updateMyStatus().then(loadHomeData)}
+                                            disabled={isSyncing}
+                                            className="h-12 w-12 bg-white dark:bg-white/10 rounded-2xl flex items-center justify-center text-[#f43f5e] shadow-lg border border-white/60 active:bg-rose-50"
+                                        >
+                                            <Zap className={`w-5 h-5 ${isSyncing ? 'animate-spin text-amber-500' : ''}`} />
+                                        </motion.button>
 
-                                        <div className="flex flex-col items-center gap-2">
-                                            <button
-                                                onClick={() => updateMyStatus().then(loadHomeData)}
-                                                disabled={isSyncing}
-                                                className="w-16 h-16 bg-white dark:bg-white/10 border border-white/60 dark:border-white/10 rounded-[2rem] flex items-center justify-center text-[#f43f5e] shadow-lg hover:bg-rose-50 transition-colors disabled:opacity-50"
-                                            >
-                                                <Zap className={`w-6 h-6 ${isSyncing ? 'animate-spin text-amber-500' : ''}`} />
-                                            </button>
-                                            <span className="text-[8px] font-black text-[#f43f5e] uppercase tracking-[0.2em] opacity-40">تحديث</span>
-                                        </div>
+                                        <motion.button
+                                            whileTap={{ scale: 0.9 }}
+                                            onClick={() => setShowMap(true)}
+                                            className="h-12 w-12 bg-white dark:bg-white/10 rounded-2xl flex items-center justify-center text-[#f43f5e] shadow-lg border border-white/60 active:bg-rose-50"
+                                        >
+                                            <MapPin className="w-5 h-5" />
+                                        </motion.button>
+
+                                        <motion.button
+                                            whileTap={{ scale: 0.96 }}
+                                            onClick={handleNudge}
+                                            className="flex-1 h-12 bg-gradient-to-r from-[#f43f5e] to-[#fb7185] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-rose-200 dark:shadow-rose-900/40 flex items-center justify-center gap-2 group/nudge"
+                                        >
+                                            <Heart className={`w-5 h-5 ${nudgeActive ? 'fill-white animate-bounce' : 'fill-white/40'}`} />
+                                            <span>تنبيه المودة</span>
+                                        </motion.button>
                                     </div>
                                 </div>
                             </motion.div>
@@ -446,7 +573,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                     >
                         <div className="absolute top-0 right-0 w-32 h-32 bg-mood/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-mood/10 transition-colors" />
                         <div className="flex items-center gap-6 relative z-10 text-right">
-                            <div className="w-16 h-16 rounded-[2rem] glass-dark border-white/10 flex items-center justify-center text-mood group-hover:scale-110 group-hover:rotate-6 transition-all duration-700 shadow-xl shadow-mood/5">
+                            <div className="w-16 h-16 rounded-[2rem] bg-mood/5 border border-white/20 flex items-center justify-center text-mood group-hover:scale-110 group-hover:rotate-6 transition-all duration-700 shadow-xl shadow-mood/5">
                                 <Feather className="w-8 h-8" />
                             </div>
                             <div className="text-right space-y-1">
@@ -465,7 +592,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         <div className="absolute top-0 left-0 w-40 h-40 bg-amber-500/5 rounded-full blur-[80px] -ml-20 -mt-20 group-hover:bg-amber-500/10 transition-colors" />
                         <div className="flex items-center justify-between relative z-10 w-full">
                             <div className="flex items-center gap-6">
-                                <div className="w-16 h-16 rounded-[2rem] glass-dark border-white/10 flex items-center justify-center text-amber-500 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700 shadow-xl shadow-amber-500/5">
+                                <div className="w-16 h-16 rounded-[2rem] bg-amber-500/5 border border-white/20 flex items-center justify-center text-amber-500 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700 shadow-xl shadow-amber-500/5">
                                     <Map className="w-8 h-8" />
                                 </div>
                                 <div className="text-right space-y-1">
@@ -476,9 +603,9 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                             <ChevronLeft className="w-5 h-5 text-foreground/20 group-hover:translate-x-[-6px] transition-transform" />
                         </div>
 
-                        <div className="flex items-center justify-between bg-white/20 backdrop-blur-xl rounded-[2rem] p-6 border border-white/60 shadow-inner">
+                        <div className="flex items-center justify-between bg-white/20 dark:bg-black/40 backdrop-blur-xl rounded-[2rem] p-6 border border-white/60 dark:border-white/10 shadow-inner">
                             <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-xl glass-dark border-white/10 flex items-center justify-center text-amber-500">
+                                <div className="w-10 h-10 rounded-xl bg-amber-500/5 border border-white/20 flex items-center justify-center text-amber-500">
                                     <Compass className="w-4 h-4" />
                                 </div>
                                 <div className="flex flex-col">
@@ -496,7 +623,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 </section>
 
                 {/* Mood Sanctuary */}
-                <section className="glass rounded-[3rem] p-10 border-white/60 shadow-2xl relative overflow-hidden bg-white/20">
+                <section className="glass rounded-[3rem] p-10 border-white/60 dark:border-white/10 shadow-2xl relative overflow-hidden bg-white/20 dark:bg-[#0a0505]/60">
                     <div className="absolute top-0 left-0 w-40 h-40 bg-mood/5 rounded-full blur-[100px] -ml-20 -mt-20" />
                     <div className="text-center mb-10 relative z-10">
                         <h3 className="text-2xl font-black text-foreground mb-2 tracking-tighter">نزعة الروح</h3>
@@ -583,14 +710,14 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                         key={event.id}
                                         className="relative group block"
                                     >
-                                        <div className="glass rounded-[1.8rem] p-4 border-white/60 flex items-center justify-between shadow-xl hover:shadow-mood/10 transition-all duration-700 bg-white/5 relative overflow-hidden group-hover:translate-x-[-4px]">
+                                        <div className="glass rounded-[1.8rem] p-4 border-white/60 dark:border-white/10 flex items-center justify-between shadow-xl hover:shadow-mood/10 transition-all duration-700 bg-white/5 dark:bg-black/20 relative overflow-hidden group-hover:translate-x-[-4px]">
                                             {/* Subtle Sweep Effect */}
                                             <div className="absolute inset-0 bg-gradient-to-r from-mood/0 via-mood/5 to-mood/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out pointer-events-none" />
 
                                             <div className="flex items-center gap-4 relative z-10">
                                                 {/* Station Marker */}
                                                 <div className="relative shrink-0">
-                                                    <div className="w-12 h-12 rounded-[1.2rem] glass-dark border-white/10 overflow-hidden flex items-center justify-center text-mood shadow-md group-hover:scale-110 transition-transform duration-500">
+                                                    <div className="w-12 h-12 rounded-[1.2rem] bg-mood/5 border border-white/20 overflow-hidden flex items-center justify-center text-mood shadow-md group-hover:scale-110 transition-transform duration-500">
                                                         {event.image_url ? (
                                                             <img src={event.image_url} className="w-full h-full object-cover" alt="" />
                                                         ) : (
@@ -649,8 +776,8 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                 );
                             })
                         ) : (
-                            <div className="glass rounded-[4rem] p-20 border-white/40 text-center space-y-10 border-dashed group hover:border-mood/20 transition-all duration-1000 bg-white/10">
-                                <div className="w-24 h-24 rounded-[2.5rem] glass-dark border-white/5 flex items-center justify-center mx-auto opacity-10 group-hover:opacity-30 group-hover:rotate-45 transition-all duration-700">
+                            <div className="glass rounded-[4rem] p-20 border-white/40 dark:border-white/10 text-center space-y-10 border-dashed group hover:border-mood/20 transition-all duration-1000 bg-white/10 dark:bg-black/40">
+                                <div className="w-24 h-24 rounded-[2.5rem] bg-white/10 border border-white/20 flex items-center justify-center mx-auto opacity-10 group-hover:opacity-30 group-hover:rotate-45 transition-all duration-700">
                                     <PlusCircle className="w-12 h-12" />
                                 </div>
                                 <div className="space-y-4">
@@ -661,7 +788,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         )}
                     </div>
                 </section>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

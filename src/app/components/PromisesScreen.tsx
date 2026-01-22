@@ -89,7 +89,7 @@ export function PromisesScreen({ onNavigate, userId, partnershipId }: PromisesSc
   if (!partnershipId) {
     return (
       <div className="flex-1 bg-background flex flex-col items-center justify-center p-10 text-center">
-        <div className="w-24 h-24 rounded-[2.5rem] glass-dark border-white/5 flex items-center justify-center mb-8 shadow-2xl">
+        <div className="w-24 h-24 rounded-[2.5rem] bg-primary/5 border border-white/20 flex items-center justify-center mb-8 shadow-2xl">
           <ShieldCheck className="w-12 h-12 text-primary/40" />
         </div>
         <h2 className="text-2xl font-black mb-3 tracking-tighter">ميثاق المودة</h2>
@@ -125,7 +125,7 @@ export function PromisesScreen({ onNavigate, userId, partnershipId }: PromisesSc
           </motion.button>
         </div>
 
-        <div className="flex glass-dark border-white/5 p-1.5 rounded-[2.2rem] max-w-[340px] mx-auto relative overflow-hidden">
+        <div className="flex bg-white/10 border border-white/20 p-1.5 rounded-[2.2rem] max-w-[340px] mx-auto relative overflow-hidden">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             return (
@@ -156,7 +156,7 @@ export function PromisesScreen({ onNavigate, userId, partnershipId }: PromisesSc
             >
               {(activeTab === 'promises' ? promises : activeTab === 'rules' ? rules : tasks).length === 0 ? (
                 <div className="text-center py-24 space-y-8 glass rounded-[3.5rem] border-white/10 opacity-30">
-                  <div className="w-20 h-20 glass-dark border-white/5 rounded-[2rem] flex items-center justify-center mx-auto">
+                  <div className="w-20 h-20 bg-primary/5 border border-white/20 rounded-[2rem] flex items-center justify-center mx-auto">
                     <Sparkles className="w-10 h-10" />
                   </div>
                   <p className="text-[10px] font-black uppercase tracking-[0.3em] leading-relaxed">لم يتم تدوين أي عهد بعد..</p>
@@ -168,9 +168,9 @@ export function PromisesScreen({ onNavigate, userId, partnershipId }: PromisesSc
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
-                    className={`glass-dark rounded-[2.5rem] p-7 shadow-2xl shadow-black/5 border relative overflow-hidden flex items-start gap-5 group ${activeTab === 'tasks' && item.is_completed ? 'opacity-40 border-white/5' : 'border-white/10'}`}
+                    className={`glass rounded-[2.5rem] p-7 shadow-2xl shadow-black/5 border relative overflow-hidden flex items-start gap-5 group ${activeTab === 'tasks' && item.is_completed ? 'opacity-40 border-white/5' : 'border-white/10'}`}
                   >
-                    <div className="w-10 h-10 rounded-2xl glass-dark border-white/5 flex items-center justify-center text-primary/40 group-hover:text-primary transition-colors shrink-0">
+                    <div className="w-10 h-10 rounded-2xl bg-primary/5 border border-white/20 flex items-center justify-center text-primary/40 group-hover:text-primary transition-colors shrink-0">
                       {activeTab === 'promises' ? <Heart className="w-4 h-4 fill-current" /> : activeTab === 'rules' ? <ShieldCheck className="w-4 h-4" /> : <Target className="w-4 h-4" />}
                     </div>
 
@@ -215,7 +215,7 @@ export function PromisesScreen({ onNavigate, userId, partnershipId }: PromisesSc
               className="relative w-full max-w-md glass border-white/30 rounded-[3.5rem] p-10 z-10 space-y-8 shadow-2xl"
             >
               <div className="text-center space-y-2">
-                <div className="w-16 h-16 glass-dark border-white/10 rounded-2xl flex items-center justify-center mx-auto text-primary">
+                <div className="w-16 h-16 bg-primary/5 border border-white/20 rounded-2xl flex items-center justify-center mx-auto text-primary">
                   <Plus className="w-8 h-8" />
                 </div>
                 <h2 className="text-2xl font-black text-foreground tracking-tighter">إضافة بند للميثاق</h2>
@@ -225,7 +225,7 @@ export function PromisesScreen({ onNavigate, userId, partnershipId }: PromisesSc
               <textarea
                 value={formText} onChange={(e) => setFormText(e.target.value)} autoFocus
                 placeholder="..."
-                className="w-full min-h-[160px] glass-dark border-white/10 rounded-[2.5rem] p-8 font-bold text-right outline-none resize-none text-lg placeholder:text-muted-foreground/20 italic"
+                className="w-full min-h-[160px] bg-white/10 border border-white/20 rounded-[2.5rem] p-8 font-bold text-right outline-none resize-none text-lg placeholder:text-muted-foreground/20 italic"
               />
 
               <div className="flex gap-4">
