@@ -262,11 +262,25 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                             setNudgeActive(true);
                             setTimeout(() => setNudgeActive(false), 3000);
 
+                            // In-App Toast
                             toast.success(newNotif.title, {
                                 description: newNotif.body,
                                 icon: '💖',
                                 duration: 5000,
                             });
+
+                            // System Notification (Web Push / OS)
+                            if (Notification.permission === 'granted') {
+                                try {
+                                    new Notification(newNotif.title, {
+                                        body: newNotif.body,
+                                        icon: '/icon.png', // Fallback or use a valid asset path
+                                        badge: '/icon.png'
+                                    });
+                                } catch (e) {
+                                    console.error('System notification failed:', e);
+                                }
+                            }
                         }
                     }
                 )

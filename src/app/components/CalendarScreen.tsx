@@ -34,6 +34,9 @@ interface CalendarScreenProps {
 
 // Memoized Memory Item for performance
 const MemoryItem = ({ item, idx, viewMode, onDelete, onOpenGallery, getRelativeTime, monthNames }: any) => {
+  const [showImages, setShowImages] = useState(idx === 0);
+  const hasImages = item.images && item.images.length > 0;
+
   return (
     <div className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-12 relative items-start w-full`}>
       {viewMode === 'timeline' && (
@@ -46,59 +49,85 @@ const MemoryItem = ({ item, idx, viewMode, onDelete, onOpenGallery, getRelativeT
 
       <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex-1 min-w-0 w-full mb-4">
         <div className="glass rounded-[3rem] overflow-hidden border-white/20 group transition-all duration-700 hover:shadow-2xl">
-          {item.images && item.images.length > 0 && (
-            <div className="relative overflow-hidden bg-muted/5 cursor-pointer" onClick={() => onOpenGallery(item.images!, 0)}>
-              {item.images.length === 1 ? (
-                <motion.img
-                  initial={{ opacity: 0 }}
-                  whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  src={item.images[0].image_url}
-                  loading={idx === 0 ? "eager" : "lazy"}
-                  decoding="async"
-                  fetchPriority={idx === 0 ? "high" : "auto"}
-                  className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-[2s]"
-                />
-              ) : item.images.length === 2 ? (
-                <div className="grid grid-cols-2 gap-0.5 h-48">
-                  {item.images.map((img: any, imgIdx: number) => (
-                    <motion.img
-                      key={imgIdx}
-                      initial={{ opacity: 0 }}
-                      whileInView={{ opacity: 1 }}
-                      viewport={{ once: true }}
-                      src={img.image_url}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-cover"
-                      onClick={(e) => { e.stopPropagation(); onOpenGallery(item.images!, imgIdx); }}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-0.5 h-48">
-                  {item.images.slice(0, 3).map((img: any, imgIdx: number) => (
-                    <motion.img
-                      key={imgIdx}
-                      initial={{ opacity: 0 }}
-                      whileInView={{ opacity: 1 }}
-                      viewport={{ once: true }}
-                      src={img.image_url}
-                      loading="lazy"
-                      decoding="async"
-                      className={`w-full h-full object-cover ${imgIdx === 2 && item.images!.length > 3 ? 'brightness-50' : ''}`}
-                      onClick={(e) => { e.stopPropagation(); onOpenGallery(item.images!, imgIdx); }}
-                    />
-                  ))}
-                  {item.images.length > 3 && (
-                    <div className="absolute bottom-0 right-0 w-1/3 h-full flex items-center justify-center pointer-events-none">
-                      <span className="text-white text-2xl font-black drop-shadow-lg">+{item.images.length - 3}</span>
+          {hasImages && (
+            <div className={`relative bg-muted/5 transition-all duration-500 ${showImages ? '' : 'h-24'}`}>
+              <AnimatePresence>
+                {showImages ? (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="cursor-pointer"
+                    onClick={() => onOpenGallery(item.images!, 0)}
+                  >
+                    {item.images.length === 1 ? (
+                      <motion.img
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        viewport={{ once: true }}
+                        src={`${item.images[0].image_url}?width=800&quality=70`}
+                        loading={idx === 0 ? "eager" : "lazy"}
+                        decoding="async"
+                        fetchPriority={idx === 0 ? "high" : "auto"} // Optimization
+                        className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-[2s]"
+                      />
+                    ) : item.images.length === 2 ? (
+                      <div className="grid grid-cols-2 gap-0.5 h-48">
+                        {item.images.map((img: any, imgIdx: number) => (
+                          <motion.img
+                            key={imgIdx}
+                            initial={{ opacity: 0 }}
+                            whileInView={{ opacity: 1 }}
+                            viewport={{ once: true }}
+                            src={`${img.image_url}?width=400&quality=60`}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover"
+                            onClick={(e) => { e.stopPropagation(); onOpenGallery(item.images!, imgIdx); }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-0.5 h-48">
+                        {item.images.slice(0, 3).map((img: any, imgIdx: number) => (
+                          <motion.img
+                            key={imgIdx}
+                            initial={{ opacity: 0 }}
+                            whileInView={{ opacity: 1 }}
+                            viewport={{ once: true }}
+                            src={`${img.image_url}?width=400&quality=60`}
+                            loading="lazy"
+                            decoding="async"
+                            className={`w-full h-full object-cover ${imgIdx === 2 && item.images!.length > 3 ? 'brightness-50' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); onOpenGallery(item.images!, imgIdx); }}
+                          />
+                        ))}
+                        {item.images.length > 3 && (
+                          <div className="absolute bottom-0 right-0 w-1/3 h-full flex items-center justify-center pointer-events-none">
+                            <span className="text-white text-2xl font-black drop-shadow-lg">+{item.images.length - 3}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                ) : (
+                  <div
+                    onClick={() => setShowImages(true)}
+                    className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-transparent to-black/20 cursor-pointer group/btn"
+                  >
+                    {/* Blurred Background Preview if possible, or just a button */}
+                    <div className="absolute inset-0 overflow-hidden opacity-30 blur-xl">
+                      <img src={`${item.images[0].image_url}?width=100&quality=10`} className="w-full h-full object-cover" />
                     </div>
-                  )}
-                </div>
-              )}
+                    <button className="relative z-10 px-6 py-2 glass rounded-full text-xs font-black uppercase tracking-widest text-foreground/80 group-hover/btn:scale-110 transition-transform flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" />
+                      عرض {item.images.length} صور
+                    </button>
+                  </div>
+                )}
+              </AnimatePresence>
 
-              {item.images.length > 1 && (
+              {showImages && item.images.length > 1 && (
                 <div className="absolute bottom-3 left-3 bg-black/60 border border-white/10 text-white px-3 py-1.5 rounded-lg text-[8px] font-black flex items-center gap-2 backdrop-blur-md">
                   <ImageIcon className="w-3 h-3 text-primary" />
                   <span>{item.images.length} صور - انقر للعرض</span>
@@ -308,11 +337,24 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
 
       if (!mError && memory && selectedImages.length > 0) {
         const uploadedUrls = [];
+        // Dynamically import to avoid top-level failures
+        const { compressImage } = await import('../../utils/imageOptimizer');
+
         for (const img of selectedImages) {
-          const fileExt = img.file.name.split('.').pop();
+          // Compress image before upload (max 1200px width, 70% quality)
+          let fileToUpload = img.file;
+          try {
+            fileToUpload = await compressImage(img.file, { maxWidth: 1200, quality: 0.7 });
+          } catch (err) {
+            console.warn("Image compression failed, uploading original.", err);
+          }
+
+          const fileExt = 'jpg';
           const fileName = `${Math.random()}.${fileExt}`;
           const filePath = `${partnershipId}/${memory.id}/${fileName}`;
-          const { error: uploadError } = await supabase.storage.from('memories').upload(filePath, img.file);
+
+          const { error: uploadError } = await supabase.storage.from('memories').upload(filePath, fileToUpload);
+
           if (!uploadError) {
             const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(filePath);
             uploadedUrls.push({ memory_id: memory.id, image_url: publicUrl });
