@@ -32,6 +32,7 @@ import {
 import { Logo } from './Logo';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 
 interface HomeScreenProps {
     onNavigate: (screen: string) => void;
@@ -216,7 +217,37 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
             loadHomeData();
             updateMyStatus();
             const interval = setInterval(() => { updateMyStatus(); loadHomeData(); }, 60000);
-            return () => clearInterval(interval);
+
+            // Listen for nudges
+            const channel = supabase
+                .channel(`nudge_${userId}`)
+                .on('postgres_changes',
+                    {
+                        event: 'INSERT',
+                        schema: 'public',
+                        table: 'notifications',
+                        filter: `user_id=eq.${userId}`
+                    },
+                    (payload) => {
+                        const newNotif = payload.new as any;
+                        if (newNotif.type === 'nudge') {
+                            setNudgeActive(true);
+                            setTimeout(() => setNudgeActive(false), 3000);
+
+                            toast.success(newNotif.title, {
+                                description: newNotif.body,
+                                icon: '💖',
+                                duration: 5000,
+                            });
+                        }
+                    }
+                )
+                .subscribe();
+
+            return () => {
+                clearInterval(interval);
+                supabase.removeChannel(channel);
+            };
         }
     }, [partnershipId, userId]);
 

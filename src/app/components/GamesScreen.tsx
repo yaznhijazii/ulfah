@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Heart, Sparkles, User, Clock, ChevronRight, CheckCircle, Bomb, Crown, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, Heart, Sparkles, User, Clock, ChevronRight, CheckCircle, Bomb, Crown, Gamepad2, Brain } from 'lucide-react';
 import { Button } from './ui/button';
 import { BoomBoomGame } from './BoomBoomGame';
 import { ChessGame } from './ChessGame';
+import { WordGuessGame } from './WordGuessGame';
 import { supabase } from '../../lib/supabase';
 
 interface GamesScreenProps {
   onNavigate: (screen: string) => void;
   isDarkMode?: boolean;
   userId: string;
+  partnershipId: string | null;
 }
 
-export function GamesScreen({ onNavigate, isDarkMode, userId }: GamesScreenProps) {
+export function GamesScreen({ onNavigate, isDarkMode, userId, partnershipId }: GamesScreenProps) {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [userName, setUserName] = useState('');
 
@@ -32,7 +34,7 @@ export function GamesScreen({ onNavigate, isDarkMode, userId }: GamesScreenProps
         <div className="absolute top-[-10%] right-[-10%] w-[100%] h-[70%] bg-purple-500/10 blur-[150px] rounded-full opacity-60" />
       </div>
 
-      <header className="px-8 pt-10 pb-4 flex items-center justify-between sticky top-0 bg-background/40 backdrop-blur-3xl z-30">
+      <header className="px-8 pt-6 pb-2 flex items-center justify-between sticky top-0 bg-background/40 backdrop-blur-3xl z-30">
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={() => selectedGame !== null ? setSelectedGame(null) : onNavigate('home')}
@@ -42,7 +44,7 @@ export function GamesScreen({ onNavigate, isDarkMode, userId }: GamesScreenProps
         </motion.button>
         <div className="text-center">
           <h1 className="text-xl font-black text-foreground tracking-tighter">
-            {selectedGame === 'boom-boom' ? 'بوم بوم' : selectedGame === 'chess' ? 'الشطرنج' : 'مرفأ الألعاب'}
+            {selectedGame === 'boom-boom' ? 'بوم بوم' : selectedGame === 'chess' ? 'الشطرنج' : selectedGame === 'word-guess' ? 'لعبه الكلمة' : 'مرفأ الألعاب'}
           </h1>
           <p className="text-[9px] font-black text-purple-600/40 uppercase tracking-[0.4em]">منافسة بكل حب</p>
         </div>
@@ -51,7 +53,7 @@ export function GamesScreen({ onNavigate, isDarkMode, userId }: GamesScreenProps
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-8 py-8 pb-40 space-y-12">
+      <div className="flex-1 overflow-hidden relative">
         <AnimatePresence mode="wait">
           {selectedGame === null ? (
             <motion.div
@@ -59,7 +61,7 @@ export function GamesScreen({ onNavigate, isDarkMode, userId }: GamesScreenProps
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="space-y-10"
+              className="absolute inset-0 overflow-y-auto px-8 py-8 pb-20 space-y-10"
             >
               <section className="space-y-6">
                 <div className="px-2">
@@ -110,21 +112,60 @@ export function GamesScreen({ onNavigate, isDarkMode, userId }: GamesScreenProps
                     </div>
                     <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:translate-x-[-4px] transition-transform" />
                   </motion.button>
+
+                  <motion.button
+                    whileHover={{ y: -4 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setSelectedGame('word-guess')}
+                    className="glass rounded-[2rem] p-6 flex items-center justify-between border-white/20 group overflow-hidden relative"
+                  >
+                    <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none group-hover:scale-110 transition-transform">
+                      <Brain className="w-24 h-24 text-teal-500" />
+                    </div>
+
+                    <div className="flex items-center gap-5 relative z-10 text-right">
+                      <div className="w-14 h-14 bg-teal-500/10 rounded-[1.5rem] flex items-center justify-center text-teal-500 group-hover:shadow-lg group-hover:shadow-teal-500/20 transition-all">
+                        <Brain className="w-6 h-6" />
+                      </div>
+                      <div className="text-right">
+                        <h4 className="text-lg font-black text-foreground mb-1">لعبة الكلمة</h4>
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">تخمين ذكي وتواصل ممتع</p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:translate-x-[-4px] transition-transform" />
+                  </motion.button>
                 </div>
               </section>
             </motion.div>
-          ) : selectedGame === 'chess' ? (
-            <ChessGame
-              onBack={() => setSelectedGame(null)}
-              userId={userId}
-              userName={userName}
-            />
           ) : (
-            <BoomBoomGame
-              onBack={() => setSelectedGame(null)}
-              userId={userId}
-              userName={userName || 'اللاعب'}
-            />
+            <motion.div
+              key="game"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="absolute inset-0 overflow-hidden"
+            >
+              {selectedGame === 'chess' ? (
+                <ChessGame
+                  onBack={() => setSelectedGame(null)}
+                  userId={userId}
+                  userName={userName}
+                />
+              ) : selectedGame === 'boom-boom' ? (
+                <BoomBoomGame
+                  onBack={() => setSelectedGame(null)}
+                  userId={userId}
+                  userName={userName || 'اللاعب'}
+                />
+              ) : (
+                <WordGuessGame
+                  onBack={() => setSelectedGame(null)}
+                  userId={userId}
+                  userName={userName || 'اللاعب'}
+                  partnershipId={partnershipId}
+                />
+              )}
+            </motion.div>
           )}
         </AnimatePresence>
       </div>

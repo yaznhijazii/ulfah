@@ -13,6 +13,7 @@ import { AdventureBucketScreen } from './components/AdventureBucketScreen';
 import { FinanceScreen } from './components/FinanceScreen';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
+import { Toaster } from 'sonner';
 
 type Screen =
   | 'login'
@@ -135,7 +136,7 @@ function App() {
       case 'calendar':
         return <CalendarScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       case 'games':
-        return <GamesScreen onNavigate={handleNavigate} isDarkMode={isDarkMode} userId={userId} />;
+        return <GamesScreen onNavigate={handleNavigate} isDarkMode={isDarkMode} userId={userId} partnershipId={partnershipId} />;
       case 'commitments':
         return <CommitmentsScreen onBack={() => handleNavigate('home')} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       case 'settings':
@@ -209,6 +210,7 @@ function App() {
           </>
         )}
       </div>
+      <Toaster position="top-center" richColors />
     </div>
   );
 }

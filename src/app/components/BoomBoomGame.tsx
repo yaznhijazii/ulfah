@@ -44,23 +44,24 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isAIMode, setIsAIMode] = useState(false);
+    const [presence, setPresence] = useState<any>({});
 
     // Audio effects (optional, placeholders)
     const playSound = (type: 'pop' | 'boom' | 'win') => {
         // Implementation for sound effects
     };
 
-    // Presence / Realtime
     useEffect(() => {
         if (!roomData?.id) return;
 
         const channel = supabase
-            .channel(`game_${roomData.id}`)
+            .channel(`game_${roomData.id}`, {
+                config: { presence: { key: userId } }
+            })
             .on('postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'game_rooms', filter: `id=eq.${roomData.id}` },
                 (payload) => {
                     const newData = payload.new as any;
-                    // Parse necessary jsonb fields
                     const parsedState = typeof newData.game_state === 'string' ? JSON.parse(newData.game_state) : newData.game_state;
 
                     setRoomData(prev => ({
@@ -70,21 +71,38 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
                     }));
                 }
             )
-            .subscribe();
+            .on('presence', { event: 'sync' }, () => {
+                setPresence(channel.presenceState());
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.track({
+                        user_id: userId,
+                        name: userName,
+                        online_at: new Date().toISOString(),
+                    });
+                }
+            });
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [roomData?.id]);
+    }, [roomData?.id, userId, userName]);
 
     // Sync gameState with roomData status and detect AI Mode
     useEffect(() => {
         if (roomData?.status) {
             let status = roomData.status as string;
-            // Map DB status 'waiting' to UI state 'lobby'
             if (status === 'waiting') status = 'lobby';
 
+            // Critical check: if there is a winner, it's finished
+            if (roomData.winner) status = 'finished';
+
             if (status !== gameState) {
+                // Reset local selections if we are entering setup (rematch)
+                if (status === 'setup') {
+                    setMyBooms([]);
+                }
                 setGameState(status as GameState);
             }
         }
@@ -94,7 +112,7 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
                 setIsAIMode((roomData as any).isAIMode);
             }
         }
-    }, [roomData?.status, (roomData as any)?.isAIMode]);
+    }, [roomData?.status, (roomData as any)?.isAIMode, gameState, roomData?.winner]);
 
     const generateRoomCode = () => {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -160,6 +178,7 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
             .from('game_rooms')
             .select('*')
             .eq('room_code', joinCode.toUpperCase())
+            .eq('game_type', 'boom-boom')
             .eq('status', 'waiting')
             .single();
 
@@ -174,7 +193,8 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
             .from('game_rooms')
             .update({
                 guest_user_id: userId,
-                status: 'setup' // Move straight to setup once guest joins
+                status: 'setup',
+                updated_at: new Date().toISOString()
             })
             .eq('id', rooms.id)
             .select()
@@ -403,6 +423,10 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
             winner: winner
         };
 
+        // Optimistic Update
+        setRoomData(newGameState as any);
+        if (status === 'finished') setGameState('finished');
+
         const { error: updateError } = await supabase
             .from('game_rooms')
             .update({
@@ -426,6 +450,9 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
         if (currentRequests.includes(userId)) return;
 
         const newRequests = [...currentRequests, userId];
+
+        // Optimistic update for local UI
+        setRoomData({ ...roomData, rematch_requests: newRequests } as any);
 
         // If both requested, restart
         if (newRequests.length >= 2) {
@@ -466,14 +493,7 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
     if (gameState === 'menu') {
         return (
             <div className="flex flex-col h-full bg-background p-6">
-                <div className="flex items-center gap-4 mb-10">
-                    <Button variant="ghost" className="w-12 h-12 rounded-full p-0" onClick={onBack}>
-                        <ArrowLeft className="w-6 h-6" />
-                    </Button>
-                    <h1 className="text-3xl font-black">بوم بوم! 💣</h1>
-                </div>
-
-                <div className="flex-1 flex flex-col justify-center gap-6">
+                <div className="flex-1 flex flex-col justify-center gap-6 pb-20">
                     <motion.div
                         initial={{ scale: 0.9, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
@@ -554,14 +574,33 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
                         <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-black">{userName[0]}</div>
                         <div className="text-right flex-1">
                             <p className="font-bold text-sm">أنت ({userName})</p>
-                            <p className="text-[10px] text-emerald-500 font-black flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> جاهز</p>
+                            <div className="flex items-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <p className="text-[9px] text-emerald-500 font-black">متواجد بالروم</p>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border border-border opacity-50">
-                        <div className="w-10 h-10 rounded-full bg-muted-foreground/20 flex items-center justify-center text-muted-foreground"><Users className="w-5 h-5" /></div>
+                    <div className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${roomData?.guest_user_id ? 'bg-muted/30 border-border' : 'bg-muted/10 border-dashed border-border/50 opacity-50'}`}>
+                        <div className="w-10 h-10 rounded-full bg-muted-foreground/20 flex items-center justify-center text-muted-foreground">
+                            {roomData?.guest_user_id ? <Users className="w-5 h-5" /> : <Ghost className="w-5 h-5" />}
+                        </div>
                         <div className="text-right flex-1">
-                            <p className="font-bold text-sm">بانتظار الشريك...</p>
+                            <p className="font-bold text-sm">
+                                {roomData?.guest_user_id ? 'الشريك' : 'بانتظار الشريك...'}
+                            </p>
+                            {(() => {
+                                const partnerId = roomData?.host_user_id === userId ? roomData?.guest_user_id : roomData?.host_user_id;
+                                const isPartnerInRoom = partnerId && presence[partnerId];
+                                return (
+                                    <div className="flex items-center gap-1.5">
+                                        <div className={`w-2 h-2 rounded-full ${isPartnerInRoom ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                                        <p className={`text-[9px] font-black ${isPartnerInRoom ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                            {isPartnerInRoom ? 'متواجد بالروم' : roomData?.guest_user_id ? 'غادر الروم' : '--'}
+                                        </p>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
 
@@ -574,6 +613,24 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
                             </div>
                         </div>
                     )}
+
+                    <div className="pt-10">
+                        <Button
+                            variant="ghost"
+                            onClick={async () => {
+                                setLoading(true);
+                                const { data } = await supabase.from('game_rooms').select('*').eq('id', roomData?.id).single();
+                                if (data) {
+                                    const ps = typeof data.game_state === 'string' ? JSON.parse(data.game_state) : data.game_state;
+                                    setRoomData({ ...roomData!, ...data, ...ps });
+                                }
+                                setLoading(false);
+                            }}
+                            className="text-[10px] font-black opacity-30 uppercase tracking-widest"
+                        >
+                            تحديث الحالة يدوياً
+                        </Button>
+                    </div>
                 </div>
             </div>
         );
@@ -657,36 +714,45 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
 
     if (gameState === 'playing') {
         return (
-            <div className="flex flex-col h-full bg-background p-5 pt-8">
+            <div className="flex flex-col h-full bg-background p-4 pt-4">
                 {/* Header Info */}
-                <div className="flex items-center justify-between mb-8 bg-card p-4 rounded-3xl border border-border shadow-sm">
-                    <div className={`flex items-center gap-3 ${isMyTurn ? 'opacity-100' : 'opacity-50 grayscale'}`}>
-                        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white text-xs font-black">أنا</div>
+                <div className="flex items-center justify-between mb-4 bg-card p-3 rounded-2xl border border-border shadow-sm">
+                    <div className={`flex items-center gap-2 ${isMyTurn ? 'opacity-100' : 'opacity-50 grayscale'}`}>
+                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[10px] font-black">أنا</div>
                         <div className="text-right">
-                            <p className="text-[10px] uppercase font-black text-muted-foreground">دورك</p>
-                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                            <p className="text-[8px] uppercase font-black text-muted-foreground">أنا</p>
+                            {isMyTurn && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
                         </div>
                     </div>
-                    <div className="bg-muted px-4 py-2 rounded-xl text-xs font-black">
-                        {isMyTurn ? 'دورك الآن' : 'دور الشريك'}
+                    <div className="bg-muted px-3 py-1.5 rounded-xl text-[10px] font-black min-w-[80px]">
+                        {roomData?.winner ? 'انتهت اللعبة' : (isMyTurn ? 'دورك الآن' : 'دور الشريك')}
                     </div>
-                    <div className={`flex items-center gap-3 flex-row-reverse ${!isMyTurn ? 'opacity-100' : 'opacity-50 grayscale'}`}>
-                        <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white text-xs font-black">هو</div>
-                        <div className="text-right">
-                            <p className="text-[10px] uppercase font-black text-muted-foreground">دوره</p>
-                            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                        </div>
-                    </div>
+                    {(() => {
+                        const partnerId = isHost ? roomData?.guest_user_id : roomData?.host_user_id;
+                        const isPartnerInRoom = partnerId && presence[partnerId];
+                        return (
+                            <div className={`flex items-center gap-2 flex-row-reverse ${!isMyTurn ? 'opacity-100' : 'opacity-50 grayscale'}`}>
+                                <div className="relative">
+                                    <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[10px] font-black">هو</div>
+                                    <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card ${isPartnerInRoom ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[8px] uppercase font-black text-muted-foreground">الشريك</p>
+                                    {!isMyTurn && roomData?.status === 'playing' && !roomData.winner && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />}
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
 
-                <div className="flex-1 flex flex-col gap-8 overflow-y-auto pb-4">
+                <div className="flex-1 flex flex-col gap-4 overflow-y-auto pb-4 scrollbar-hide">
                     {/* Opponent Grid (Target) */}
                     <div>
-                        <h3 className="text-center font-black mb-4 flex items-center justify-center gap-2">
-                            <Ghost className="w-4 h-4 text-indigo-500" /> منطقة الخصم (اضرب هنا)
+                        <h3 className="text-center font-black mb-2 flex items-center justify-center gap-2 text-xs">
+                            <Ghost className="w-3.5 h-3.5 text-indigo-500" /> منطقة الخصم (اضرب هنا)
                         </h3>
                         <div
-                            className="grid gap-3 w-full max-w-sm mx-auto"
+                            className="grid gap-2 w-full max-w-[280px] mx-auto"
                             style={{ gridTemplateColumns: `repeat(3, 1fr)` }}
                         >
                             {opponentGrid?.map((cell, i) => (
@@ -716,12 +782,12 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
                     <div className="w-full h-px bg-border/50" />
 
                     {/* My Grid (Status) */}
-                    <div className="opacity-80 scale-90 origin-top">
-                        <h3 className="text-center font-black mb-4 flex items-center justify-center gap-2 text-muted-foreground text-sm">
-                            <ShieldCheck className="w-4 h-4" /> منطقتي (محاولاته)
+                    <div className="opacity-80 scale-[0.85] origin-top">
+                        <h3 className="text-center font-black mb-2 flex items-center justify-center gap-2 text-muted-foreground text-[10px]">
+                            <ShieldCheck className="w-3 h-3" /> منطقتي (محاولاته)
                         </h3>
                         <div
-                            className="grid gap-3 w-full max-w-sm mx-auto pointer-events-none"
+                            className="grid gap-2 w-full max-w-[280px] mx-auto pointer-events-none"
                             style={{ gridTemplateColumns: `repeat(3, 1fr)` }}
                         >
                             {myGrid?.map((cell, i) => (

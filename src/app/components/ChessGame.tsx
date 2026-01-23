@@ -306,11 +306,7 @@ export function ChessGame({ onBack, userId, userName }: ChessGameProps) {
     if (gameState === 'menu') {
         return (
             <div className="flex flex-col h-full bg-background p-6">
-                <div className="flex items-center gap-4 mb-10">
-                    <Button variant="ghost" className="w-12 h-12 rounded-full p-0" onClick={onBack}><ArrowLeft className="w-6 h-6" /></Button>
-                    <h1 className="text-3xl font-black">الشطرنج ♟️</h1>
-                </div>
-                <div className="flex-1 flex flex-col justify-center gap-6">
+                <div className="flex-1 flex flex-col justify-center gap-6 pb-20">
                     <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-foreground/5 rounded-[2.5rem] p-8 text-center border-2 border-foreground/10">
                         <div className="text-6xl mb-6">♚</div>
                         <h2 className="text-2xl font-black mb-2">تحدي الملوك</h2>
