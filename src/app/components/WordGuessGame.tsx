@@ -476,103 +476,89 @@ export function WordGuessGame({ onBack, userId, userName, partnershipId }: WordG
         const partnerId = isHost ? roomData?.guest_user_id : roomData?.host_user_id;
         const isPartnerInRoom = partnerId && presence[partnerId];
 
-        // Closeness I see about my GUESSES (from partner)
         const myCloseness = isHost ? roomData?.game_state.host_closeness : roomData?.game_state.guest_closeness;
-        // Closeness the partner sees (I set this for them)
         const partnerCloseness = isHost ? roomData?.game_state.guest_closeness : roomData?.game_state.host_closeness;
 
         return (
             <div className="flex flex-col h-full bg-background p-4 pt-4 overflow-hidden relative">
-                {/* Compact Game Header */}
-                <div className="flex items-center justify-between mb-4 bg-card/60 backdrop-blur-xl p-2.5 rounded-2xl border border-border shadow-sm">
+                {/* Optimized Header with High Contrast */}
+                <div className="flex items-center justify-between mb-4 bg-card p-3 rounded-2xl border-2 border-primary/10 shadow-md">
                     <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-white text-[9px] font-black shadow-lg">أنا</div>
-                        <p className="text-[9px] font-black opacity-60">تحدي متبادل</p>
+                        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-[10px] font-black shadow-lg shadow-primary/20">أنا</div>
+                        <p className="text-[10px] font-black text-foreground">تحدي متبادل</p>
                     </div>
-                    <div className="flex items-center gap-1 bg-primary/10 px-3 py-1.5 rounded-xl border border-primary/10">
-                        <HelpCircle className="w-3 h-3 text-primary" />
-                        <span className="text-xs font-black tracking-tighter text-primary">{roomData?.game_state.question_count} سؤال</span>
+                    <div className="flex items-center gap-1.5 bg-secondary px-3 py-1.5 rounded-xl border border-secondary">
+                        <HelpCircle className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-black tracking-tighter text-secondary-foreground">{roomData?.game_state.question_count} سؤال</span>
                     </div>
                     <div className="relative">
-                        <div className="w-7 h-7 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[9px] font-black shadow-lg">هو</div>
-                        <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border-2 border-card ${isPartnerInRoom ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+                        <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-[10px] font-black shadow-lg">هو</div>
+                        <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-card ${isPartnerInRoom ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
                     </div>
                 </div>
 
-                <div className="flex-1 flex flex-col items-center justify-start pt-6 gap-6">
-                    {/* Compact Visual Proximity Indicator */}
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="text-center space-y-3"
-                    >
+                <div className="flex-1 flex flex-col items-center justify-start pt-6 gap-8">
+                    {/* Simplified Animation for Performance */}
+                    <div className="text-center space-y-4">
                         <motion.div
-                            animate={{
-                                scale: myCloseness === 'very_near' ? [1, 1.03, 1] : 1,
-                            }}
-                            transition={{ repeat: Infinity, duration: 2 }}
-                            className={`w-24 h-24 rounded-[2.5rem] mx-auto flex items-center justify-center shadow-xl transition-all duration-700 relative ${myCloseness === 'far' ? 'bg-rose-500 text-white shadow-rose-500/10' :
-                                    myCloseness === 'near' ? 'bg-amber-500 text-white shadow-amber-500/10' :
-                                        'bg-emerald-500 text-white shadow-emerald-500/20'
+                            animate={{ scale: myCloseness === 'very_near' ? [1, 1.05, 1] : 1 }}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                            className={`w-28 h-28 rounded-[2.5rem] mx-auto flex items-center justify-center shadow-xl transition-colors duration-500 relative border-4 border-white/10 ${myCloseness === 'far' ? 'bg-rose-500 text-white' :
+                                    myCloseness === 'near' ? 'bg-amber-500 text-white' :
+                                        'bg-emerald-500 text-white'
                                 }`}>
-                            <div className="absolute inset-0 bg-white/10 rounded-[inherit] animate-pulse" />
-                            {myCloseness === 'far' ? <Ghost className="w-10 h-10 relative z-10" /> :
-                                myCloseness === 'near' ? <Compass className="w-10 h-10 relative z-10" /> : <Sparkles className="w-10 h-10 relative z-10 text-emerald-100" />}
+                            {myCloseness === 'far' ? <Ghost className="w-12 h-12" /> :
+                                myCloseness === 'near' ? <Compass className="w-12 h-12" /> : <Sparkles className="w-12 h-12" />}
                         </motion.div>
 
-                        <div className="space-y-0.5">
-                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60">مدى قربك من الحل</p>
-                            <h3 className="text-xl font-black tracking-tight">
+                        <div className="space-y-1">
+                            <p className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">قربك من الحل</p>
+                            <h3 className="text-2xl font-black text-foreground">
                                 {myCloseness === 'far' ? 'لسه ببعيد 💨' :
                                     myCloseness === 'near' ? 'قربت كثير! 👀' : 'خلاص، قدامك! 🔥'}
                             </h3>
                         </div>
-                    </motion.div>
+                    </div>
 
-                    {/* Compact Interaction Zone */}
-                    <div className="w-full flex flex-col gap-3 max-w-[280px]">
+                    {/* High Contrast Interaction Buttons */}
+                    <div className="w-full flex flex-col gap-4 max-w-[300px]">
                         {isMyTurn ? (
-                            <motion.div whileTap={{ scale: 0.97 }}>
-                                <Button
-                                    onClick={nextTurn}
-                                    className="w-full h-16 rounded-[1.8rem] bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl shadow-indigo-500/20 text-md font-black border-2 border-indigo-400/20"
-                                >
-                                    سألت، دورك! 🤝
-                                </Button>
-                            </motion.div>
+                            <Button
+                                onClick={nextTurn}
+                                className="w-full h-16 rounded-3xl bg-primary text-white shadow-xl shadow-primary/20 text-lg font-black border-b-4 border-primary-foreground/20 active:border-b-0 active:translate-y-1 transition-all"
+                            >
+                                أنهيت سؤالي، دورك! 🤝
+                            </Button>
                         ) : (
-                            <div className="h-16 flex items-center justify-center bg-muted/20 rounded-[1.8rem] border border-dashed border-primary/20 text-muted-foreground text-xs font-black animate-pulse">
+                            <div className="h-16 flex items-center justify-center bg-muted rounded-3xl border-2 border-dashed border-primary/20 text-foreground font-black animate-pulse text-sm">
                                 بانتظار الشريك.. ⏳
                             </div>
                         )}
 
                         <Button
                             onClick={() => {
-                                if (window.confirm('أكيد عرفت الكلمة؟')) {
+                                if (window.confirm('هل أنت متأكد من الكلمة؟')) {
                                     submitGuess();
                                 }
                             }}
-                            className="w-full h-11 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 border border-emerald-500/20 font-black text-[10px] transition-all active:scale-95"
+                            variant="secondary"
+                            className="w-full h-12 rounded-2xl bg-secondary text-secondary-foreground font-black text-xs border border-secondary shadow-md"
                         >
                             خمنت كلمته صح؟ 🎉
                         </Button>
                     </div>
                 </div>
 
-                {/* Compact Word Picker Tools */}
-                <motion.div
-                    initial={{ y: 50 }}
-                    animate={{ y: 0 }}
-                    className="absolute bottom-20 left-4 right-4 bg-card/90 backdrop-blur-3xl p-4 rounded-3xl border border-border shadow-2xl space-y-3 z-40"
-                >
+                {/* Feedback Panel - Solid Colors for Visibility */}
+                <div className="absolute bottom-20 left-4 right-4 bg-card p-5 rounded-[2.5rem] border-2 border-border shadow-2xl space-y-4 z-40">
                     <div className="flex items-center justify-between px-1">
-                        <p className="text-[8px] font-black text-muted-foreground uppercase">وجه شريكك لـ كلمتك:</p>
-                        <div className="bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/10">
-                            <span className="text-[9px] font-black text-primary uppercase">سرّي: {isHost ? roomData?.game_state.host_word : roomData?.game_state.guest_word}</span>
+                        <p className="text-[10px] font-black text-foreground uppercase tracking-wider">وجه شريكك لـ كلمتك:</p>
+                        <div className="bg-primary px-3 py-1 rounded-xl">
+                            <span className="text-[11px] font-black text-white uppercase tracking-tight">السر: {isHost ? roomData?.game_state.host_word : roomData?.game_state.guest_word}</span>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 gap-3">
                         {[
                             { id: 'far', label: 'ببعيد', icon: Ghost, color: 'rose' },
                             { id: 'near', label: 'قريب', icon: Compass, color: 'amber' },
@@ -581,17 +567,17 @@ export function WordGuessGame({ onBack, userId, userName, partnershipId }: WordG
                             <button
                                 key={item.id}
                                 onClick={() => updateCloseness(item.id as any)}
-                                className={`h-14 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 border-2 active:scale-95 ${partnerCloseness === item.id
-                                        ? `bg-${item.color}-500 text-white border-${item.color}-300 shadow-lg shadow-${item.color}-500/20`
-                                        : 'bg-muted/30 border-transparent text-muted-foreground'
+                                className={`h-16 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 border-2 active:scale-95 ${partnerCloseness === item.id
+                                        ? `bg-${item.color}-500 text-white border-${item.color}-600 shadow-lg`
+                                        : 'bg-secondary text-secondary-foreground border-transparent opacity-80'
                                     }`}
                             >
-                                <item.icon className="w-4 h-4" />
-                                <span className="text-[8px] font-black tracking-tighter">{item.label}</span>
+                                <item.icon className="w-5 h-5" />
+                                <span className="text-[10px] font-black">{item.label}</span>
                             </button>
                         ))}
                     </div>
-                </motion.div>
+                </div>
             </div>
         );
     }

@@ -157,66 +157,94 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
         setTimeout(() => setIsSyncing(false), 1000);
     }, [userId]);
 
-    const loadHomeData = async () => {
+    // Load stable data (Images, Events, Jars) - Run once or manually
+    const loadStableData = async () => {
+        if (!partnershipId) return;
         const today = new Date().toISOString().split('T')[0];
-        const [partnershipRes, upcomingEventsRes, pastEventsRes, moodRes] = await Promise.allSettled([
-            supabase.from('partnerships').select('*, user1:user1_id(avatar_url, last_seen, latitude, longitude), user2:user2_id(avatar_url, last_seen, latitude, longitude)').eq('id', partnershipId).single(),
-            supabase.from('calendar_events').select('*').eq('partnership_id', partnershipId).gte('event_date', today).order('event_date', { ascending: true }).limit(1),
-            supabase.from('calendar_events').select('*').eq('partnership_id', partnershipId).lt('event_date', today).not('image_url', 'is', null).order('event_date', { ascending: false }).limit(1),
-            supabase.from('mood_logs').select('mood').eq('user_id', userId).eq('mood_date', today).maybeSingle(),
-            // Get partner's mood
-            partnershipId ? supabase.from('partnerships').select('user1_id, user2_id').eq('id', partnershipId).single() : Promise.resolve({ data: null })
+
+        const [upcomingEventsRes, pastEventsRes, jarRes] = await Promise.all([
+            supabase.from('calendar_events')
+                .select('id, title, event_date, event_type')
+                .eq('partnership_id', partnershipId)
+                .gte('event_date', today)
+                .order('event_date', { ascending: true })
+                .limit(1),
+            supabase.from('calendar_events')
+                .select('id, title, event_date, image_url')
+                .eq('partnership_id', partnershipId)
+                .lt('event_date', today)
+                .not('image_url', 'is', null)
+                .order('event_date', { ascending: false })
+                .limit(1),
+            supabase.from('finance_jars')
+                .select('current_amount')
+                .eq('partnership_id', partnershipId)
+                .eq('title', 'حصالة المغامرات')
+                .maybeSingle()
         ]);
 
-        let combinedEvents: any[] = [];
-        if (upcomingEventsRes.status === 'fulfilled' && upcomingEventsRes.value.data) combinedEvents = [...upcomingEventsRes.value.data];
-        if (pastEventsRes.status === 'fulfilled' && pastEventsRes.value.data) combinedEvents = [...combinedEvents, ...pastEventsRes.value.data];
-        setUpcomingEvents(combinedEvents);
+        if (upcomingEventsRes.data || pastEventsRes.data) {
+            const combined = [...(upcomingEventsRes.data || []), ...(pastEventsRes.data || [])];
+            setUpcomingEvents(combined);
+        }
+        if (jarRes.data) setAdventureBalance(jarRes.data.current_amount);
+    };
 
-        if (partnershipRes.status === 'fulfilled' && partnershipRes.value.data) {
-            const p = partnershipRes.value.data;
+    // Load volatile data (Status, Mood) - Run frequently
+    const loadVolatileData = async () => {
+        if (!partnershipId || !userId) return;
+        const today = new Date().toISOString().split('T')[0];
+
+        // 1. Get partnership and partner user status (minimal columns)
+        const { data: p } = await supabase.from('partnerships')
+            .select('*, user1:user1_id(avatar_url, last_seen, latitude, longitude), user2:user2_id(avatar_url, last_seen, latitude, longitude)')
+            .eq('id', partnershipId)
+            .single();
+
+        if (p) {
             setPartnership(p);
-
-            // Get Partner ID
-            const partnerId = p.user1_id === userId ? p.user2_id : p.user1_id;
-
-            // Fetch partner's mood for today
-            const { data: pMood } = await supabase.from('mood_logs').select('mood').eq('user_id', partnerId).eq('mood_date', today).maybeSingle();
-            if (pMood) setPartnerMood(pMood.mood);
-            else setPartnerMood(null);
-
-            const start = new Date(p.relationship_start_date || p.created_at);
-            const now = new Date();
-            const diff = Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-            setDaysTogether(diff + 1);
-
             const isUser1 = p.user1_id === userId;
             const partner = isUser1 ? p.user2 : p.user1;
-            setAvatars({ me: (isUser1 ? p.user1 : p.user2 as any)?.avatar_url, partner: (partner as any)?.avatar_url });
+            const partnerId = isUser1 ? p.user2_id : p.user1_id;
 
-            const partnerData = partner as any;
-            setPartnerTracking({ last_seen: partnerData?.last_seen, lat: partnerData?.latitude, lng: partnerData?.longitude });
+            setAvatars({
+                me: (isUser1 ? p.user1 : p.user2 as any)?.avatar_url,
+                partner: (partner as any)?.avatar_url
+            });
 
-            if (partnerData?.latitude && partnerData?.longitude) {
-                // Distance calculation moved to separate useEffect
+            setPartnerTracking({
+                last_seen: partner?.last_seen,
+                lat: partner?.latitude,
+                lng: partner?.longitude
+            });
+
+            const start = new Date(p.relationship_start_date || p.created_at);
+            setDaysTogether(Math.floor((new Date().getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+            // 2. Fetch partner and my mood
+            const [{ data: myMood }, { data: pMood }] = await Promise.all([
+                supabase.from('mood_logs').select('mood').eq('user_id', userId).eq('mood_date', today).maybeSingle(),
+                supabase.from('mood_logs').select('mood').eq('user_id', partnerId).eq('mood_date', today).maybeSingle()
+            ]);
+
+            if (myMood) {
+                setSelectedMoodId(myMood.mood);
+                setShowMoodPrompt(false);
             }
+            if (pMood) setPartnerMood(pMood.mood);
         }
-        if (moodRes.status === 'fulfilled' && moodRes.value.data) {
-            setShowMoodPrompt(false);
-            const savedMoodId = (moodRes.value.data as any).mood;
-            setSelectedMoodId(savedMoodId);
-        }
-
-        // Fetch Adventure Jar Balance
-        const { data: jar } = await supabase.from('finance_jars').select('current_amount').eq('partnership_id', partnershipId).eq('title', 'حصالة المغامرات').maybeSingle();
-        if (jar) setAdventureBalance(jar.current_amount);
     };
 
     useEffect(() => {
         if (partnershipId && userId) {
-            loadHomeData();
+            loadStableData();
+            loadVolatileData();
             updateMyStatus();
-            const interval = setInterval(() => { updateMyStatus(); loadHomeData(); }, 60000);
+
+            const interval = setInterval(() => {
+                updateMyStatus();
+                loadVolatileData();
+            }, 60000);
 
             // Listen for nudges
             const channel = supabase
@@ -287,8 +315,8 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
             setSelectedMoodId(mood);
             setShowMoodPrompt(false);
 
-            // Refresh home data to get partner updates immediately
-            loadHomeData();
+            // Refresh mood data to get partner updates immediately
+            loadVolatileData();
         } catch (err: any) {
             console.error('Mood Save Error:', err);
             alert(`خطأ في الحفظ: ${err.message}\n\nتأكد من تشغيل V8 SQL Fix.`);
@@ -538,7 +566,11 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                     <div className="flex items-center justify-between gap-3 pt-2">
                                         <motion.button
                                             whileTap={{ scale: 0.9 }}
-                                            onClick={() => updateMyStatus().then(loadHomeData)}
+                                            onClick={() => {
+                                                updateMyStatus();
+                                                loadStableData();
+                                                loadVolatileData();
+                                            }}
                                             disabled={isSyncing}
                                             className="h-12 w-12 bg-white dark:bg-white/10 rounded-2xl flex items-center justify-center text-[#f43f5e] shadow-lg border border-white/60 active:bg-rose-50"
                                         >
@@ -655,7 +687,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         </div>
                         <div className="space-y-1">
                             <h3 className="text-base font-black text-foreground tracking-tight">بريد الألفة</h3>
-                            <p className="text-[7px] font-black text-mood/40 uppercase tracking-[0.3em]">بوح القلوب</p>
+                            <p className="text-[7px] font-black text-mood/70 uppercase tracking-[0.3em]">بوح القلوب</p>
                         </div>
                     </motion.button>
 
@@ -671,7 +703,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         </div>
                         <div className="space-y-1">
                             <h3 className="text-base font-black text-foreground tracking-tight">مغامراتنا</h3>
-                            <p className="text-[7px] font-black text-amber-600/40 uppercase tracking-[0.3em]">أحلام مشتركة</p>
+                            <p className="text-[7px] font-black text-amber-600/70 uppercase tracking-[0.3em]">أحلام مشتركة</p>
                         </div>
                     </motion.button>
                 </section>
@@ -686,7 +718,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         </div>
                         <div className="text-center">
                             <h3 className="text-lg font-black text-foreground tracking-tight">نزعة الروح</h3>
-                            <p className="text-[7px] font-black text-mood/40 uppercase tracking-[0.4em]">بصمتك اليومية</p>
+                            <p className="text-[7px] font-black text-mood/70 uppercase tracking-[0.4em]">بصمتك اليومية</p>
                         </div>
                         <div className="w-10 h-10" />
                     </div>
@@ -788,7 +820,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                             </div>
                             <div className="space-y-0">
                                 <h3 className="text-lg font-black text-foreground tracking-tight">محطات المسير</h3>
-                                <p className="text-[7px] font-black text-muted-foreground/30 uppercase tracking-[0.2em]">رحلة تقارب القلوب</p>
+                                <p className="text-[7px] font-black text-muted-foreground/60 uppercase tracking-[0.2em]">رحلة تقارب القلوب</p>
                             </div>
                         </div>
                         <button
