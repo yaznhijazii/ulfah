@@ -19,7 +19,11 @@ import {
   ChevronLeft,
   ChevronRight,
   LayoutGrid,
-  Target
+  Target,
+  Gift,
+  MailOpen,
+  Mail,
+  Edit2
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
@@ -197,14 +201,18 @@ const EventItem = ({ item, idx, viewMode, onDelete, getRelativeTime, monthNames 
 export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }: CalendarScreenProps) {
   const [events, setEvents] = useState<any[]>([]);
   const [memories, setMemories] = useState<any[]>([]);
+  const [greetings, setGreetings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showAddEventForm, setShowAddEventForm] = useState(false);
   const [showAddMemoryForm, setShowAddMemoryForm] = useState(false);
   const [showAddRealEventForm, setShowAddRealEventForm] = useState(false);
+  const [showAddGreetingForm, setShowAddGreetingForm] = useState(false);
 
   const [eventForm, setEventForm] = useState({ title: '', event_date: '', event_time: '', location: '', event_type: 'other' });
   const [memoryForm, setMemoryForm] = useState({ title: '', memory_date: new Date().toISOString().split('T')[0], description: '' });
+  const [greetingForm, setGreetingForm] = useState({ title: '', target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], message: '' });
+  const [editingGreetingId, setEditingGreetingId] = useState<string | null>(null);
   const [selectedImages, setSelectedImages] = useState<{ file: File, preview: string }[]>([]);
 
   // Image gallery state - for viewing all images of a memory
@@ -284,12 +292,14 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
     setLoading(false);
 
     // Phase 2: FULL Initial Load (up to limit)
-    const [eventsResult, memoriesResult] = await Promise.all([
+    const [eventsResult, memoriesResult, greetingsResult] = await Promise.all([
       supabase.from('calendar_events').select('*').eq('partnership_id', partnershipId).order('event_date', { ascending: false }).limit(limit),
-      supabase.from('memories').select('*, images:memory_images(image_url)').eq('partnership_id', partnershipId).order('memory_date', { ascending: false }).limit(limit)
+      supabase.from('memories').select('*, images:memory_images(image_url)').eq('partnership_id', partnershipId).order('memory_date', { ascending: false }).limit(limit),
+      supabase.from('occasion_greetings').select('*').eq('partnership_id', partnershipId).eq('sender_id', userId).order('target_date', { ascending: false })
     ]);
 
     if (eventsResult.data) setEvents(eventsResult.data);
+    if (greetingsResult.data) setGreetings(greetingsResult.data);
     if (memoriesResult.data) {
       setMemories(memoriesResult.data);
       setHasMore(memoriesResult.data.length >= limit);
@@ -307,6 +317,11 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
   const fetchMemories = async () => {
     const { data } = await supabase.from('memories').select('*, images:memory_images(image_url)').eq('partnership_id', partnershipId).order('memory_date', { ascending: false }).limit(limit);
     if (data) setMemories(data);
+  };
+
+  const fetchGreetings = async () => {
+    const { data } = await supabase.from('occasion_greetings').select('*').eq('partnership_id', partnershipId).eq('sender_id', userId).order('target_date', { ascending: false });
+    if (data) setGreetings(data);
   };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -374,12 +389,56 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
     }
   };
 
-  const deleteItem = async (id: string, type: 'event' | 'memory') => {
-    const table = type === 'event' ? 'calendar_events' : 'memories';
+  const handleCreateGreeting = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!partnershipId || isSubmitting) return;
+    setIsSubmitting(true);
+    
+    // Convert date string to ISO date with time for accurate countdown target
+    const targetDateObj = new Date(greetingForm.target_date);
+    targetDateObj.setHours(0, 0, 0, 0);
+
+    const payload = {
+      partnership_id: partnershipId,
+      sender_id: userId,
+      title: greetingForm.title,
+      target_date: targetDateObj.toISOString(),
+      message: greetingForm.message,
+      is_opened: false
+    };
+
+    let error;
+    if (editingGreetingId) {
+      const res = await supabase.from('occasion_greetings').update(payload).eq('id', editingGreetingId);
+      error = res.error;
+    } else {
+      const res = await supabase.from('occasion_greetings').insert(payload);
+      error = res.error;
+    }
+
+    if (!error) {
+      setShowAddGreetingForm(false);
+      setEditingGreetingId(null);
+      fetchGreetings();
+      setGreetingForm({ title: '', target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], message: '' });
+      // Notify success
+      alert(editingGreetingId ? "تم التعديل بنجاح!" : "تم إيداع المعايدة بنجاح.. ستظهر لشريكك قبل موعدها بيومين! 💌");
+    } else {
+      alert("تأكد أنك قمت بإنشاء جدول المعايدات في Supabase!");
+    }
+    setIsSubmitting(false);
+  };
+
+  const deleteItem = async (id: string, type: 'event' | 'memory' | 'greeting') => {
+    // Cannot rely on user alert for native functionality in a custom dashboard but okay for simple use cases
+    if (type === 'greeting' && !window.confirm('هل أنت متأكد من حذف هذه المعايدة؟')) return;
+
+    const table = type === 'event' ? 'calendar_events' : type === 'memory' ? 'memories' : 'occasion_greetings';
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (!error) {
       if (type === 'event') fetchEvents();
-      else fetchMemories();
+      else if (type === 'memory') fetchMemories();
+      else fetchGreetings();
     }
   };
 
@@ -497,6 +556,46 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
       </header>
 
       <div className="flex-1 overflow-y-auto px-8 py-8 pb-40 scrollbar-hide">
+      
+        {/* Greetings Dashboard */}
+        {greetings.length > 0 && (
+          <div className="mb-12">
+            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-4 flex items-center gap-2">
+              <Gift className="w-3.5 h-3.5 text-amber-500" /> معايداتك المخبأة
+            </h3>
+            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+              {greetings.map(greeting => (
+                <div key={greeting.id} className="min-w-[200px] glass rounded-[2rem] p-5 border-white/20 relative group shrink-0">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${greeting.is_opened ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                      {greeting.is_opened ? <MailOpen className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
+                    </div>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <button onClick={() => {
+                        setEditingGreetingId(greeting.id);
+                        setGreetingForm({
+                          title: greeting.title,
+                          target_date: new Date(greeting.target_date).toISOString().split('T')[0],
+                          message: greeting.message
+                        });
+                        setShowAddGreetingForm(true);
+                      }} className="w-8 h-8 flex items-center justify-center glass border-white/10 text-muted-foreground rounded-lg hover:bg-white/10 hover:text-white active:scale-95"><Edit2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => deleteItem(greeting.id, 'greeting')} className="w-8 h-8 flex items-center justify-center glass border-white/10 text-rose-500 rounded-lg hover:bg-rose-500/10 active:scale-95"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                  <h4 className="font-black text-sm text-foreground mb-1">{greeting.title}</h4>
+                  <div className="flex items-center justify-between mt-4">
+                    <span className="text-[9px] font-black uppercase text-muted-foreground/60">{new Date(greeting.target_date).toLocaleDateString('ar-EG')}</span>
+                    <span className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-lg ${greeting.is_opened ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'}`}>
+                      {greeting.is_opened ? 'تم الفتح ورؤيتها' : 'قيد الانتظار'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="relative">
           {viewMode === 'timeline' && timelineItems.length > 0 && (
             <div className="absolute right-7 top-0 bottom-0 w-[1px] bg-gradient-to-b from-primary/40 via-primary/10 to-transparent rounded-full" />
@@ -583,7 +682,44 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
                     <p className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-widest leading-relaxed">تخطيط لمسافة لم نقطعها بعد</p>
                   </div>
                 </button>
+                <button onClick={() => { 
+                  setEditingGreetingId(null);
+                  setGreetingForm({ title: '', target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], message: '' });
+                  setShowAddEventForm(false); 
+                  setShowAddGreetingForm(true); 
+                }} className="w-full p-10 glass border-amber-500/20 rounded-[3rem] flex items-center gap-7 transition-all hover:border-amber-500/50 group bg-amber-500/5">
+                  <div className="w-16 h-16 rounded-[1.8rem] bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform"><Gift className="w-8 h-8" /></div>
+                  <div className="text-right">
+                    <h4 className="font-black text-xl text-foreground mb-1">معايدة سرية 💌</h4>
+                    <p className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest leading-relaxed">رسالة ستظهر قبل المناسبة القادمة بـ 48 ساعة</p>
+                  </div>
+                </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showAddGreetingForm && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-8">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => { setShowAddGreetingForm(false); setEditingGreetingId(null); }} />
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="relative w-full max-w-sm glass rounded-[3.5rem] p-12 border-amber-500/30">
+              <h2 className="text-3xl font-black mb-10 text-foreground tracking-tighter">{editingGreetingId ? 'تعديل المعايدة ✏️' : 'معايدة مخبأة 💌'}</h2>
+              <form onSubmit={handleCreateGreeting} className="space-y-10">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">المناسبة القادمة</label>
+                  <input required className="w-full h-18 glass rounded-2xl px-6 text-lg font-black border-white/10 text-foreground focus:border-amber-500 transition-all" placeholder="مثلاً: يوم ميلادها، عيد الفطر..." value={greetingForm.title} onChange={e => setGreetingForm({ ...greetingForm, title: e.target.value })} />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">تاريخ المناسبة</label>
+                  <input type="date" required className="w-full h-16 glass rounded-2xl px-5 text-sm font-black border-white/10 text-foreground font-sans focus:border-amber-500 transition-all" value={greetingForm.target_date} onChange={e => setGreetingForm({ ...greetingForm, target_date: e.target.value })} />
+                  <p className="text-[8px] text-muted-foreground/40 text-center px-4 font-black">المظروف التفاعلي سيظهر على الشاشة الرئيسية قبل الموعد بـ 48 ساعة</p>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">رسالة العهد</label>
+                  <textarea required className="w-full h-32 glass rounded-3xl p-6 text-sm font-black border-white/10 text-foreground focus:border-amber-500 transition-all resize-none leading-[1.8]" placeholder="اكتب ما بقلبك هنا..." value={greetingForm.message} onChange={e => setGreetingForm({ ...greetingForm, message: e.target.value })} />
+                </div>
+                <Button type="submit" disabled={isSubmitting} className="w-full h-18 rounded-[2rem] text-lg font-black shadow-2xl shadow-amber-500/20 bg-amber-500 text-white">{editingGreetingId ? 'حفظ التعديلات' : 'إخفاء الرسالة للموعد'}</Button>
+              </form>
             </motion.div>
           </div>
         )}

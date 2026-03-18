@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Send, Type, Heart, MessageCircle, Repeat, Share2, Sparkles, Feather, PenLine } from 'lucide-react';
+import { ArrowLeft, Send, Type, Heart, MessageCircle, Repeat, Share2, Sparkles, Feather, PenLine, Lock, Unlock, Clock, Ghost, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { supabase } from '../../lib/supabase';
 
@@ -22,6 +22,8 @@ interface Note {
         name: string;
         avatar_url: string;
     };
+    unlock_at?: string | null;
+    unlock_condition?: string | null;
 }
 
 export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode }: LoveNotesScreenProps) {
@@ -30,6 +32,10 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
     const [selectedFont, setSelectedFont] = useState('font-normal');
     const [isWriting, setIsWriting] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState<'notes' | 'vault'>('notes');
+    const [unlockDate, setUnlockDate] = useState<string>('');
+    const [unlockMood, setUnlockMood] = useState<string>('');
+    const [partnerMood, setPartnerMood] = useState<string | null>(null);
 
     const weights = [
         { name: 'خفيف', value: 'font-light' },
@@ -42,8 +48,31 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
     useEffect(() => {
         if (partnershipId) {
             fetchNotes();
+            fetchPartnerMood();
         }
     }, [partnershipId]);
+
+    const fetchPartnerMood = async () => {
+        if (!partnershipId) return;
+        const partnerId = await getPartnerId();
+        if (!partnerId) return;
+
+        const today = new Date().toISOString().split('T')[0];
+        const { data } = await supabase
+            .from('mood_logs')
+            .select('mood')
+            .eq('user_id', partnerId)
+            .eq('mood_date', today)
+            .maybeSingle();
+
+        if (data) setPartnerMood(data.mood);
+    };
+
+    const getPartnerId = async () => {
+        const { data } = await supabase.from('partnerships').select('user1_id, user2_id').eq('id', partnershipId).single();
+        if (!data) return null;
+        return data.user1_id === userId ? data.user2_id : data.user1_id;
+    };
 
     const fetchNotes = async () => {
         if (!partnershipId) {
@@ -111,12 +140,16 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
                 partnership_id: partnershipId,
                 author_id: userId,
                 content: newNote.trim(),
-                font_style: selectedFont
+                font_style: selectedFont,
+                unlock_at: unlockDate ? new Date(unlockDate).toISOString() : null,
+                unlock_condition: unlockMood || null
             });
 
             if (error) throw error;
 
             setNewNote('');
+            setUnlockDate('');
+            setUnlockMood('');
             setIsWriting(false);
             fetchNotes();
         } catch (err: any) {
@@ -130,6 +163,36 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
     const NoteCard = ({ note, index }: { note: Note, index: number }) => {
         const isLiked = note.likes?.includes(userId);
         const isAuthor = note.author_id === userId;
+
+        const isLocked = !isAuthor && (
+            (note.unlock_at && new Date(note.unlock_at) > new Date()) ||
+            (note.unlock_condition && partnerMood !== note.unlock_condition)
+        );
+
+        if (isLocked) {
+            return (
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="glass rounded-[3rem] p-8 border-white/50 mb-8 max-w-md mx-auto w-full relative bg-zinc-100/40 dark:bg-black/40 overflow-hidden"
+                >
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white/10 backdrop-blur-md z-10">
+                        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary animate-pulse">
+                            <Lock className="w-8 h-8" />
+                        </div>
+                        <div className="text-center px-6">
+                            <h3 className="text-xl font-black text-foreground tracking-tight">رسالة مخبوءة</h3>
+                            <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-[0.3em] mt-2.5 max-w-[200px] mx-auto leading-relaxed">
+                                {note.unlock_at ? `سوف تزهر هذه الكلمات في ${new Date(note.unlock_at).toLocaleDateString('ar-SA')}` : `تتحرر هذه الرسالة عندما تغادر حالة الـ ${note.unlock_condition === 'sad' ? 'غائم' : note.unlock_condition === 'happy' ? 'مشرق' : note.unlock_condition}`}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="opacity-5 blur-xl select-none pointer-events-none text-right text-3xl">
+                        {note.content.substring(0, 50)}...
+                    </div>
+                </motion.div>
+            );
+        }
 
         return (
             <motion.div
@@ -154,22 +217,34 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
                         </div>
                         <div>
                             <span className="text-sm font-black text-foreground block">{isAuthor ? 'أنا' : note.author?.name}</span>
-                            <span className="text-[9px] font-black text-primary/40 tracking-[0.3em] uppercase">سليل المودة</span>
+                            <div className="flex items-center gap-1">
+                                <span className="text-[9px] font-black text-rose-500/40 tracking-[0.4em] uppercase">سليل المودة</span>
+                                {(note.unlock_at || note.unlock_condition) && <Unlock className="w-2.5 h-2.5 text-emerald-500/60" />}
+                            </div>
                         </div>
                     </div>
                     {isAuthor && (
-                        <motion.button
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleDelete(note.id)}
-                            className="w-10 h-10 rounded-xl glass border-white/40 flex items-center justify-center text-rose-500/40 hover:text-rose-500 transition-all ml-2"
-                            title="حذف الخاطرة"
-                        >
-                            <Repeat className="w-5 h-5 rotate-45" /> {/* Using Repeat as a cross/delete icon for style or Trash if you want */}
-                        </motion.button>
+                        <div className="flex gap-2">
+                            {(note.unlock_at || note.unlock_condition) && (
+                                <div className="w-10 h-10 rounded-xl glass border-white/40 flex items-center justify-center text-emerald-500/40">
+                                    <Lock className="w-4 h-4" />
+                                </div>
+                            )}
+                            <motion.button
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => handleDelete(note.id)}
+                                className="w-10 h-10 rounded-xl glass border-white/40 flex items-center justify-center text-rose-500/40 hover:text-rose-500 transition-all"
+                                title="حذف الخاطرة"
+                            >
+                                <Repeat className="w-5 h-5 rotate-45" />
+                            </motion.button>
+                        </div>
                     )}
-                    <div className="w-10 h-10 rounded-2xl glass border-white/40 flex items-center justify-center text-primary/20">
-                        <Sparkles className="w-5 h-5" />
-                    </div>
+                    {!isAuthor && (
+                        <div className="w-10 h-10 rounded-2xl glass border-white/40 flex items-center justify-center text-primary/20">
+                            <Sparkles className="w-5 h-5" />
+                        </div>
+                    )}
                 </div>
 
                 <div className={`text-right ${note.font_style} text-3xl leading-[1.5] text-foreground tracking-tight whitespace-pre-wrap mb-12 relative z-10 px-2`}>
@@ -203,30 +278,40 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
 
     return (
         <div className="flex-1 bg-background flex flex-col relative h-full overflow-hidden mood-love">
-            {/* Romantic Red Atmospheric Aura */}
+            {/* Romantic Atmospheric Aura - More Sophisticated */}
             <div className="fixed inset-0 pointer-events-none -z-10">
-                <div className="absolute top-[-20%] left-[-10%] w-[100%] h-[70%] bg-rose-500/10 blur-[180px] rounded-full opacity-60 pointer-events-none" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[80%] h-[50%] bg-rose-500/5 blur-[120px] rounded-full opacity-40 pointer-events-none" />
+                <div className="absolute top-[-10%] right-[-15%] w-[100%] h-[70%] bg-rose-500/[0.08] blur-[180px] rounded-full" />
+                <div className="absolute bottom-[-15%] left-[-10%] w-[90%] h-[60%] bg-violet-500/[0.04] blur-[140px] rounded-full" />
             </div>
 
             <header className="px-8 pt-10 pb-6 flex items-center justify-between sticky top-0 bg-background/40 backdrop-blur-3xl z-30">
                 <motion.button
                     whileTap={{ scale: 0.9 }}
                     onClick={() => onNavigate('home')}
-                    className="w-12 h-12 flex items-center justify-center glass rounded-2xl border-white/60 shadow-xl text-foreground/40"
+                    className="w-12 h-12 flex items-center justify-center glass rounded-[1.4rem] border-white/60 dark:border-white/10 shadow-2xl text-foreground/30 active:scale-90 transition-all font-black"
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </motion.button>
-                <div className="text-center">
-                    <h1 className="text-xl font-black text-foreground tracking-tighter">خاطرات الألفة</h1>
-                    <p className="text-[9px] font-black text-rose-600/40 uppercase tracking-[0.4em]">كلمات تخلد في الوجدان</p>
+                <div className="flex items-center bg-white/40 dark:bg-white/[0.03] rounded-2xl p-1.5 border border-white/60 dark:border-white/5 shadow-inner">
+                    <button
+                        onClick={() => setActiveTab('notes')}
+                        className={`px-6 py-2.5 rounded-[1.2rem] text-[10px] font-black transition-all duration-500 uppercase tracking-widest ${activeTab === 'notes' ? 'bg-rose-500 text-white shadow-xl shadow-rose-500/20' : 'text-foreground/30 hover:text-foreground/50'}`}
+                    >
+                        الرسائل
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('vault')}
+                        className={`px-6 py-2.5 rounded-[1.2rem] text-[10px] font-black transition-all duration-500 uppercase tracking-widest ${activeTab === 'vault' ? 'bg-rose-500 text-white shadow-xl shadow-rose-500/20' : 'text-foreground/30 hover:text-foreground/50'}`}
+                    >
+                        المخبوءة
+                    </button>
                 </div>
                 <motion.button
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setIsWriting(!isWriting)}
-                    className={`w-12 h-12 flex items-center justify-center rounded-2xl glass border shadow-2xl transition-all duration-500 ${isWriting ? 'bg-rose-500 text-white border-rose-500 shadow-rose-500/20' : 'border-white/60 text-rose-500'}`}
+                    className={`w-12 h-12 flex items-center justify-center rounded-[1.4rem] glass border shadow-2xl transition-all duration-700 ${isWriting ? 'bg-rose-500 text-white border-rose-500 shadow-rose-500/20' : 'border-white/60 dark:border-white/5 text-rose-500'}`}
                 >
-                    {isWriting ? <ArrowLeft className="w-5 h-5 rotate-90" /> : <PenLine className="w-5 h-5" />}
+                    {isWriting ? <X className="w-5 h-5" /> : <PenLine className="w-5 h-5" />}
                 </motion.button>
             </header>
 
@@ -244,11 +329,14 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
                                 <Feather className="w-40 h-40 text-primary" />
                             </div>
 
-                            <div className="mb-8 flex items-center gap-3 text-primary relative z-10">
-                                <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-                                    <PenLine className="w-5 h-5" />
+                            <div className="mb-8 flex items-center gap-3.5 text-rose-500/60 relative z-10">
+                                <div className="w-12 h-12 rounded-[1.4rem] bg-rose-500/5 border border-rose-500/10 flex items-center justify-center shadow-inner">
+                                    <Feather className="w-6 h-6" />
                                 </div>
-                                <span className="text-[11px] font-black uppercase tracking-[0.5em]">بوح القلم</span>
+                                <div className="flex flex-col">
+                                    <span className="text-[11px] font-black uppercase tracking-[0.5em] leading-none mb-1">همس السكينة</span>
+                                    <span className="text-[8px] font-bold opacity-40 uppercase tracking-[0.2em]">اكتب ما يمليه عليك قلبك</span>
+                                </div>
                             </div>
 
                             <textarea
@@ -259,37 +347,78 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
                                 autoFocus
                             />
 
-                            <div className="flex items-center gap-3 overflow-x-auto pb-6 scrollbar-hide mb-10 border-b border-primary/5 relative z-10">
+                            <div className="flex items-center gap-3 overflow-x-auto pb-4 scrollbar-hide mb-6 border-b border-primary/5 relative z-10">
                                 {weights.map(weight => (
                                     <button
                                         key={weight.value}
                                         onClick={() => setSelectedFont(weight.value)}
-                                        className={`px-7 py-3 rounded-2xl text-[10px] font-black whitespace-nowrap transition-all duration-500 border-2 ${selectedFont === weight.value ? 'bg-primary text-white border-primary shadow-2xl shadow-primary/30 scale-105' : 'glass border-white/40 text-primary/40'}`}
+                                        className={`px-5 py-2.5 rounded-xl text-[9px] font-black whitespace-nowrap transition-all duration-500 border-2 ${selectedFont === weight.value ? 'bg-primary text-white border-primary shadow-2xl shadow-primary/30 scale-105' : 'glass border-white/40 text-primary/40'}`}
                                     >
                                         {weight.name}
                                     </button>
                                 ))}
                             </div>
 
+                            <div className="grid grid-cols-2 gap-4 mb-8 relative z-10">
+                                <div className="space-y-2">
+                                    <label className="text-[8px] font-black text-primary/40 uppercase tracking-widest block pr-2">فتح في تاريخ</label>
+                                    <div className="relative">
+                                        <input
+                                            type="date"
+                                            value={unlockDate}
+                                            onChange={(e) => setUnlockDate(e.target.value)}
+                                            className="w-full h-12 glass border-white/40 rounded-xl px-4 text-[10px] font-black text-foreground/60 outline-none focus:border-primary/40"
+                                        />
+                                        <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/20 pointer-events-none" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[8px] font-black text-primary/40 uppercase tracking-widest block pr-2">فتح عند شعور</label>
+                                    <select
+                                        value={unlockMood}
+                                        onChange={(e) => setUnlockMood(e.target.value)}
+                                        className="w-full h-12 glass border-white/40 rounded-xl px-4 text-[10px] font-black text-foreground/60 outline-none focus:border-primary/40 appearance-none"
+                                    >
+                                        <option value="">لا يوجد شرط</option>
+                                        <option value="happy">مشرق (سعيد)</option>
+                                        <option value="good">جيد</option>
+                                        <option value="okay">عادي</option>
+                                        <option value="sad">غائم (حزين)</option>
+                                    </select>
+                                </div>
+                            </div>
+
                             <button
                                 onClick={handleSaveNote}
                                 disabled={loading || !newNote.trim()}
-                                className="w-full h-18 bg-primary text-white rounded-[2.2rem] text-lg font-black shadow-[0_20px_60px_rgba(var(--primary-rgb),0.3)] hover:scale-[1.01] active:scale-95 transition-all disabled:opacity-30 relative z-10 border-t border-white/20"
+                                className="w-full h-18 bg-rose-500 text-white rounded-[2.2rem] text-lg font-black shadow-xl shadow-rose-500/20 hover:scale-[1.01] active:scale-95 transition-all duration-500 disabled:opacity-30 relative z-10 border-t border-white/20"
                             >
-                                {loading ? 'جاري تخليد الكلمات...' : 'تسجيل في خلدنا'}
+                                {loading ? 'جاري تخليد الكلمات...' : 'تسجيل في أفقنا'}
                             </button>
                         </motion.div>
                     ) : (
                         <div className="space-y-4">
-                            {notes.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-96 text-center opacity-20">
-                                    <Feather className="w-16 h-16 mb-6" />
-                                    <p className="font-black text-xl">لا رسائل بعد</p>
-                                    <p className="text-[10px] font-bold uppercase tracking-widest mt-2">كن أنت من يبدأ بالكلمة الطيبة</p>
-                                </div>
-                            ) : (
-                                notes.map((note, i) => <NoteCard key={note.id} note={note} index={i} />)
-                            )}
+                            {(() => {
+                                const filteredNotes = notes.filter(n => {
+                                    const isLocked = n.author_id !== userId && (
+                                        (n.unlock_at && new Date(n.unlock_at) > new Date()) ||
+                                        (n.unlock_condition && partnerMood !== n.unlock_condition)
+                                    );
+                                    return activeTab === 'notes' ? !isLocked : isLocked;
+                                });
+
+                                if (filteredNotes.length === 0) {
+                                    return (
+                                        <div className="flex flex-col items-center justify-center h-96 text-center opacity-20">
+                                            {activeTab === 'notes' ? <Feather className="w-16 h-16 mb-6" /> : <Lock className="w-16 h-16 mb-6" />}
+                                            <p className="font-black text-xl">{activeTab === 'notes' ? 'لا رسائل متاحة' : 'الخزانة فارغة'}</p>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest mt-2">{activeTab === 'notes' ? 'تتحرر الكلمات عندما يحين وقتها' : 'رسائل تنتظر اللحظة المناسبة لتزهر'}</p>
+                                        </div>
+                                    );
+                                }
+
+                                return filteredNotes.map((note, i) => <NoteCard key={note.id} note={note} index={i} />);
+                            })()}
                         </div>
                     )}
                 </AnimatePresence>

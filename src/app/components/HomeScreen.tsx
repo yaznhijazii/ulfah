@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { supabase } from '../../lib/supabase';
+import { getAIRecommendation } from '../../utils/aiAdvisor';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 
@@ -58,12 +59,14 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     const [moodLoading, setMoodLoading] = useState(false);
     const [selectedMoodId, setSelectedMoodId] = useState<string | null>(null);
     const [partnerMood, setPartnerMood] = useState<any>(null);
+    const [aiRecommendation, setAiRecommendation] = useState<{ title: string; advice: string } | null>(null);
+    const [upcomingGreeting, setUpcomingGreeting] = useState<{ title: string } | null>(null);
 
     const getGreeting = () => {
         const hour = new Date().getHours();
-        if (hour < 12) return 'صباح الخير والمودة';
-        if (hour < 18) return 'طاب يومك بكل حب';
-        return 'مساء السكينة والمودة';
+        if (hour < 12) return 'صباح المودة والسكينة';
+        if (hour < 18) return 'طاب يومكم بكل مودة';
+        return 'مساء السكينة والمحبة';
     };
 
     const formatLastSeen = (lastSeen: string | null) => {
@@ -162,7 +165,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
         if (!partnershipId) return;
         const today = new Date().toISOString().split('T')[0];
 
-        const [upcomingEventsRes, pastEventsRes, jarRes] = await Promise.all([
+        const [upcomingEventsRes, pastEventsRes, jarRes, greetingRes] = await Promise.all([
             supabase.from('calendar_events')
                 .select('id, title, event_date, event_type')
                 .eq('partnership_id', partnershipId)
@@ -180,6 +183,16 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 .select('current_amount')
                 .eq('partnership_id', partnershipId)
                 .eq('title', 'حصالة المغامرات')
+                .maybeSingle(),
+            supabase.from('occasion_greetings')
+                .select('title')
+                .eq('partnership_id', partnershipId)
+                .neq('sender_id', userId)
+                .eq('is_opened', false)
+                .lte('target_date', new Date(Date.now() + 86400000 * 3).toISOString()) // Within 3 days
+                .gte('target_date', new Date(Date.now() - 86400000 * 3).toISOString()) // Don't show if passed by more than 3 days
+                .order('target_date', { ascending: true })
+                .limit(1)
                 .maybeSingle()
         ]);
 
@@ -188,6 +201,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
             setUpcomingEvents(combined);
         }
         if (jarRes.data) setAdventureBalance(jarRes.data.current_amount);
+        if (greetingRes.data) setUpcomingGreeting(greetingRes.data);
     };
 
     // Load volatile data (Status, Mood) - Run frequently
@@ -232,6 +246,21 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 setShowMoodPrompt(false);
             }
             if (pMood) setPartnerMood(pMood.mood);
+
+            // 3. Fetch partner's latest note for AI context
+            const { data: latestNote } = await supabase
+                .from('love_notes')
+                .select('content')
+                .eq('author_id', partnerId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            const recommendation = getAIRecommendation({
+                mood: pMood?.mood || null,
+                lastNote: latestNote?.content || null
+            });
+            setAiRecommendation(recommendation);
         }
     };
 
@@ -357,17 +386,18 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
 
     return (
         <div className="flex-1 bg-background overflow-x-hidden scrollbar-hide pb-32 relative mood-home">
-            {/* Ambient Background Aura */}
+            {/* Ambient Background Aura - More Subtle & Magical */}
             <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
-                <div className="absolute top-[-10%] right-[-10%] w-[100%] h-[60%] bg-[#ec4899]/10 blur-[150px] rounded-full" />
-                <div className="absolute bottom-[-10%] left-[-10%] w-[80%] h-[60%] bg-amber-500/5 blur-[150px] rounded-full" />
+                <div className="absolute top-[-10%] right-[-15%] w-[100%] h-[70%] bg-rose-500/[0.07] blur-[160px] rounded-full" />
+                <div className="absolute bottom-[-15%] left-[-10%] w-[90%] h-[60%] bg-amber-500/[0.04] blur-[140px] rounded-full" />
+                <div className="absolute top-[30%] left-[20%] w-[40%] h-[30%] bg-indigo-500/[0.03] blur-[120px] rounded-full" />
             </div>
 
             <header className="px-8 pt-10 pb-6 sticky top-0 bg-background/40 backdrop-blur-3xl z-40">
                 <div className="flex items-center justify-between">
                     <div className="flex flex-col text-right">
-                        <p className="text-[9px] font-black uppercase tracking-[0.5em] text-[#f43f5e] opacity-40 mb-1">{getGreeting()}</p>
-                        <div className="flex items-center gap-3">
+                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-rose-500/50 mb-1.5 leading-none">{getGreeting()}</p>
+                        <div className="flex items-center gap-3.5">
                             <Logo size="sm" />
                             <h1 className="text-2xl font-black text-foreground tracking-tighter">أُلْفَة</h1>
                         </div>
@@ -376,9 +406,9 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         whileTap={{ scale: 0.9 }}
                         whileHover={{ rotate: 15 }}
                         onClick={() => onNavigate('settings')}
-                        className="w-12 h-12 flex items-center justify-center glass rounded-2xl border-white/40 shadow-xl"
+                        className="w-12 h-12 flex items-center justify-center glass rounded-[1.4rem] border-white/60 dark:border-white/10 shadow-2xl active:scale-90 transition-all"
                     >
-                        <Settings className="w-5 h-5 text-foreground/40" />
+                        <Settings className="w-5 h-5 text-foreground/30 group-hover:text-foreground/60" />
                     </motion.button>
                 </div>
             </header>
@@ -545,12 +575,12 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
 
                                         <div className="text-center mt-3">
                                             <h2 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2 justify-center">
-                                                <span>{distKm && distKm < 1 ? 'قرب الروح' : 'اتصال المودة'}</span>
+                                                <span>{distKm && distKm < 0.5 ? 'قرب الروح' : 'اتصال مودة'}</span>
                                             </h2>
-                                            <div className="flex items-center justify-center gap-2 mt-1">
-                                                <p className="text-[9px] font-black text-[#f43f5e] uppercase tracking-[0.4em] opacity-40">أُلْفَة لا تنتهي</p>
-                                                <div className="flex items-center gap-1.5 px-3 py-1 bg-white/40 dark:bg-white/10 rounded-full border border-rose-100 dark:border-white/10 shadow-sm">
-                                                    <span className="text-[9px] font-bold text-foreground/70">
+                                            <div className="flex items-center justify-center gap-2 mt-1.5">
+                                                <div className="flex items-center gap-2 px-4 py-1.5 bg-white/60 dark:bg-white/5 rounded-full border border-rose-100/50 dark:border-white/5 shadow-inner">
+                                                    <div className={`w-1.5 h-1.5 rounded-full ${isPartnerOnline() ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`} />
+                                                    <span className="text-[10px] font-black text-foreground/50 tracking-tight">
                                                         {formatLastSeen(partnerTracking.last_seen)}
                                                     </span>
                                                 </div>
@@ -602,10 +632,10 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                         <motion.button
                                             whileTap={{ scale: 0.96 }}
                                             onClick={handleNudge}
-                                            className="flex-1 h-12 bg-gradient-to-r from-[#f43f5e] to-[#fb7185] text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-rose-200 dark:shadow-rose-900/40 flex items-center justify-center gap-2 group/nudge"
+                                            className="flex-1 h-13 bg-gradient-to-r from-rose-500 to-rose-400 text-white rounded-2xl font-black text-xs uppercase tracking-[0.15em] shadow-xl shadow-rose-500/20 active:shadow-inner flex items-center justify-center gap-3 group/nudge"
                                         >
-                                            <Heart className={`w-5 h-5 ${nudgeActive ? 'fill-white animate-bounce' : 'fill-white/40'}`} />
-                                            <span>تنبيه المودة</span>
+                                            <Heart className={`w-5 h-5 ${nudgeActive ? 'fill-white animate-bounce' : 'fill-white/30'}`} />
+                                            <span>نبض المودة</span>
                                         </motion.button>
                                     </div>
                                 </div>
@@ -687,37 +717,58 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                     </AnimatePresence>
                 </section>
 
+                {/* Special Occasion Banner - DYNAMICALLY RENDERED */}
+                {upcomingGreeting && (
+                    <section>
+                        <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => onNavigate('occasion')}
+                            className="w-full relative overflow-hidden glass rounded-[2.5rem] p-6 border-amber-500/30 shadow-2xl flex items-center justify-between text-right bg-gradient-to-l from-amber-500/10 to-rose-500/10 mb-5 border-[2px] group"
+                        >
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/20 rounded-full blur-[40px] pointer-events-none" />
+                            <div className="w-14 h-14 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-rose-500 shadow-inner group-hover:rotate-12 transition-transform shrink-0">
+                                <Gift className="w-6 h-6 fill-current opacity-80" />
+                            </div>
+                            <div className="relative z-10 flex flex-col items-end gap-1">
+                                <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest drop-shadow-md">مناسبة قريبة!</span>
+                                <h3 className="text-xl font-black text-foreground tracking-tight">{upcomingGreeting.title}</h3>
+                            </div>
+                        </motion.button>
+                    </section>
+                )}
+
                 {/* Experience Dashboard - Split Grid for better reach */}
                 <section className="grid grid-cols-2 gap-5">
                     <motion.button
-                        whileHover={{ y: -4, scale: 1.02 }}
+                        whileHover={{ y: -6, scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => onNavigate('love_notes')}
-                        className="group relative overflow-hidden glass rounded-[2.5rem] p-6 border-white/40 shadow-xl flex flex-col gap-4 text-right bg-white/10"
+                        className="group relative overflow-hidden glass rounded-[3rem] p-7 border-white/60 shadow-2xl flex flex-col gap-5 text-right bg-white/40 dark:bg-[#0a0505]/40"
                     >
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-mood/10 rounded-full blur-2xl -mr-12 -mt-12 group-hover:bg-mood/20 transition-all duration-700 pointer-events-none" />
-                        <div className="w-12 h-12 rounded-2xl bg-mood/10 border border-white/20 flex items-center justify-center text-mood shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
-                            <Feather className="w-6 h-6" />
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-rose-500/20 transition-all duration-1000 pointer-events-none" />
+                        <div className="w-14 h-14 rounded-[1.8rem] bg-rose-500/10 border border-rose-500/10 flex items-center justify-center text-rose-500 shadow-inner group-hover:scale-110 group-hover:rotate-6 transition-all duration-700">
+                            <Feather className="w-7 h-7" />
                         </div>
-                        <div className="space-y-1">
-                            <h3 className="text-base font-black text-foreground tracking-tight">بريد الألفة</h3>
-                            <p className="text-[7px] font-black text-mood/70 uppercase tracking-[0.3em]">بوح القلوب</p>
+                        <div className="space-y-1.5">
+                            <h3 className="text-lg font-black text-foreground tracking-tight">رسائل السكينة</h3>
+                            <p className="text-[8px] font-black text-rose-500/40 uppercase tracking-[0.4em]">همس الوجدان</p>
                         </div>
                     </motion.button>
 
                     <motion.button
-                        whileHover={{ y: -4, scale: 1.02 }}
+                        whileHover={{ y: -6, scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => onNavigate('adventure_bucket')}
-                        className="group relative overflow-hidden glass rounded-[2.5rem] p-6 border-white/40 shadow-xl flex flex-col gap-4 text-right bg-white/10"
+                        className="group relative overflow-hidden glass rounded-[3rem] p-7 border-white/60 shadow-2xl flex flex-col gap-5 text-right bg-white/40 dark:bg-[#0a0505]/40"
                     >
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl -mr-12 -mt-12 group-hover:bg-amber-500/20 transition-all duration-700 pointer-events-none" />
-                        <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-white/20 flex items-center justify-center text-amber-500 shadow-inner group-hover:scale-110 group-hover:-rotate-3 transition-all duration-500">
-                            <Map className="w-6 h-6" />
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-amber-500/20 transition-all duration-1000 pointer-events-none" />
+                        <div className="w-14 h-14 rounded-[1.8rem] bg-amber-500/10 border border-amber-500/10 flex items-center justify-center text-amber-500 shadow-inner group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
+                            <Compass className="w-7 h-7" />
                         </div>
-                        <div className="space-y-1">
-                            <h3 className="text-base font-black text-foreground tracking-tight">مغامراتنا</h3>
-                            <p className="text-[7px] font-black text-amber-600/70 uppercase tracking-[0.3em]">أحلام مشتركة</p>
+                        <div className="space-y-1.5">
+                            <h3 className="text-lg font-black text-foreground tracking-tight">أفق أحلامنا</h3>
+                            <p className="text-[8px] font-black text-amber-600/40 uppercase tracking-[0.4em]">مستقبلنا معاً</p>
                         </div>
                     </motion.button>
                 </section>
@@ -727,12 +778,12 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                     <div className="absolute top-0 left-0 w-32 h-32 bg-mood/10 rounded-full blur-[80px] -ml-16 -mt-16 pointer-events-none" />
                     <div className="absolute bottom-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-[80px] -mr-16 -mb-16 pointer-events-none" />
                     <div className="flex items-center justify-between mb-4 px-2">
-                        <div className="w-10 h-10 rounded-xl bg-mood/5 border border-mood/10 flex items-center justify-center text-mood/60">
+                        <div className="w-10 h-10 rounded-xl bg-rose-500/5 border border-rose-500/10 flex items-center justify-center text-rose-500/60 shadow-sm">
                             <Heart className="w-5 h-5" fill="currentColor" />
                         </div>
                         <div className="text-center">
-                            <h3 className="text-lg font-black text-foreground tracking-tight">نزعة الروح</h3>
-                            <p className="text-[7px] font-black text-mood/70 uppercase tracking-[0.4em]">بصمتك اليومية</p>
+                            <h3 className="text-xl font-black text-foreground tracking-tight">نبض الوجدان</h3>
+                            <p className="text-[8px] font-black text-rose-500/40 uppercase tracking-[0.4em] mt-1">بصمتك الروحية اليوم</p>
                         </div>
                         <div className="w-10 h-10" />
                     </div>
@@ -896,7 +947,46 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         )}
                     </div>
                 </section>
-            </div >
-        </div >
+            </div>
+
+            {/* AI Love Language Advisor Section */}
+            <AnimatePresence>
+                {aiRecommendation && (
+                    <motion.section
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="px-8 mt-4 mb-2"
+                    >
+                        <div className="glass rounded-[2.5rem] p-6 border-primary/20 bg-primary/5 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-[60px] -mr-16 -mt-16 pointer-events-none group-hover:bg-primary/20 transition-all duration-700" />
+
+                            <div className="flex items-center gap-4 mb-4 text-right">
+                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                                    <Sparkles className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-foreground tracking-tight">{aiRecommendation.title}</h3>
+                                    <p className="text-[8px] font-black text-primary/40 uppercase tracking-[0.3em]">نصيحة الألفة اليومية</p>
+                                </div>
+                            </div>
+
+                            <p className="text-xs leading-[1.8] text-foreground/70 text-right pr-4 border-r-2 border-primary/20 font-medium">
+                                {aiRecommendation.advice}
+                            </p>
+
+                            <div className="mt-6 pt-5 border-t border-primary/10 flex justify-between items-center">
+                                <div className="flex -space-x-1.5 opacity-60">
+                                    <div className="w-5 h-5 rounded-full bg-primary/20 border border-white shadow-sm" />
+                                    <div className="w-5 h-5 rounded-full bg-primary/10 border border-white shadow-sm" />
+                                </div>
+                                <span className="text-[8px] font-black text-primary/40 uppercase tracking-widest text-left">ذكاء الألفة الوجداني</span>
+                            </div>
+                        </div>
+                    </motion.section>
+                )}
+            </AnimatePresence>
+
+            <div className="h-32" /> {/* Bottom spacing for nav */}
+        </div>
     );
 }

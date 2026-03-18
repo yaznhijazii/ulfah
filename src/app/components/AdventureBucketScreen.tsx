@@ -188,41 +188,70 @@ export function AdventureBucketScreen({ onNavigate, userId, partnershipId }: Adv
 
             <header className="px-6 pt-10 pb-6 sticky top-0 bg-background/60 backdrop-blur-xl z-40 border-b border-white/5">
                 <div className="flex items-center justify-between mb-8">
-                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => onNavigate('home')} className="w-12 h-12 flex items-center justify-center glass rounded-2xl border-white/40 text-foreground/60 shadow-sm"><ArrowLeft className="w-5 h-5" /></motion.button>
+                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => onNavigate('home')} className="w-12 h-12 flex items-center justify-center glass rounded-[1.4rem] border-white/60 dark:border-white/10 text-foreground/30 shadow-2xl active:scale-90 transition-all font-black"><ArrowLeft className="w-5 h-5" /></motion.button>
                     <div className="text-center">
-                        <h1 className="text-xl font-black text-foreground tracking-tight">قائمة الأحلام</h1>
-                        <div className="flex items-center justify-center gap-1.5 mt-1">
-                            <Plane className="w-3 h-3 text-orange-500" />
-                            <p className="text-[10px] font-bold text-orange-500/80 uppercase tracking-widest">تذاكر نحو المجهول</p>
+                        <h1 className="text-xl font-black text-foreground tracking-tighter">أفق أحلامنا</h1>
+                        <div className="flex items-center justify-center gap-2 mt-1.5 px-3 py-1 bg-amber-500/5 rounded-full border border-amber-500/10">
+                            <Sparkles className="w-3 h-3 text-amber-500/60" />
+                            <p className="text-[9px] font-black text-amber-600/60 uppercase tracking-[0.3em]">بوصلة الشغف المشترك</p>
                         </div>
                     </div>
-                    <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowAddForm(true)} className="w-12 h-12 bg-foreground text-background rounded-2xl flex items-center justify-center shadow-2xl"><Plus className="w-6 h-6" /></motion.button>
+                    <motion.button 
+                        whileTap={{ scale: 0.9 }} 
+                        onClick={() => setShowAddForm(true)} 
+                        className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 text-white rounded-[1.4rem] flex items-center justify-center shadow-xl shadow-amber-500/20 active:scale-90 transition-all"
+                    >
+                        <Plus className="w-6 h-6" />
+                    </motion.button>
                 </div>
 
                 {adventureJar && (
-                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative w-full h-44 rounded-[2.5rem] p-8 overflow-hidden mb-8 shadow-2xl group">
-                        <div className="absolute inset-0 bg-[#1c1c1e] z-0" />
-                        <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-50 z-0" />
-                        <div className="absolute -top-20 -right-20 w-64 h-64 bg-orange-500/20 blur-[80px] rounded-full z-0" />
-                        <div className="relative z-10 flex flex-col justify-between h-full text-white">
+                    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="relative w-full h-48 rounded-[3rem] p-8 overflow-hidden mb-10 shadow-[0_30px_60px_-12px_rgba(0,0,0,0.15)] group bg-[#111] border border-white/5">
+                        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/[0.08] via-transparent to-rose-500/[0.05] z-0" />
+                        <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/[0.05] blur-[80px] rounded-full z-0 -mr-20 -mt-20" />
+                        
+                        <div className="relative z-10 flex flex-col justify-between h-full text-white/90">
                             <div className="flex justify-between items-start">
-                                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md"><Compass className="w-6 h-6 text-orange-400" /></div>
-                                <div className="text-left"><p className="text-[9px] font-black opacity-50 uppercase tracking-[0.2em] mb-1">Adventure Fund</p><p className="text-3xl font-black tracking-tight">{adventureJar.current_amount.toLocaleString()} <span className="text-sm opacity-50 font-medium">JOD</span></p></div>
+                                <div className="p-3.5 bg-white/[0.03] rounded-2xl border border-white/5 backdrop-blur-3xl shadow-inner">
+                                    <Wallet className="w-6 h-6 text-amber-400/80" />
+                                </div>
+                                <div className="text-left font-black tracking-tighter">
+                                    <p className="text-[9px] font-bold opacity-30 uppercase tracking-[0.4em] mb-1.5">مخزون الرخاء</p>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-3xl">{adventureJar.current_amount.toLocaleString()}</span>
+                                        <span className="text-[10px] opacity-30 uppercase tracking-widest font-medium">JOD</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <div className="flex justify-between items-end mb-3"><p className="text-[10px] font-medium opacity-60 tracking-widest">Target: {adventureJar.target_amount.toLocaleString()}</p><p className="text-[10px] font-black text-orange-400">{Math.round((adventureJar.current_amount / (adventureJar.target_amount || 1)) * 100)}% Ready</p></div>
-                                <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, (adventureJar.current_amount / (adventureJar.target_amount || 1)) * 100)}%` }} transition={{ duration: 1, delay: 0.5 }} className="h-full bg-gradient-to-r from-orange-400 to-amber-500 rounded-full shadow-[0_0_15px_rgba(251,146,60,0.5)]" /></div>
+                            
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-end mb-1">
+                                    <p className="text-[10px] font-black opacity-30 uppercase tracking-widest">اكتمال الهدف: {adventureJar.target_amount.toLocaleString()}</p>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-amber-500/80 tracking-widest leading-none">
+                                            {Math.round((adventureJar.current_amount / (adventureJar.target_amount || 1)) * 100)}%
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="h-2.5 w-full bg-white/[0.03] rounded-full overflow-hidden p-[2px] border border-white/5">
+                                    <motion.div 
+                                        initial={{ width: 0 }} 
+                                        animate={{ width: `${Math.min(100, (adventureJar.current_amount / (adventureJar.target_amount || 1)) * 100)}%` }} 
+                                        transition={{ duration: 1.5, ease: "circOut" }} 
+                                        className="h-full bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 rounded-full shadow-[0_0_20px_rgba(251,146,60,0.4)]" 
+                                    />
+                                </div>
                             </div>
                         </div>
                     </motion.div>
                 )}
 
-                <div className="flex items-center p-1.5 bg-muted/40 rounded-[2rem] relative">
-                    {[{ id: 'dream', label: 'الأمنيات' }, { id: 'planned', label: 'المخطط لها' }, { id: 'done', label: 'الأرشيف' }].map((tab) => {
+                <div className="flex items-center p-1.5 bg-white/40 dark:bg-white/[0.03] rounded-[2.2rem] relative border border-white/60 dark:border-white/5 shadow-inner">
+                    {[{ id: 'dream', label: 'أمنياتنا' }, { id: 'planned', label: 'خارطة الطريق' }, { id: 'done', label: 'حصاد اللحظات' }].map((tab) => {
                         const isActive = activeTab === tab.id;
                         return (
-                            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 py-3 rounded-[1.8rem] relative z-10 text-[11px] font-black transition-all duration-300 ${isActive ? 'text-white' : 'text-muted-foreground'}`}>
-                                {isActive && <motion.div layoutId="activeTabPill" className="absolute inset-0 bg-orange-500 rounded-[1.8rem] shadow-lg shadow-orange-500/20 z-[-1]" />}
+                            <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 py-3.5 rounded-[1.8rem] relative z-10 text-[10px] font-black transition-all duration-500 uppercase tracking-widest ${isActive ? 'text-white' : 'text-foreground/30 hover:text-foreground/50'}`}>
+                                {isActive && <motion.div layoutId="activeTabPill" className="absolute inset-0 bg-gradient-to-r from-amber-500 to-orange-500 rounded-[1.8rem] shadow-xl shadow-amber-500/20 z-[-1]" />}
                                 {tab.label}
                             </button>
                         );

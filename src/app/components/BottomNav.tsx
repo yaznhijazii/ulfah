@@ -8,11 +8,11 @@ interface BottomNavProps {
 
 export function BottomNav({ currentScreen, onNavigate }: BottomNavProps) {
     const navItems = [
-        { id: 'home', label: 'ألفة', icon: Home, moodClass: 'text-[#ec4899]', glowClass: 'bg-[#ec4899]' },
-        { id: 'calendar', label: 'الذكرى', icon: Calendar, moodClass: 'text-rose-500', glowClass: 'bg-rose-500' },
+        { id: 'home', label: 'نبض', icon: Home, moodClass: 'text-rose-500', glowClass: 'bg-rose-500' },
+        { id: 'calendar', label: 'الذكرى', icon: Calendar, moodClass: 'text-amber-500', glowClass: 'bg-amber-500' },
         { id: 'finance', label: 'المالية', icon: Wallet, moodClass: 'text-emerald-500', glowClass: 'bg-emerald-500' },
         { id: 'games', label: 'ألعابنا', icon: Gamepad2, moodClass: 'text-purple-500', glowClass: 'bg-purple-500' },
-        { id: 'dialogues', label: 'الميثاق', icon: MessageCircle, moodClass: 'text-blue-500', glowClass: 'bg-blue-500' },
+        { id: 'dialogues', label: 'ميثاقنا', icon: MessageCircle, moodClass: 'text-blue-500', glowClass: 'bg-blue-500' },
     ];
 
     return (
