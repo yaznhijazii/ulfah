@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
     ArrowLeft, MessageCircle, ShieldCheck, Plus, Sparkles,
     Trash2, AlertCircle, AlertTriangle, Target, Flame,
-    Heart, XCircle, CheckCircle2, User, Users
+    Heart, XCircle, CheckCircle2, User, Users, FileSignature, Coins
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -15,7 +15,7 @@ interface DialogueScreenProps {
     isDarkMode?: boolean;
 }
 
-type Tab = 'constitution' | 'commitments';
+type Tab = 'constitution' | 'commitments' | 'penalty_rules';
 
 export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreenProps) {
     const [activeTab, setActiveTab] = useState<Tab>('constitution');
@@ -23,6 +23,7 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
     // UI States
     const [showAddDialogue, setShowAddDialogue] = useState(false);
     const [showAddCommitment, setShowAddCommitment] = useState(false);
+    const [showAddRule, setShowAddRule] = useState(false);
     const [loading, setLoading] = useState(true);
     const [names, setNames] = useState<{ me: string, partner: string }>({ me: 'أنا', partner: 'الشريك' });
     const [partnerId, setPartnerId] = useState<string | null>(null);
@@ -37,6 +38,8 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
     const [dialogues, setDialogues] = useState<any[]>([]);
     const [agreements, setAgreements] = useState<any[]>([]);
     const [commitments, setCommitments] = useState<any[]>([]);
+    const [penaltyRules, setPenaltyRules] = useState<any[]>([]);
+    const [penaltyRecords, setPenaltyRecords] = useState<any[]>([]);
 
     // Helper: Is current user the one who should NOT do the task?
     const isObserver = (assigneeId: string) => assigneeId !== userId;
@@ -59,6 +62,11 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
         period_type: 'weekly' as 'daily' | 'weekly' | 'monthly',
         punishment: '',
         assignee: 'me' as 'me' | 'partner'
+    });
+
+    const [ruleForm, setRuleForm] = useState({
+        title: '',
+        subRules: [{ id: Date.now().toString(), label: '', points: 1 }]
     });
 
     const filteredDialogues = useMemo(() => {
@@ -109,15 +117,19 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
         if (!partnershipId) return;
         setLoading(true);
         try {
-            const [dRes, aRes, cRes] = await Promise.all([
+            const [dRes, aRes, cRes, prRes, precRes] = await Promise.all([
                 supabase.from('dialogues').select('*').eq('partnership_id', partnershipId).order('dialogue_date', { ascending: false }),
                 supabase.from('agreements').select('*').eq('partnership_id', partnershipId),
-                supabase.from('commitments').select('*').eq('partnership_id', partnershipId).eq('is_active', true)
+                supabase.from('commitments').select('*').eq('partnership_id', partnershipId).eq('is_active', true),
+                supabase.from('penalty_rules').select('*').eq('partnership_id', partnershipId).eq('is_active', true).order('created_at', { ascending: false }),
+                supabase.from('penalty_records').select('*').eq('partnership_id', partnershipId).order('created_at', { ascending: false })
             ]);
 
             if (dRes.data) setDialogues(dRes.data);
             if (aRes.data) setAgreements(aRes.data);
             if (cRes.data) setCommitments(cRes.data);
+            if (prRes.data) setPenaltyRules(prRes.data);
+            if (precRes.data) setPenaltyRecords(precRes.data);
         } catch (err) { console.error(err); }
         setLoading(false);
     };
@@ -307,6 +319,79 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
         setIsSubmitting(false);
     };
 
+    const handleSaveRule = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        try {
+            const { error } = await supabase.from('penalty_rules').insert({
+                partnership_id: partnershipId,
+                created_by_user_id: userId,
+                title: ruleForm.title,
+                sub_rules: ruleForm.subRules,
+                is_active: true
+            });
+            if (error) {
+                alert("للأسف صار في مشكلة: " + error.message);
+            } else {
+                setShowAddRule(false);
+                setRuleForm({ title: '', subRules: [{ id: Date.now().toString(), label: '', points: 1 }] });
+                loadData();
+            }
+        } catch (err) { console.error(err); }
+        setIsSubmitting(false);
+    };
+
+    const handleAddPenalty = async (ruleId: string, violatorId: string, subRuleId: string, points: number) => {
+        setIsSubmitting(true);
+        try {
+            const numPoints = Number(points);
+            const { data, error } = await supabase.from('penalty_records').insert({
+                partnership_id: partnershipId,
+                user_id: violatorId,
+                rule_id: ruleId,
+                sub_rule_id: subRuleId,
+                points: numPoints
+            }).select();
+
+            if (error) {
+                alert("مشكلة في تسجيل الخصم: " + error.message);
+            } else {
+                // Remove alert after testing, just for confirmation
+                alert(`تم تسجيل خصم ${numPoints} نقاط بنجاح! جاري تحديث الأرقام...`);
+                loadData();
+            }
+        } catch (err: any) { 
+            alert("خطأ غير متوقع: " + err.message);
+            console.error(err); 
+        }
+        setIsSubmitting(false);
+    };
+
+    const handleDeleteRule = async (rule: any) => {
+        setIsSubmitting(true);
+        try {
+            await supabase.from('penalty_rules').delete().eq('id', rule.id);
+            setConfirmModal(null);
+            loadData();
+        } catch (err) { console.error(err); }
+        setIsSubmitting(false);
+    };
+
+    const handleResetPenalties = async (ruleId?: string) => {
+        setIsSubmitting(true);
+        try {
+            let query = supabase.from('penalty_records').delete().eq('partnership_id', partnershipId);
+            if (ruleId) query = query.eq('rule_id', ruleId);
+            
+            const { error } = await query;
+            if (error) throw error;
+            
+            setConfirmModal(null);
+            loadData();
+        } catch (err) { console.error(err); }
+        setIsSubmitting(false);
+    };
+
     const nextStep = () => setDialogueStep(prev => Math.min(prev + 1, 5));
     const prevStep = () => setDialogueStep(prev => Math.max(prev - 1, 1));
 
@@ -335,16 +420,21 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
                     <motion.button
                         whileHover={{ scale: 1.1, rotate: 90 }}
                         whileTap={{ scale: 0.9 }}
-                        onClick={() => activeTab === 'constitution' ? setShowAddDialogue(true) : setShowAddCommitment(true)}
+                        onClick={() => {
+                            if (activeTab === 'constitution') setShowAddDialogue(true);
+                            else if (activeTab === 'commitments') setShowAddCommitment(true);
+                            else setShowAddRule(true);
+                        }}
                         className="w-14 h-14 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-2xl shadow-blue-500/40 relative overflow-hidden group border-4 border-white dark:border-[#0a0505]"
                     >
                         <Plus className="w-8 h-8 relative z-10" />
                     </motion.button>
                 </div>
 
-                <div className="flex bg-white dark:bg-[#0a0505]/40 rounded-[2.8rem] border border-white/40 dark:border-white/5 p-1.5 shadow-2xl shadow-blue-900/5 max-w-[320px] mx-auto relative overflow-hidden backdrop-blur-xl">
+                <div className="flex bg-white dark:bg-[#0a0505]/40 rounded-[2.8rem] border border-white/40 dark:border-white/5 p-1.5 shadow-2xl shadow-blue-900/5 max-w-[360px] mx-auto relative overflow-hidden backdrop-blur-xl">
                     {[
                         { id: 'constitution', label: 'جلسات الحوار', icon: MessageCircle },
+                        { id: 'penalty_rules', label: 'دفتر الاتفاقيات', icon: FileSignature },
                         { id: 'commitments', label: 'التزاماتنا', icon: Target }
                     ].map((tab) => {
                         const isActive = activeTab === tab.id;
@@ -352,11 +442,11 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as any)}
-                                className={`flex-1 flex items-center justify-center gap-3 py-3 rounded-[2.2rem] transition-all duration-700 relative z-10 ${isActive ? 'text-white' : 'text-blue-900/40 dark:text-white/30 hover:text-blue-600 dark:hover:text-white'}`}
+                                className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-[2.2rem] transition-all duration-700 relative z-10 ${isActive ? 'text-white' : 'text-blue-900/40 dark:text-white/30 hover:text-blue-600 dark:hover:text-white'}`}
                             >
                                 {isActive && <motion.div layoutId="pact-tab-pill" className="absolute inset-0 bg-blue-600 rounded-[2.2rem] shadow-xl shadow-blue-600/20 z-[-1]" />}
-                                <tab.icon className={`w-3.5 h-3.5 transition-transform ${isActive ? 'rotate-12 scale-110' : 'opacity-40'}`} />
-                                <span className={`text-[10px] font-black uppercase tracking-widest ${isActive ? 'opacity-100' : 'opacity-60'}`}>{tab.label}</span>
+                                <tab.icon className={`w-3 h-3 transition-transform ${isActive ? 'rotate-12 scale-110' : 'opacity-40'}`} />
+                                <span className={`text-[8.5px] font-black uppercase tracking-widest ${isActive ? 'opacity-100' : 'opacity-60'}`}>{tab.label}</span>
                             </button>
                         );
                     })}
@@ -364,8 +454,8 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
             </header>
 
             <div className="flex-1 px-4 py-8 overflow-y-auto pb-32 scrollbar-hide">
-                <AnimatePresence>
-                    {activeTab === 'constitution' ? (
+                <AnimatePresence mode="wait">
+                    {activeTab === 'constitution' && (
                         <motion.div
                             key="constitution"
                             initial={{ opacity: 0, x: -20 }}
@@ -498,7 +588,107 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
                                 </div>
                             </div>
                         </motion.div>
-                    ) : (
+                    )}
+                    {activeTab === 'penalty_rules' && (
+                        <motion.div
+                            key="penalty_rules"
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="space-y-6 px-1"
+                        >
+                            {(() => {
+                                const myPoints = penaltyRecords.filter(r => r.user_id === userId).reduce((acc, r) => acc + (r.points || 0), 0);
+                                const partnerPoints = penaltyRecords.filter(r => r.user_id === partnerId).reduce((acc, r) => acc + (r.points || 0), 0);
+                                const myJod = (myPoints / 10).toFixed(1);
+                                const partnerJod = (partnerPoints / 10).toFixed(1);
+
+                                return (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-4 mb-6">
+                                            <div className="bg-rose-500/10 rounded-[2rem] p-5 text-center flex flex-col items-center">
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-2">مخالفات {names.me}</span>
+                                                <span className="text-3xl font-black text-rose-500 mb-1">{myPoints}</span>
+                                                <div className="bg-white/50 dark:bg-black/20 px-3 py-1 rounded-full flex items-center gap-1.5 border border-black/5 mt-1">
+                                                    <Coins className="w-3 h-3 text-amber-500" />
+                                                    <span className="text-[10px] font-bold">{myJod} JOD</span>
+                                                </div>
+                                            </div>
+                                            <div className="bg-emerald-500/10 rounded-[2rem] p-5 text-center flex flex-col items-center">
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-2">مخالفات {names.partner}</span>
+                                                <span className="text-3xl font-black text-emerald-500 mb-1">{partnerPoints}</span>
+                                                <div className="bg-white/50 dark:bg-black/20 px-3 py-1 rounded-full flex items-center gap-1.5 border border-black/5 mt-1">
+                                                    <Coins className="w-3 h-3 text-amber-500" />
+                                                    <span className="text-[10px] font-bold">{partnerJod} JOD</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {penaltyRecords.length > 0 && (
+                                            <div className="flex justify-center mb-6">
+                                                <button onClick={() => setConfirmModal({ show: true, type: 'reset_penalties', data: null })} className="text-[10px] font-black uppercase tracking-widest text-rose-500 bg-rose-500/5 px-6 py-3 rounded-[1rem] hover:bg-rose-500 hover:text-white transition-all border border-rose-500/10">
+                                                    تصفير عداد المخالفات بالكامل 🔄
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-4">
+                                            {penaltyRules.length === 0 && !loading && (
+                                                <div className="text-center py-10 opacity-40">
+                                                    <div className="w-20 h-20 glass border-white/10 rounded-[2.5rem] flex items-center justify-center mx-auto mb-4">
+                                                        <FileSignature className="w-8 h-8" />
+                                                    </div>
+                                                    <p className="text-[10px] font-black tracking-[0.2em] uppercase">لا توجد اتفاقيات قيد التنفيذ</p>
+                                                </div>
+                                            )}
+                                            {penaltyRules.map((rule, idx) => (
+                                                <motion.div
+                                                    key={rule.id}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: idx * 0.05 }}
+                                                    className="bg-white dark:bg-[#0a0505]/60 rounded-[2.5rem] p-6 shadow-sm border border-black/5 dark:border-white/5 overflow-hidden relative group"
+                                                >
+                                                    <div className="flex justify-between items-start mb-5 text-right">
+                                                        <div className="flex gap-2">
+                                                            <button onClick={() => setConfirmModal({ show: true, type: 'delete_rule', data: rule })} className="text-muted-foreground/20 hover:text-rose-500 transition-colors p-2" title="حذف القانون"><Trash2 className="w-4 h-4" /></button>
+                                                            <button onClick={() => setConfirmModal({ show: true, type: 'reset_rule_penalties', data: rule })} className="text-muted-foreground/20 hover:text-blue-500 transition-colors p-2" title="تصفير هذا الاتفاق"><Plus className="w-4 h-4 rotate-45" /></button>
+                                                        </div>
+                                                        
+                                                        <div className="flex items-start gap-4">
+                                                            <div className="flex flex-col items-end">
+                                                                <h4 className="font-black text-base text-foreground leading-tight mb-2">{rule.title}</h4>
+                                                                <span className="text-[9px] font-black text-amber-600 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">{rule.sub_rules?.length || 0} مستويات</span>
+                                                            </div>
+                                                            <div className="w-12 h-12 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center shrink-0">
+                                                                <FileSignature className="w-5 h-5" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-3 pt-5 border-t border-black/5 dark:border-white/5">
+                                                        {rule.sub_rules?.map((sr: any) => (
+                                                            <div key={sr.id} className="flex flex-col gap-2 p-3 rounded-2xl bg-muted/20 border border-black/5">
+                                                                <div className="flex justify-between items-center text-right mb-1">
+                                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-md">{sr.points} نقاط</span>
+                                                                    <span className="text-xs font-black">{sr.label}</span>
+                                                                </div>
+                                                                <div className="flex gap-2">
+                                                                    <Button onClick={() => handleAddPenalty(rule.id, partnerId!, sr.id, sr.points)} disabled={isSubmitting} className="flex-1 bg-emerald-500/10 text-emerald-500 font-bold hover:bg-emerald-500 hover:text-white h-8 rounded-xl text-[9px] uppercase shadow-none border border-emerald-500/20">تغريم {names.partner}</Button>
+                                                                    <Button onClick={() => handleAddPenalty(rule.id, userId, sr.id, sr.points)} disabled={isSubmitting} className="flex-1 bg-rose-500/10 text-rose-500 font-bold hover:bg-rose-500 hover:text-white h-8 rounded-xl text-[9px] uppercase shadow-none border border-rose-500/20">أنا أخطأت</Button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )
+                            })()}
+                        </motion.div>
+                    )}
+                    {activeTab === 'commitments' && (
                         <motion.div
                             key="commitments"
                             initial={{ opacity: 0, x: 20 }}
@@ -691,6 +881,53 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
                 )}
             </AnimatePresence>
 
+            {/* Modal for New Penalty Rule */}
+            <AnimatePresence>
+                {showAddRule && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center p-5">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/60 backdrop-blur-xl" onClick={() => setShowAddRule(false)} />
+                        <motion.div initial={{ scale: 0.9, y: 40, opacity: 0 }} animate={{ scale: 1, y: 0, opacity: 1 }} exit={{ scale: 0.9, y: 40, opacity: 0 }} className="relative w-full max-w-md bg-white dark:bg-[#0a0505] rounded-[3.5rem] p-10 shadow-2xl z-10 border border-white/20">
+                            <div className="text-center">
+                                <div className="w-16 h-16 bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                                    <FileSignature className="w-8 h-8" />
+                                </div>
+                                <h2 className="text-2xl font-black mb-8 text-center">إضافة بند للاتفاقيات 📝</h2>
+                            </div>
+                            <form onSubmit={handleSaveRule} className="space-y-6">
+                                <div className="space-y-2 text-right">
+                                    <label className="text-[10px] font-black uppercase tracking-widest opacity-40">ما هو الفعل؟</label>
+                                    <textarea required className="w-full h-24 rounded-[2rem] bg-muted/40 p-6 text-right font-bold resize-none leading-relaxed" placeholder="أدخل اسم البند (مثال: المسبات)" value={ruleForm.title} onChange={e => setRuleForm({ ...ruleForm, title: e.target.value })} />
+                                </div>
+                                <div className="space-y-3 text-right">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <button type="button" onClick={() => setRuleForm({ ...ruleForm, subRules: [...ruleForm.subRules, { id: Date.now().toString(), label: '', points: 1 }]})} className="text-[10px] text-blue-500 font-bold bg-blue-500/10 px-3 py-1 rounded-full">إضافة مستوى +</button>
+                                        <label className="text-[10px] font-black uppercase tracking-widest opacity-40">مستويات الخصم</label>
+                                    </div>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto scrollbar-hide pr-1">
+                                    {ruleForm.subRules.map((sr, idx) => (
+                                        <div key={sr.id} className="flex items-center gap-2">
+                                            {ruleForm.subRules.length > 1 && <button type="button" onClick={() => setRuleForm({ ...ruleForm, subRules: ruleForm.subRules.filter(r => r.id !== sr.id)})} className="w-10 h-12 shrink-0 bg-rose-500/10 text-rose-500 rounded-2xl flex items-center justify-center"><Trash2 className="w-4 h-4"/></button>}
+                                            <div className="flex bg-muted/40 rounded-2xl overflow-hidden p-1 focus-within:ring-2 ring-blue-500 transition-all w-24 shrink-0 h-12">
+                                                <input type="number" min="1" required className="w-full bg-transparent px-2 font-black text-center outline-none" value={sr.points} onChange={e => {
+                                                    const newSR = [...ruleForm.subRules]; newSR[idx].points = parseInt(e.target.value) || 1; setRuleForm({ ...ruleForm, subRules: newSR });
+                                                }} />
+                                                <div className="flex items-center px-2 bg-white dark:bg-black/40 rounded-xl text-muted-foreground font-black text-[9px] uppercase">نقاط</div>
+                                            </div>
+                                            <input required className="flex-1 h-12 rounded-2xl bg-muted/40 px-4 text-right font-bold text-sm outline-none w-full" placeholder="مثال: مسبة قوية" value={sr.label} onChange={e => {
+                                                    const newSR = [...ruleForm.subRules]; newSR[idx].label = e.target.value; setRuleForm({ ...ruleForm, subRules: newSR });
+                                                }} />
+                                        </div>
+                                    ))}
+                                    </div>
+                                    <p className="text-[9px] font-bold text-center text-blue-500/60 pt-2">(10 نقاط = 1 JOD)</p>
+                                </div>
+                                <Button type="submit" disabled={isSubmitting || !ruleForm.title || ruleForm.subRules.length === 0} className="w-full h-16 rounded-[2rem] font-black bg-blue-600 shadow-xl shadow-blue-500/20 mt-4 text-sm">{isSubmitting ? 'جاري الحفظ...' : 'تثبيت بالدفتر ✨'}</Button>
+                            </form>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
             {/* Selected Dialogue Details Modal */}
             <AnimatePresence>
                 {selectedDialogue && (
@@ -822,6 +1059,9 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
                                     else if (confirmModal.type === 'delete_dialogue') handleDeleteDialogue(confirmModal.data);
                                     else if (confirmModal.type === 'delete_agreement') handleDeleteAgreement(confirmModal.data);
                                     else if (confirmModal.type === 'delete_commitment') handleDeleteCommitment(confirmModal.data);
+                                    else if (confirmModal.type === 'delete_rule') handleDeleteRule(confirmModal.data);
+                                    else if (confirmModal.type === 'reset_penalties') handleResetPenalties();
+                                    else if (confirmModal.type === 'reset_rule_penalties') handleResetPenalties(confirmModal.data.id);
                                 }}>نعم، اعتمد</Button>
                                 <button className="h-12 font-black text-[10px] opacity-40 uppercase" onClick={() => setConfirmModal(null)}>تراجع</button>
                             </div>

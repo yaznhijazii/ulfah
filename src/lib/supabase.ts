@@ -206,3 +206,29 @@ export type FinanceJar = {
   created_at: string;
   updated_at: string;
 };
+
+export type SubRule = {
+    id: string;
+    label: string;
+    points: number;
+};
+
+export type PenaltyRule = {
+  id: string;
+  partnership_id: string;
+  created_by_user_id: string;
+  title: string;
+  sub_rules: SubRule[];
+  is_active: boolean;
+  created_at: string;
+};
+
+export type PenaltyRecord = {
+  id: string;
+  partnership_id: string;
+  user_id: string;
+  rule_id: string;
+  sub_rule_id: string;
+  points: number;
+  created_at: string;
+};
