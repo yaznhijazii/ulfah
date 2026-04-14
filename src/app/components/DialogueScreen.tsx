@@ -113,6 +113,39 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
     }, [partnershipId, activeTab]);
 
 
+    const checkAndResetCommitments = async (items: any[]) => {
+        const now = new Date();
+        let resetOccurred = false;
+
+        for (const item of items) {
+            const lastReset = new Date(item.last_reset_at || item.created_at);
+            let shouldReset = false;
+
+            if (item.period_type === 'daily') {
+                shouldReset = now.toDateString() !== lastReset.toDateString();
+            } else if (item.period_type === 'weekly') {
+                const startOfThisWeek = new Date(now);
+                // In many Arab countries, week starts on Sunday (0) or Saturday (6)
+                // We'll use Sunday (0) as the reference point
+                startOfThisWeek.setDate(now.getDate() - now.getDay());
+                startOfThisWeek.setHours(0, 0, 0, 0);
+                shouldReset = lastReset < startOfThisWeek;
+            } else if (item.period_type === 'monthly') {
+                shouldReset = now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear();
+            }
+
+            if (shouldReset) {
+                await supabase.from('commitments').update({
+                    current_count: 0,
+                    status: 'on-track',
+                    last_reset_at: now.toISOString()
+                }).eq('id', item.id);
+                resetOccurred = true;
+            }
+        }
+        return resetOccurred;
+    };
+
     const loadData = async () => {
         if (!partnershipId) return;
         setLoading(true);
@@ -127,7 +160,17 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
 
             if (dRes.data) setDialogues(dRes.data);
             if (aRes.data) setAgreements(aRes.data);
-            if (cRes.data) setCommitments(cRes.data);
+            
+            if (cRes.data) {
+                const didReset = await checkAndResetCommitments(cRes.data);
+                if (didReset) {
+                    const { data: refreshed } = await supabase.from('commitments').select('*').eq('partnership_id', partnershipId).eq('is_active', true);
+                    setCommitments(refreshed || cRes.data);
+                } else {
+                    setCommitments(cRes.data);
+                }
+            }
+
             if (prRes.data) setPenaltyRules(prRes.data);
             if (precRes.data) setPenaltyRecords(precRes.data);
         } catch (err) { console.error(err); }
@@ -205,7 +248,8 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
                 current_count: 0,
                 status: 'on-track',
                 is_active: true,
-                start_date: new Date().toISOString()
+                start_date: new Date().toISOString(),
+                last_reset_at: new Date().toISOString()
             };
 
             const { error: firstTryError } = await supabase.from('commitments').insert({

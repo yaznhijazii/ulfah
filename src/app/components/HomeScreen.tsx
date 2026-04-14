@@ -393,600 +393,370 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 <div className="absolute top-[30%] left-[20%] w-[40%] h-[30%] bg-indigo-500/[0.03] blur-[120px] rounded-full" />
             </div>
 
-            <header className="px-8 pt-10 pb-6 sticky top-0 bg-background/40 backdrop-blur-3xl z-40">
+            <header className="px-8 pt-16 pb-12 sticky top-0 bg-background/5 backdrop-blur-2xl z-40 transition-all duration-700">
                 <div className="flex items-center justify-between">
                     <div className="flex flex-col text-right">
-                        <p className="text-[10px] font-black uppercase tracking-[0.4em] text-rose-500/50 mb-1.5 leading-none">{getGreeting()}</p>
-                        <div className="flex items-center gap-3.5">
-                            <Logo size="sm" />
-                            <h1 className="text-2xl font-black text-foreground tracking-tighter">أُلْفَة</h1>
-                        </div>
+                        <motion.div
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            className="flex items-center gap-4 group cursor-pointer"
+                        >
+                            <div className="relative">
+                                <Logo size="sm" />
+                                <motion.div 
+                                    animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
+                                    transition={{ duration: 3, repeat: Infinity }}
+                                    className="absolute inset-0 bg-rose-500/20 blur-xl rounded-full -z-10"
+                                />
+                            </div>
+                            <h1 className="text-4xl font-black text-foreground tracking-tighter drop-shadow-2xl">أُلْفَة</h1>
+                        </motion.div>
+                        <motion.p 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 }}
+                            className="text-[10px] font-black uppercase tracking-[0.6em] text-rose-500/40 mt-3 pr-1 leading-none"
+                        >
+                            {getGreeting()}
+                        </motion.p>
                     </div>
                     <motion.button
-                        whileTap={{ scale: 0.9 }}
-                        whileHover={{ rotate: 15 }}
+                        whileTap={{ scale: 0.85 }}
+                        whileHover={{ rotate: -8, scale: 1.1 }}
                         onClick={() => onNavigate('settings')}
-                        className="w-12 h-12 flex items-center justify-center glass rounded-[1.4rem] border-white/60 dark:border-white/10 shadow-2xl active:scale-90 transition-all"
+                        className="w-16 h-16 flex items-center justify-center glass rounded-3xl border-white/40 dark:border-white/5 shadow-[0_20px_40px_rgba(0,0,0,0.1)] active:shadow-inner transition-all text-foreground/30 hover:text-rose-500 hover:bg-white/80"
                     >
-                        <Settings className="w-5 h-5 text-foreground/30 group-hover:text-foreground/60" />
+                        <Settings className="w-7 h-7" />
                     </motion.button>
                 </div>
             </header>
 
-            <div className="px-8 mt-8 space-y-12">
-                {/* Connection Widget - Updated */}
-                <section className="relative perspective-[2000px]">
-                    <AnimatePresence mode="wait">
-                        {!showMap ? (
-                            <motion.div
-                                key="stats"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                className="relative glass rounded-[3rem] p-8 border-white/60 dark:border-white/10 overflow-hidden shadow-2xl bg-white/40 dark:bg-[#0a0505]/60 transition-all duration-700"
-                            >
-                                {/* Romantic Mesh & Floating Hearts Background - Fills Entire Card */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-[#f43f5e]/5 via-transparent to-amber-500/5 pointer-events-none overflow-hidden">
-                                    <motion.div
-                                        animate={{
-                                            rotate: [0, 45, 0],
-                                            opacity: [0.3, 0.4, 0.3]
-                                        }}
-                                        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                                        className="absolute top-0 right-0 w-64 h-64 bg-rose-400/5 blur-[100px] rounded-full"
-                                        style={{ transform: "translateZ(0)", willChange: "transform, opacity" }}
-                                    />
-                                    {[...Array(6)].map((_, i) => (
-                                        <motion.div
-                                            key={i}
-                                            initial={{ y: 140, x: Math.random() * 320, opacity: 0 }}
-                                            animate={{
-                                                y: -40,
-                                                opacity: [0, 0.3, 0],
-                                                scale: [0.5, 1, 0.8]
-                                            }}
-                                            transition={{
-                                                duration: 10 + Math.random() * 8,
-                                                repeat: Infinity,
-                                                delay: i * 2,
-                                                ease: "easeInOut"
-                                            }}
-                                            className="absolute text-rose-500/10"
-                                        >
-                                            <Heart size={12 + i * 4} fill="currentColor" />
-                                        </motion.div>
-                                    ))}
-                                </div>
-
-                                <div className="relative z-10 flex flex-col gap-4">
-
-                                    {/* Header: Centered Infinity Avatars with Vibrant Flow */}
-                                    <div className="flex flex-col items-center py-2 relative">
-                                        <div className="relative w-full max-w-[260px] h-28 flex items-center justify-center">
-                                            {/* Advanced Infinity Path SVG Animation */}
-                                            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" viewBox="0 0 260 110">
-                                                <defs>
-                                                    <filter id="glow">
-                                                        <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
-                                                        <feMerge>
-                                                            <feMergeNode in="coloredBlur" /><feMergeNode in="SourceGraphic" />
-                                                        </feMerge>
-                                                    </filter>
-                                                    <linearGradient id="infinity-magical" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                        <stop offset="0%" stopColor="#f43f5e" stopOpacity="0" />
-                                                        <stop offset="25%" stopColor="#f43f5e" stopOpacity="0.8" />
-                                                        <stop offset="50%" stopColor="#fb7185" stopOpacity="1" />
-                                                        <stop offset="75%" stopColor="#f43f5e" stopOpacity="0.8" />
-                                                        <stop offset="100%" stopColor="#f43f5e" stopOpacity="0" />
-                                                    </linearGradient>
-                                                </defs>
-
-                                                {/* Ambient Path Trace */}
-                                                <path
-                                                    d="M 65 55 C 65 15, 15 15, 15 55 C 15 95, 65 95, 130 55 C 195 15, 245 15, 245 55 C 245 95, 195 95, 130 55 L 65 55"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    strokeWidth="0.5"
-                                                    className="text-rose-500/5"
-                                                />
-
-                                                {/* Glowing Magical Flow - Slower & More Subtle */}
-                                                <motion.path
-                                                    d="M 65 55 C 65 15, 15 15, 15 55 C 15 95, 65 95, 130 55 C 195 15, 245 15, 245 55 C 245 95, 195 95, 130 55 L 65 55"
-                                                    fill="none"
-                                                    stroke="url(#infinity-magical)"
-                                                    strokeWidth="1.5"
-                                                    strokeLinecap="round"
-                                                    strokeDasharray="90 310"
-                                                    animate={{ strokeDashoffset: [-400, 0] }}
-                                                    transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
-                                                    className="opacity-40 drop-shadow-[0_0_8px_rgba(244,63,94,0.6)]"
-                                                    style={{ willChange: "stroke-dashoffset" }}
-                                                />
-                                                {/* Flowing Particle Orbs - Slower & Faded */}
-                                                {[0, 1].map((i) => (
-                                                    <motion.circle
-                                                        key={i}
-                                                        r="2"
-                                                        fill="#f43f5e"
-                                                        fillOpacity="0.5"
-                                                        initial={{ offsetDistance: "0%" }}
-                                                        animate={{ offsetDistance: "100%" }}
-                                                        transition={{
-                                                            duration: 12,
-                                                            repeat: Infinity,
-                                                            ease: "linear",
-                                                            delay: i * 6
-                                                        }}
-                                                        style={{
-                                                            offsetPath: "path('M 65 55 C 65 15, 15 15, 15 55 C 15 95, 65 95, 130 55 C 195 15, 245 15, 245 55 C 245 95, 195 95, 130 55 L 65 55')",
-                                                            willChange: "offset-distance"
-                                                        }}
-                                                        className="drop-shadow-[0_0_5px_rgba(244,63,94,0.8)]"
-                                                    />
-                                                ))}
-                                            </svg>
-
-                                            <div className="flex items-center justify-center -space-x-8 relative z-10 w-full pt-1">
-                                                <motion.div
-                                                    animate={{
-                                                        y: [0, -5, 0],
-                                                        rotate: [-1, 2, -1]
-                                                    }}
-                                                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                                                    className="w-20 h-20 rounded-[2.2rem] border-[4px] border-white dark:border-white/20 shadow-2xl overflow-hidden bg-white/5 relative group"
-                                                >
-                                                    {avatars.me ? <img src={avatars.me} className="w-full h-full object-cover transition-transform group-hover:scale-110" /> : <User className="w-full h-full p-4 text-[#f43f5e] opacity-20" />}
-                                                    <div className="absolute top-2.5 right-2.5 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full shadow-lg" />
-                                                </motion.div>
-
-                                                <div className="relative z-30 mx-[-6px]">
-                                                    <motion.div
-                                                        animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.1, 0.4] }}
-                                                        transition={{ duration: 2, repeat: Infinity }}
-                                                        className="absolute inset-0 bg-rose-400 blur-2xl rounded-full"
-                                                    />
-                                                    <div className="w-14 h-14 rounded-full glass border-white dark:border-white/20 shadow-2xl flex items-center justify-center bg-white/95 dark:bg-black/60 backdrop-blur-2xl">
-                                                        <motion.div
-                                                            animate={{
-                                                                scale: nudgeActive ? [1, 1.6, 1] : [1, 1.15, 1],
-                                                                rotate: nudgeActive ? [0, 20, -20, 0] : 0
-                                                            }}
-                                                            transition={{ repeat: nudgeActive ? 0 : Infinity, duration: nudgeActive ? 0.3 : 2 }}
-                                                        >
-                                                            <Heart className="w-7 h-7 text-[#f43f5e] fill-current drop-shadow-[0_0_12px_rgba(244,63,94,0.7)]" />
-                                                        </motion.div>
-                                                    </div>
-                                                </div>
-
-                                                <motion.div
-                                                    animate={{
-                                                        y: [0, 5, 0],
-                                                        rotate: [2, -1, 2]
-                                                    }}
-                                                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                                                    className="w-20 h-20 rounded-[2.2rem] border-[4px] border-white dark:border-white/20 shadow-2xl overflow-hidden bg-white/5 relative group"
-                                                >
-                                                    {avatars.partner ? <img src={avatars.partner} className="w-full h-full object-cover transition-transform group-hover:scale-110" /> : <Heart className="w-full h-full p-4 text-[#f43f5e] opacity-10" />}
-                                                    <div className={`absolute top-2.5 left-2.5 w-3.5 h-3.5 ${isPartnerOnline() ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'} border-2 border-white rounded-full shadow-lg`} />
-                                                </motion.div>
-                                            </div>
-                                        </div>
-
-                                        <div className="text-center mt-3">
-                                            <h2 className="text-xl font-black text-foreground tracking-tight flex items-center gap-2 justify-center">
-                                                <span>{distKm && distKm < 0.5 ? 'قرب الروح' : 'اتصال مودة'}</span>
-                                            </h2>
-                                            <div className="flex items-center justify-center gap-2 mt-1.5">
-                                                <div className="flex items-center gap-2 px-4 py-1.5 bg-white/60 dark:bg-white/5 rounded-full border border-rose-100/50 dark:border-white/5 shadow-inner">
-                                                    <div className={`w-1.5 h-1.5 rounded-full ${isPartnerOnline() ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`} />
-                                                    <span className="text-[10px] font-black text-foreground/50 tracking-tight">
-                                                        {formatLastSeen(partnerTracking.last_seen)}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Main Display: Days & Distance Duo - More Compact */}
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="bg-white/30 dark:bg-white/5 border border-white/50 dark:border-white/10 p-4 rounded-[2rem] flex flex-col items-center shadow-sm backdrop-blur-md">
-                                            <span className="text-[7px] font-black text-[#f43f5e] uppercase tracking-widest mb-0.5 opacity-60">رحلة العهد</span>
-                                            <div className="flex items-baseline gap-0.5">
-                                                <span className="text-2xl font-black text-foreground tracking-tighter">{daysTogether}</span>
-                                                <span className="text-[8px] font-black text-foreground/40">يوم</span>
-                                            </div>
-                                        </div>
-                                        <div className="bg-white/30 dark:bg-white/5 border border-white/50 dark:border-white/10 p-4 rounded-[2rem] flex flex-col items-center shadow-sm backdrop-blur-md">
-                                            <span className="text-[7px] font-black text-[#f43f5e] uppercase tracking-widest mb-0.5 opacity-60">المسافة الآن</span>
-                                            <div className="flex items-baseline gap-0.5">
-                                                <span className="text-2xl font-black text-[#f43f5e] tracking-tighter">{distance?.split(' ')[0] || '--'}</span>
-                                                <span className="text-[8px] font-black text-[#f43f5e] opacity-60">{distance?.split(' ')[1] || 'كم'}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Action Hub - Compact & Innovative Buttons */}
-                                    <div className="flex items-center justify-between gap-3 pt-2">
-                                        <motion.button
-                                            whileTap={{ scale: 0.9 }}
-                                            onClick={() => {
-                                                updateMyStatus();
-                                                loadStableData();
-                                                loadVolatileData();
-                                            }}
-                                            disabled={isSyncing}
-                                            className="h-12 w-12 bg-white dark:bg-white/10 rounded-2xl flex items-center justify-center text-[#f43f5e] shadow-lg border border-white/60 active:bg-rose-50"
-                                        >
-                                            <Zap className={`w-5 h-5 ${isSyncing ? 'animate-spin text-amber-500' : ''}`} />
-                                        </motion.button>
-
-                                        <motion.button
-                                            whileTap={{ scale: 0.9 }}
-                                            onClick={() => setShowMap(true)}
-                                            className="h-12 w-12 bg-white dark:bg-white/10 rounded-2xl flex items-center justify-center text-[#f43f5e] shadow-lg border border-white/60 active:bg-rose-50"
-                                        >
-                                            <MapPin className="w-5 h-5" />
-                                        </motion.button>
-
-                                        <motion.button
-                                            whileTap={{ scale: 0.96 }}
-                                            onClick={handleNudge}
-                                            className="flex-1 h-13 bg-gradient-to-r from-rose-500 to-rose-400 text-white rounded-2xl font-black text-xs uppercase tracking-[0.15em] shadow-xl shadow-rose-500/20 active:shadow-inner flex items-center justify-center gap-3 group/nudge"
-                                        >
-                                            <Heart className={`w-5 h-5 ${nudgeActive ? 'fill-white animate-bounce' : 'fill-white/30'}`} />
-                                            <span>نبض المودة</span>
-                                        </motion.button>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key="map"
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ type: "spring", damping: 20, stiffness: 100 }}
-                                className="relative glass rounded-[3rem] h-[520px] border-white/60 overflow-hidden shadow-2xl bg-white/40 dark:bg-white/5"
-                            >
-                                {/* Interactive Map Placeholder / Embed */}
-                                <div className="absolute inset-0 bg-mood/5">
-                                    {partnerTracking.lat && partnerTracking.lng ? (
-                                        <iframe
-                                            width="100%"
-                                            height="100%"
-                                            frameBorder="0"
-                                            style={{ border: 0, filter: isDarkMode ? 'invert(90%) hue-rotate(180deg)' : 'none' }}
-                                            src={`https://maps.google.com/maps?q=${partnerTracking.lat},${partnerTracking.lng}&z=15&output=embed`}
-                                            allowFullScreen
-                                        />
-                                    ) : (
-                                        <div className="w-full h-full flex flex-col items-center justify-center text-white/20 gap-4">
-                                            <Compass className="w-20 h-20 animate-spin-slow" />
-                                            <p className="text-[10px] font-black uppercase tracking-widest">جاري تحديد الموقع...</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Map Overlay UI */}
-                                <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-8">
-                                    <div className="flex items-center justify-between pointer-events-auto">
-                                        <button
-                                            onClick={() => setShowMap(false)}
-                                            className="w-12 h-12 bg-white/10 dark:bg-white/10 border border-white/20 rounded-2xl flex items-center justify-center text-white dark:text-mood shadow-2xl backdrop-blur-md"
-                                        >
-                                            <ChevronLeft className="w-6 h-6 rotate-180" />
-                                        </button>
-                                        <div className="bg-white/10 dark:bg-white/10 px-6 py-3 rounded-2xl border border-white/20 backdrop-blur-md flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                                            <span className="text-[10px] font-black text-white dark:text-mood uppercase tracking-widest">مباشر الآن</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4 pointer-events-auto">
-                                        <div className="bg-[#500018]/90 dark:bg-black/80 p-6 rounded-[2.5rem] border border-white/10 backdrop-blur-2xl flex items-center justify-between shadow-2xl active:scale-[0.98] transition-all duration-300">
-                                            <div className="flex items-center gap-5">
-                                                <div className="relative">
-                                                    <div className="w-16 h-16 rounded-[1.5rem] border-2 border-white/20 overflow-hidden bg-white/10 shadow-lg">
-                                                        {avatars.partner ? <img src={avatars.partner} className="w-full h-full object-cover" /> : <Heart className="w-full h-full p-4 text-white" />}
-                                                    </div>
-                                                    <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-white border border-rose-200 flex items-center justify-center text-base shadow-lg text-mood">
-                                                        📍
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col text-right">
-                                                    <h3 className="text-white font-black text-lg tracking-tight">موقع الروح</h3>
-                                                    <span className="text-[10px] font-bold text-white/60 uppercase tracking-widest leading-relaxed">تبعد {distance} عنك الآن</span>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => {
-                                                    if (partnerTracking.lat && partnerTracking.lng) {
-                                                        window.open(`https://www.google.com/maps/dir/?api=1&destination=${partnerTracking.lat},${partnerTracking.lng}`, '_blank');
-                                                    }
-                                                }}
-                                                className="w-14 h-14 bg-mood text-white rounded-2xl flex items-center justify-center shadow-xl shadow-mood/40 hover:scale-105 active:scale-95 transition-all"
-                                            >
-                                                <Navigation className="w-6 h-6 fill-current" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </section>
-
-                {/* Special Occasion Banner - DYNAMICALLY RENDERED */}
-                {upcomingGreeting && (
-                    <section>
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => onNavigate('occasion')}
-                            className="w-full relative overflow-hidden glass rounded-[2.5rem] p-6 border-amber-500/30 shadow-2xl flex items-center justify-between text-right bg-gradient-to-l from-amber-500/10 to-rose-500/10 mb-5 border-[2px] group"
-                        >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/20 rounded-full blur-[40px] pointer-events-none" />
-                            <div className="w-14 h-14 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-rose-500 shadow-inner group-hover:rotate-12 transition-transform shrink-0">
-                                <Gift className="w-6 h-6 fill-current opacity-80" />
-                            </div>
-                            <div className="relative z-10 flex flex-col items-end gap-1">
-                                <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest drop-shadow-md">مناسبة قريبة!</span>
-                                <h3 className="text-xl font-black text-foreground tracking-tight">{upcomingGreeting.title}</h3>
-                            </div>
-                        </motion.button>
-                    </section>
-                )}
-
-                {/* Experience Dashboard - Split Grid for better reach */}
-                <section className="grid grid-cols-2 gap-5">
-                    <motion.button
-                        whileHover={{ y: -6, scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => onNavigate('love_notes')}
-                        className="group relative overflow-hidden glass rounded-[3rem] p-7 border-white/60 shadow-2xl flex flex-col gap-5 text-right bg-white/40 dark:bg-[#0a0505]/40"
-                    >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-rose-500/20 transition-all duration-1000 pointer-events-none" />
-                        <div className="w-14 h-14 rounded-[1.8rem] bg-rose-500/10 border border-rose-500/10 flex items-center justify-center text-rose-500 shadow-inner group-hover:scale-110 group-hover:rotate-6 transition-all duration-700">
-                            <Feather className="w-7 h-7" />
-                        </div>
-                        <div className="space-y-1.5">
-                            <h3 className="text-lg font-black text-foreground tracking-tight">رسائل السكينة</h3>
-                            <p className="text-[8px] font-black text-rose-500/40 uppercase tracking-[0.4em]">همس الوجدان</p>
-                        </div>
-                    </motion.button>
-
-                    <motion.button
-                        whileHover={{ y: -6, scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => onNavigate('adventure_bucket')}
-                        className="group relative overflow-hidden glass rounded-[3rem] p-7 border-white/60 shadow-2xl flex flex-col gap-5 text-right bg-white/40 dark:bg-[#0a0505]/40"
-                    >
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-amber-500/20 transition-all duration-1000 pointer-events-none" />
-                        <div className="w-14 h-14 rounded-[1.8rem] bg-amber-500/10 border border-amber-500/10 flex items-center justify-center text-amber-500 shadow-inner group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
-                            <Compass className="w-7 h-7" />
-                        </div>
-                        <div className="space-y-1.5">
-                            <h3 className="text-lg font-black text-foreground tracking-tight">أفق أحلامنا</h3>
-                            <p className="text-[8px] font-black text-amber-600/40 uppercase tracking-[0.4em]">مستقبلنا معاً</p>
-                        </div>
-                    </motion.button>
-                </section>
-
-                {/* Mood Sanctuary */}
-                <section className="glass rounded-[3rem] p-6 border-white/60 dark:border-white/10 shadow-2xl relative overflow-hidden bg-white/20 dark:bg-black/40">
-                    <div className="absolute top-0 left-0 w-32 h-32 bg-mood/10 rounded-full blur-[80px] -ml-16 -mt-16 pointer-events-none" />
-                    <div className="absolute bottom-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-[80px] -mr-16 -mb-16 pointer-events-none" />
-                    <div className="flex items-center justify-between mb-4 px-2">
-                        <div className="w-10 h-10 rounded-xl bg-rose-500/5 border border-rose-500/10 flex items-center justify-center text-rose-500/60 shadow-sm">
-                            <Heart className="w-5 h-5" fill="currentColor" />
-                        </div>
-                        <div className="text-center">
-                            <h3 className="text-xl font-black text-foreground tracking-tight">نبض الوجدان</h3>
-                            <p className="text-[8px] font-black text-rose-500/40 uppercase tracking-[0.4em] mt-1">بصمتك الروحية اليوم</p>
-                        </div>
-                        <div className="w-10 h-10" />
-                    </div>
-
-                    <AnimatePresence mode="wait">
-                        {showMoodPrompt ? (
-                            <motion.div key="prompt" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="grid grid-cols-4 gap-4 px-2">
-                                {moods.map((m, idx) => {
-                                    const Icon = m.icon;
-                                    const isSelected = selectedMoodId === m.id;
-                                    return (
-                                        <motion.button
-                                            key={m.id}
-                                            disabled={moodLoading}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: idx * 0.05 }}
-                                            onClick={() => handleMoodSelect(m.id)}
-                                            className="flex flex-col items-center gap-3 group/mood cursor-pointer pointer-events-auto"
-                                        >
-                                            <div className={`w-14 h-14 rounded-2xl glass border-white flex items-center justify-center ${m.color} transition-all duration-500 group-hover/mood:scale-110 group-hover/mood:-translate-y-1 ${isSelected ? 'ring-2 ring-primary bg-primary/5 ring-offset-2 ring-offset-transparent' : ''} pointer-events-none`}>
-                                                {moodLoading && isSelected ? (
-                                                    <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                                                ) : (
-                                                    <Icon className="w-6 h-6" />
-                                                )}
-                                            </div>
-                                            <span className="text-[8px] font-black text-muted-foreground/40 uppercase tracking-widest">{m.label}</span>
-                                        </motion.button>
-                                    );
-                                })}
-                            </motion.div>
-                        ) : (
-                            <motion.div key="saved" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-6 py-2">
-                                <div className="flex items-center justify-center gap-10 relative">
-                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
-
-                                    <div className="flex flex-col items-center gap-3 z-10">
-                                        <div className="w-16 h-16 glass border-primary/30 rounded-2xl flex items-center justify-center text-primary shadow-xl relative">
-                                            {selectedMoodId && moods.find(m => m.id === selectedMoodId)?.icon && (() => {
-                                                const Icon = moods.find(m => m.id === selectedMoodId)!.icon;
-                                                return <Icon className="w-8 h-8" />;
-                                            })()}
-                                            <div className="absolute -bottom-1 -right-1 bg-emerald-500 w-5 h-5 rounded-md flex items-center justify-center text-[8px] text-white shadow-lg">✓</div>
-                                        </div>
-                                        <span className="text-[8px] font-black text-foreground/30 uppercase tracking-[0.2em]">أنا</span>
-                                    </div>
-
-                                    <div className="flex flex-col items-center gap-3 z-10">
-                                        {partnerMood ? (
-                                            <div className="w-16 h-16 glass border-rose-500/30 rounded-2xl flex items-center justify-center text-rose-500 shadow-xl relative">
-                                                {moods.find(m => m.id === partnerMood)?.icon && (() => {
-                                                    const Icon = moods.find(m => m.id === partnerMood)!.icon;
-                                                    return <Icon className="w-8 h-8" />;
-                                                })()}
-                                                <motion.div
-                                                    animate={{ scale: [1, 1.2, 1] }}
-                                                    transition={{ repeat: Infinity, duration: 2 }}
-                                                    className="absolute -top-1 -left-1 bg-white border border-rose-100 p-1 rounded-md shadow-sm"
-                                                >
-                                                    <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />
-                                                </motion.div>
-                                            </div>
-                                        ) : (
-                                            <div className="w-16 h-16 glass border-white/10 rounded-2xl flex items-center justify-center text-muted-foreground/10 border-dashed animate-pulse">
-                                                <User className="w-6 h-6 opacity-20" />
-                                            </div>
-                                        )}
-                                        <span className="text-[8px] font-black text-foreground/30 uppercase tracking-[0.2em]">الشريك</span>
-                                    </div>
-                                </div>
-
-                                <div className="text-center space-y-0.5">
-                                    <p className="text-base font-black text-foreground tracking-tight">
-                                        {partnerMood ? 'تحالف القلوب ✨' : 'سكنت مشاعرك'}
-                                    </p>
-                                    <p className="text-[8px] font-black text-primary/40 uppercase tracking-[0.3em] max-w-[200px] mx-auto leading-tight text-center">
-                                        {partnerMood ? 'أنتما الآن في حالة اتصال وجداني تفيض بالمودة والسكينة' : 'تم تدوين بصمتك الوجدانية، بانتظار شريكك ليشاركك لحظته'}
-                                    </p>
-                                </div>
-
-                                <button
-                                    onClick={() => setShowMoodPrompt(true)}
-                                    className="px-6 py-2 glass border-white/60 rounded-xl text-[8px] font-black text-foreground/40 hover:text-primary transition-all uppercase tracking-[0.2em] shadow-sm active:scale-95"
-                                >
-                                    تحديث الحالة
-                                </button>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </section>
-
-                {/* Journey Timeline - Branded & elegant */}
-                <section className="space-y-6 relative">
-                    <div className="flex items-center justify-between px-2 relative z-10">
-                        <div className="flex items-center gap-3 text-right">
-                            <div className="w-10 h-10 rounded-xl bg-mood/5 flex items-center justify-center text-mood shadow-sm border border-mood/10">
-                                <Heart className="w-5 h-5" fill="currentColor" />
-                            </div>
-                            <div className="space-y-0">
-                                <h3 className="text-lg font-black text-foreground tracking-tight">محطات المسير</h3>
-                                <p className="text-[7px] font-black text-muted-foreground/60 uppercase tracking-[0.2em]">رحلة تقارب القلوب</p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => onNavigate('calendar')}
-                            className="w-10 h-10 rounded-xl bg-mood text-white flex items-center justify-center shadow-lg shadow-mood/20 hover:scale-105 active:scale-95 transition-all outline-none border-none group"
-                        >
-                            <CalendarIcon className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                        </button>
-                    </div>
-
-                    <div className="space-y-6">
-                        {upcomingEvents.length > 0 ? (
-                            upcomingEvents.map((event, i) => {
-                                const days = calculateDaysUntil(event.event_date);
-                                const isPast = days < 0;
-                                return (
-                                    <motion.div
-                                        initial={{ opacity: 0, x: 20 }}
-                                        viewport={{ once: true }}
-                                        whileInView={{ opacity: 1, x: 0 }}
-                                        transition={{ delay: i * 0.1, duration: 0.6 }}
-                                        key={event.id}
-                                        onClick={() => onNavigate('calendar')}
-                                        className="relative group cursor-pointer"
-                                    >
-                                        <div className="glass rounded-3xl p-4 border-white/60 dark:border-white/10 flex items-center justify-between shadow-lg hover:shadow-mood/5 transition-all duration-500 bg-white/10">
-                                            <div className="flex items-center gap-4 text-right">
-                                                <div className="w-12 h-12 rounded-2xl bg-mood/5 border border-mood/10 overflow-hidden flex items-center justify-center text-mood relative">
-                                                    {event.image_url ? (
-                                                        <img src={event.image_url} className="w-full h-full object-cover" alt="" />
-                                                    ) : (
-                                                        <Heart className="w-5 h-5 opacity-40" fill="currentColor" />
-                                                    )}
-                                                </div>
-                                                <div className="space-y-0.5">
-                                                    <h4 className="text-sm font-black text-foreground tracking-tight group-hover:text-mood transition-colors">{event.title}</h4>
-                                                    <div className="flex items-center gap-1.5 text-[8px] font-bold text-muted-foreground/30 uppercase tracking-widest">
-                                                        <span>{new Date(event.event_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="text-left">
-                                                <div className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-tight
-                                                    ${isPast ? 'bg-zinc-100 text-zinc-400' : 'bg-mood/5 text-mood'}
-                                                `}>
-                                                    {isPast ? 'مضت' : days === 0 ? 'اليوم' : `باقي ${days} يوم`}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                );
-                            })
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-10 opacity-10 gap-2">
-                                <Heart className="w-10 h-10" />
-                                <p className="text-[9px] font-black uppercase tracking-widest">لا توجد محطات</p>
-                            </div>
-                        )}
-                    </div>
-                </section>
-            </div>
-
-            {/* AI Love Language Advisor Section */}
-            <AnimatePresence>
-                {aiRecommendation && (
-                    <motion.section
+            <div className="px-8 mt-4 space-y-6">
+                {/* 1. THE HERO CONNECTION - THE SOUL OF THE APP */}
+                <section className="relative group">
+                    <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="px-8 mt-4 mb-2"
+                        className="glass rounded-[3.5rem] p-1 border-white/60 dark:border-white/5 shadow-[0_32px_64px_-16px_rgba(244,63,94,0.15)] overflow-hidden bg-white/40 dark:bg-zinc-950/60"
                     >
-                        <div className="glass rounded-[2.5rem] p-6 border-primary/20 bg-primary/5 relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-[60px] -mr-16 -mt-16 pointer-events-none group-hover:bg-primary/20 transition-all duration-700" />
-
-                            <div className="flex items-center gap-4 mb-4 text-right">
-                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
-                                    <Sparkles className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <h3 className="text-sm font-black text-foreground tracking-tight">{aiRecommendation.title}</h3>
-                                    <p className="text-[8px] font-black text-primary/40 uppercase tracking-[0.3em]">نصيحة الألفة اليومية</p>
-                                </div>
+                        <div className="relative p-8 overflow-hidden rounded-[3.2rem]">
+                            {/* Animated Background Orbs */}
+                            <div className="absolute inset-0 pointer-events-none">
+                                <motion.div animate={{ rotate: 360 }} transition={{ duration: 25, repeat: Infinity, ease: "linear" }} className="absolute -top-1/2 -right-1/2 w-full h-full bg-rose-500/5 blur-[120px] rounded-full" />
+                                <motion.div animate={{ rotate: -360 }} transition={{ duration: 30, repeat: Infinity, ease: "linear" }} className="absolute -bottom-1/2 -left-1/2 w-full h-full bg-amber-500/5 blur-[120px] rounded-full" />
                             </div>
 
-                            <p className="text-xs leading-[1.8] text-foreground/70 text-right pr-4 border-r-2 border-primary/20 font-medium">
-                                {aiRecommendation.advice}
-                            </p>
+                            <div className="relative z-10 flex flex-col items-center">
+                                {/* Infinity Avatars */}
+                                <div className="relative w-full h-32 flex items-center justify-center mb-6">
+                                    <svg className="absolute w-[280px] h-[140px] pointer-events-none overflow-visible opacity-10" viewBox="0 0 260 110">
+                                        <path d="M 65 55 C 65 15, 15 15, 15 55 C 15 95, 65 95, 130 55 C 195 15, 245 15, 245 55 C 245 95, 195 95, 130 55 L 65 55" fill="none" stroke="currentColor" strokeWidth="1" />
+                                    </svg>
 
-                            <div className="mt-6 pt-5 border-t border-primary/10 flex justify-between items-center">
-                                <div className="flex -space-x-1.5 opacity-60">
-                                    <div className="w-5 h-5 rounded-full bg-primary/20 border border-white shadow-sm" />
-                                    <div className="w-5 h-5 rounded-full bg-primary/10 border border-white shadow-sm" />
+                                    <div className="flex items-center justify-center -space-x-10 relative">
+                                        <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }} className="w-24 h-24 rounded-[2.5rem] border-4 border-white dark:border-zinc-900 shadow-2xl overflow-hidden relative group/avatar">
+                                            {avatars.me ? <img src={avatars.me} className="w-full h-full object-cover group-hover/avatar:scale-110 transition-transform" /> : <div className="w-full h-full bg-rose-50 text-rose-200 flex items-center justify-center"><User size={40} /></div>}
+                                            <div className="absolute top-3 right-3 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full" />
+                                        </motion.div>
+
+                                        <div className="relative z-20">
+                                            <motion.button 
+                                                whileHover={{ scale: 1.2 }}
+                                                whileTap={{ scale: 0.9 }}
+                                                onClick={handleNudge}
+                                                className="w-16 h-16 rounded-full glass border-white shadow-2xl flex items-center justify-center bg-white/95 dark:bg-zinc-900 relative group/heart"
+                                            >
+                                                <motion.div animate={{ scale: nudgeActive ? [1, 1.5, 1] : [1, 1.1, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
+                                                    <Heart className={`w-8 h-8 text-rose-500 ${nudgeActive ? 'fill-rose-500' : 'fill-rose-500/20'} group-hover/heart:fill-rose-500 transition-colors`} />
+                                                </motion.div>
+                                            </motion.button>
+                                        </div>
+
+                                        <motion.div animate={{ y: [0, 8, 0] }} transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }} className="w-24 h-24 rounded-[2.5rem] border-4 border-white dark:border-zinc-900 shadow-2xl overflow-hidden relative group/avatar">
+                                            {avatars.partner ? <img src={avatars.partner} className="w-full h-full object-cover group-hover/avatar:scale-110 transition-transform" /> : <div className="w-full h-full bg-rose-50 text-rose-100 flex items-center justify-center"><Heart size={40} fill="currentColor" /></div>}
+                                            <div className={`absolute top-3 left-3 w-4 h-4 ${isPartnerOnline() ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-300'} border-2 border-white rounded-full`} />
+                                        </motion.div>
+                                    </div>
                                 </div>
-                                <span className="text-[8px] font-black text-primary/40 uppercase tracking-widest text-left">ذكاء الألفة الوجداني</span>
+
+                                {/* Connection Metrics Pod */}
+                                <div className="grid grid-cols-2 gap-4 w-full">
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[10px] font-black text-rose-500/50 uppercase tracking-[0.4em] mb-1">المسافة</span>
+                                        <h2 className="text-3xl font-black tracking-tighter text-foreground">{distance?.split(' ')[0] || '--'} <span className="text-xs text-muted-foreground opacity-40">{distance?.split(' ')[1] || 'كم'}</span></h2>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[10px] font-black text-rose-500/50 uppercase tracking-[0.4em] mb-1">الإتحاد</span>
+                                        <h2 className="text-3xl font-black tracking-tighter text-foreground">{daysTogether} <span className="text-xs text-muted-foreground opacity-40">يوم</span></h2>
+                                    </div>
+                                </div>
+
+                                {/* Quick Connect Buttons */}
+                                <div className="flex items-center gap-4 mt-8 w-full">
+                                    <motion.button 
+                                        whileTap={{ scale: 0.9 }} 
+                                        onClick={() => setShowMap(true)}
+                                        className="h-14 flex-1 bg-white dark:bg-zinc-900 rounded-[1.8rem] border border-white/60 dark:border-white/5 shadow-xl flex items-center justify-center gap-3 text-rose-500 font-bold group"
+                                    >
+                                        <MapPin className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                                        <span className="text-xs tracking-tight">رؤية الموضع</span>
+                                    </motion.button>
+                                    <motion.button 
+                                        whileTap={{ scale: 0.9 }} 
+                                        onClick={updateMyStatus}
+                                        className="h-14 w-14 bg-rose-50 dark:bg-rose-950/20 rounded-[1.8rem] border border-rose-100 dark:border-rose-500/10 shadow-xl flex items-center justify-center text-rose-500"
+                                    >
+                                        <Zap className={`w-5 h-5 ${isSyncing ? 'animate-spin'                {/* 2. THE BENTO GRID */}
+                <div className="grid grid-cols-12 gap-5 auto-rows-[160px]">
+                    
+                    {/* BENTO: AI SEED ADVICE (Large Horizontal - 12x1) */}
+                    <AnimatePresence>
+                        {aiRecommendation && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="col-span-12 row-span-1 glass rounded-[3rem] p-8 border-rose-500/20 flex flex-col justify-center relative overflow-hidden group bg-gradient-to-l from-rose-500/5 to-transparent"
+                            >
+                                <Sparkles className="absolute left-6 top-1/2 -translate-y-1/2 w-12 h-12 text-rose-500/10 group-hover:scale-125 group-hover:rotate-12 transition-all duration-1000" />
+                                <div className="relative z-10 text-right">
+                                    <div className="flex items-center justify-end gap-2 mb-2">
+                                        <h3 className="text-sm font-black text-rose-500 tracking-tight">{aiRecommendation.title}</h3>
+                                        <div className="w-6 h-[2px] bg-rose-500/20 rounded-full" />
+                                    </div>
+                                    <p className="text-[11px] leading-[1.6] text-foreground/70 font-medium italic overflow-hidden text-ellipsis line-clamp-2 pr-2">
+                                        {aiRecommendation.advice}
+                                    </p>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* BENTO: ADVENTURE BUCKET (7x2) */}
+                    <motion.div
+                        whileHover={{ y: -5 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => onNavigate('adventure_bucket')}
+                        className="col-span-7 row-span-2 glass rounded-[3.2rem] p-7 border-amber-500/20 bg-amber-500/[0.03] flex flex-col justify-between items-end text-right overflow-hidden relative group"
+                    >
+                        <div className="absolute top-0 left-0 w-32 h-32 bg-amber-500/10 rounded-full blur-[60px] -ml-16 -mt-16 pointer-events-none" />
+                        <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center text-amber-500 shadow-inner group-hover:rotate-[-15deg] transition-transform">
+                            <Compass className="w-7 h-7" />
+                        </div>
+                        <div className="space-y-1 mt-auto">
+                            <h3 className="text-xl font-black text-foreground tracking-tight">أفق أحلامنا</h3>
+                            <p className="text-[9px] font-black text-amber-600/40 uppercase tracking-[0.4em]">مستقبلنا معاً</p>
+                        </div>
+                    </motion.div>
+
+                    {/* BENTO: WISHLIST (5x1) */}
+                    <motion.div
+                        whileHover={{ y: -5 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => onNavigate('wishlist')}
+                        className="col-span-5 row-span-1 glass rounded-[2.5rem] p-6 border-rose-500/20 bg-rose-500/[0.03] flex flex-col justify-center items-center text-center overflow-hidden relative group"
+                    >
+                        <div className="absolute bottom-0 right-0 w-20 h-20 bg-rose-500/5 rounded-full blur-[40px] -mr-10 -mb-10 pointer-events-none" />
+                        <div className="w-12 h-12 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 shadow-inner group-hover:scale-110 transition-transform">
+                            <Gift className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-sm font-black text-foreground tracking-tight mt-3">أمنياتي</h3>
+                    </motion.div>
+
+                    {/* BENTO: COMMITMENTS (5x1) */}
+                    <motion.button
+                        whileHover={{ y: -5 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => onNavigate('commitments')}
+                        className="col-span-5 row-span-1 glass rounded-[2.5rem] border-zinc-200 dark:border-white/5 flex flex-col items-center justify-center gap-2 group"
+                    >
+                        <Target className="w-6 h-6 text-zinc-400 group-hover:text-rose-500 transition-colors" />
+                        <span className="text-[8px] font-black text-zinc-400 group-hover:text-zinc-600 uppercase tracking-widest">تعهداتنا</span>
+                    </motion.button>
+
+                    {/* 3. MOOD SANCTUARY - ORGANIC INTEGRATION */}
+                    <div className="col-span-12 mt-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            whileInView={{ opacity: 1 }}
+                            viewport={{ once: true }}
+                            className="glass rounded-[3.5rem] p-10 border-white/60 dark:border-white/5 shadow-2xl relative overflow-hidden bg-gradient-to-br from-white/20 to-transparent dark:from-zinc-900/40"
+                        >
+                            <div className="absolute top-0 left-0 w-64 h-64 bg-rose-500/[0.02] rounded-full blur-[100px] -ml-32 -mt-32" />
+                            <div className="absolute bottom-0 right-0 w-64 h-64 bg-indigo-500/[0.02] rounded-full blur-[100px] -mr-32 -mb-32" />
+                            
+                            <div className="relative z-10 flex flex-col items-center gap-8">
+                                <div className="text-center">
+                                    <h3 className="text-2xl font-black text-foreground tracking-tight mb-2">سكنات الروح</h3>
+                                    <p className="text-[10px] font-black text-rose-500/30 uppercase tracking-[0.5em]">بوح الوجدان لليوم</p>
+                                </div>
+
+                                <AnimatePresence mode="wait">
+                                    {showMoodPrompt ? (
+                                        <motion.div key="prompt" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex justify-center gap-6">
+                                            {moods.map((m, idx) => {
+                                                const Icon = m.icon;
+                                                const isSelected = selectedMoodId === m.id;
+                                                return (
+                                                    <motion.button
+                                                        key={m.id}
+                                                        onClick={() => handleMoodSelect(m.id)}
+                                                        whileHover={{ y: -10, scale: 1.1 }}
+                                                        className="flex flex-col items-center gap-4 group/mood"
+                                                    >
+                                                        <div className={`w-16 h-16 rounded-3xl glass shadow-xl flex items-center justify-center ${m.color} ${isSelected ? 'ring-2 ring-primary bg-primary/10' : 'bg-white/40'} group-hover/mood:shadow-inner transition-all duration-500`}>
+                                                            <Icon className="w-7 h-7" />
+                                                        </div>
+                                                        <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-widest group-hover/mood:text-foreground/40 transition-colors">{m.label}</span>
+                                                    </motion.button>
+                                                );
+                                            })}
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div key="saved" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center gap-8 w-full max-w-[320px]">
+                                            <div className="flex items-center justify-between w-full relative">
+                                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-[1px] bg-gradient-to-r from-transparent via-rose-500/20 to-transparent" />
+                                                
+                                                <div className="flex flex-col items-center gap-3 relative z-10">
+                                                    <div className="w-20 h-20 glass border-rose-500/20 rounded-3xl flex items-center justify-center text-rose-500 shadow-2xl relative bg-white/60">
+                                                        {selectedMoodId && moods.find(m => m.id === selectedMoodId) && (() => {
+                                                            const Icon = moods.find(m => m.id === selectedMoodId)!.icon;
+                                                            return <Icon className="w-10 h-10" />;
+                                                        })()}
+                                                        <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-[10px] text-white px-2 py-0.5 rounded-lg shadow-lg font-black tracking-widest">أنا</div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col items-center gap-3 relative z-10">
+                                                    {partnerMood ? (
+                                                        <div className="w-20 h-20 glass border-rose-500/20 rounded-3xl flex items-center justify-center text-rose-500 shadow-2xl relative bg-white/60">
+                                                            {moods.find(m => m.id === partnerMood) && (() => {
+                                                                const Icon = moods.find(m => m.id === partnerMood)!.icon;
+                                                                return <Icon className="w-10 h-10" />;
+                                                            })()}
+                                                            <div className="absolute -bottom-2 -left-2 bg-rose-500 text-[10px] text-white px-2 py-0.5 rounded-lg shadow-lg font-black tracking-widest">الشريك</div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-20 h-20 glass border-zinc-100 rounded-3xl flex items-center justify-center text-zinc-100 border-dashed animate-pulse">
+                                                            <User size={30} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="text-center">
+                                                <p className="text-lg font-black text-foreground tracking-tight mb-2">{partnerMood ? 'تحالف القلوب ✨' : 'بصمة وجدانية'}</p>
+                                                <button onClick={() => setShowMoodPrompt(true)} className="text-[10px] font-black text-rose-500/40 uppercase tracking-[0.4em] hover:text-rose-500 transition-colors">تحديث الحالة</button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </motion.div>
+                    </div>
+
+                    {/* BENTO: TIMELINE PREVIEW (12x2) */}
+                    <div className="col-span-12 mt-4 space-y-6">
+                        <div className="flex items-center justify-between px-4">
+                            <h3 className="text-xl font-black text-foreground tracking-tighter">قادم الأيام</h3>
+                            <div className="w-8 h-8 rounded-full glass flex items-center justify-center text-rose-500/40">
+                                <Sparkles size={16} />
                             </div>
                         </div>
-                    </motion.section>
+
+                        <div className="space-y-4">
+                            {upcomingEvents.length > 0 ? (
+                                upcomingEvents.map((event, i) => {
+                                    const days = calculateDaysUntil(event.event_date);
+                                    return (
+                                        <motion.div
+                                            key={event.id}
+                                            onClick={() => onNavigate('calendar')}
+                                            className="glass rounded-[2rem] p-5 border-white/60 flex items-center justify-between group cursor-pointer hover:bg-white/80 transition-all shadow-sm"
+                                        >
+                                            <div className="flex items-center gap-5">
+                                                <div className="w-14 h-14 rounded-2xl bg-zinc-50 flex items-center justify-center text-zinc-300 group-hover:text-rose-500 transition-colors overflow-hidden">
+                                                    {event.image_url ? <img src={event.image_url} className="w-full h-full object-cover" /> : <Heart size={20} fill="currentColor" />}
+                                                </div>
+                                                <div className="text-right">
+                                                    <h4 className="text-base font-black text-foreground tracking-tight">{event.title}</h4>
+                                                    <p className="text-[10px] font-bold text-muted-foreground/40">{new Date(event.event_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</p>
+                                                </div>
+                                            </div>
+                                            <div className="bg-rose-50 text-rose-500 text-[10px] font-black px-4 py-2 rounded-xl shadow-inner">
+                                                {days === 0 ? 'اليوم' : `باقي ${days} يوم`}
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })
+                            ) : (
+                                <div className="text-center py-10 opacity-20"><Heart className="mx-auto mb-2" /></div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {/* MAP OVERLAY - FULL SCREEN EXPERIENCE */}
+            <AnimatePresence>
+                {showMap && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 100 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 100 }}
+                        className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-2xl p-6 flex flex-col"
+                    >
+                        <header className="flex items-center justify-between mb-8">
+                            <button onClick={() => setShowMap(false)} className="w-14 h-14 glass rounded-2xl flex items-center justify-center text-rose-500 shadow-xl">
+                                <ChevronLeft className="rotate-180" />
+                            </button>
+                            <div className="text-right">
+                                <h2 className="text-xl font-black tracking-tighter">موقع الروح</h2>
+                                <p className="text-[10px] font-black text-rose-500/40 tracking-[0.4em] uppercase">اتصال حي الآن</p>
+                            </div>
+                        </header>
+
+                        <div className="flex-1 rounded-[3rem] overflow-hidden border border-white shadow-2xl relative mb-8">
+                            {partnerTracking.lat && partnerTracking.lng ? (
+                                <iframe
+                                    width="100%" height="100%" frameBorder="0"
+                                    style={{ border: 0, filter: isDarkMode ? 'invert(90%) hue-rotate(180deg)' : 'none' }}
+                                    src={`https://maps.google.com/maps?q=${partnerTracking.lat},${partnerTracking.lng}&z=15&output=embed`}
+                                />
+                            ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-4 opacity-20"><Compass size={60} className="animate-spin-slow" /><p>تحديد الموقع...</p></div>
+                            )}
+                        </div>
+
+                        <div className="glass rounded-[3rem] p-8 flex items-center justify-between border-white shadow-2xl bg-white/40">
+                             <div className="flex items-center gap-5">
+                                <div className="w-20 h-20 rounded-[1.8rem] border-4 border-white shadow-lg overflow-hidden">
+                                     {avatars.partner ? <img src={avatars.partner} className="w-full h-full object-cover" /> : <User size={40} className="m-auto opacity-10" />}
+                                </div>
+                                <div className="text-right">
+                                    <h3 className="text-lg font-black tracking-tight">{isPartnerOnline() ? 'متصل الآن' : formatLastSeen(partnerTracking.last_seen)}</h3>
+                                    <p className="text-[11px] font-bold text-rose-500 opacity-60">تبعد المسافة {distance} عنك</p>
+                                </div>
+                             </div>
+                             <button
+                                onClick={() => { if (partnerTracking.lat && partnerTracking.lng) window.open(`https://www.google.com/maps/dir/?api=1&destination=${partnerTracking.lat},${partnerTracking.lng}`, '_blank'); }}
+                                className="w-16 h-16 bg-rose-500 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-rose-500/30"
+                             >
+                                <Navigation fill="currentColor" />
+                             </button>
+                        </div>
+                    </motion.div>
                 )}
             </AnimatePresence>
 
-            <div className="h-32" /> {/* Bottom spacing for nav */}
+            <div className="h-40" />
         </div>
     );
 }
+
+const calculateDaysUntil = (date: string) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const eventDate = new Date(date);
+    eventDate.setHours(0, 0, 0, 0);
+    const diffTime = eventDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};

@@ -12,6 +12,7 @@ import { LoveNotesScreen } from './components/LoveNotesScreen';
 import { AdventureBucketScreen } from './components/AdventureBucketScreen';
 import { FinanceScreen } from './components/FinanceScreen';
 import { OccasionScreen } from './components/OccasionScreen';
+import { WishlistScreen } from './components/WishlistScreen';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster } from 'sonner';
@@ -28,7 +29,8 @@ type Screen =
   | 'love_notes'
   | 'finance'
   | 'adventure_bucket'
-  | 'occasion';
+  | 'occasion'
+  | 'wishlist';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
@@ -163,6 +165,8 @@ function App() {
         return <AdventureBucketScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} />;
       case 'occasion':
         return <OccasionScreen onBack={() => handleNavigate('home')} isDarkMode={isDarkMode} userId={userId} partnershipId={partnershipId} />;
+      case 'wishlist':
+        return <WishlistScreen onBack={() => handleNavigate('home')} userId={userId} partnershipId={partnershipId} />;
       default:
         return <HomeScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
     }
