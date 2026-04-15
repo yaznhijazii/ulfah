@@ -1,34 +1,16 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, memo } from 'react';
 import {
-  ArrowLeft,
-  Plus,
-  Calendar as CalendarIcon,
-  Image as ImageIcon,
-  Trash2,
-  MapPin,
-  Clock,
-  X,
-  Upload,
-  Sparkles,
-  Heart,
-  Compass,
-  Camera,
-  CalendarDays,
-  History,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  LayoutGrid,
-  Target,
-  Gift,
-  MailOpen,
-  Mail,
-  Edit2
+  ArrowLeft, Plus, Calendar as CalendarIcon, Image as ImageIcon,
+  Trash2, MapPin, Clock, X, Upload, Sparkles, Heart, Compass,
+  Camera, History, ChevronLeft, ChevronRight, LayoutGrid,
+  Target, Gift, MailOpen, Mail, Edit2
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
 
+// ─── Types ─────────────────────────────────────────────────────────────────────
 interface CalendarScreenProps {
   onNavigate: (screen: string) => void;
   userId: string;
@@ -36,308 +18,419 @@ interface CalendarScreenProps {
   isDarkMode?: boolean;
 }
 
-// Memoized Memory Item for performance
-const MemoryItem = ({ item, idx, viewMode, onDelete, onOpenGallery, getRelativeTime, monthNames }: any) => {
-  const [showImages, setShowImages] = useState(idx === 0);
+// ─── Module-level Session Cache ────────────────────────────────────────────────
+// Survives navigation within the same session — instant re-open, no spinner.
+interface CacheEntry {
+  events: any[];
+  memories: any[];
+  greetings: any[];
+  hasMore: boolean;
+  ts: number;
+}
+const _sessionCache: Record<string, CacheEntry> = {};
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const PAGE_SIZE = 6;
+
+function readCache(pid: string): CacheEntry | null {
+  const c = _sessionCache[pid];
+  if (c && Date.now() - c.ts < CACHE_TTL) return c;
+  return null;
+}
+function writeCache(pid: string, data: Omit<CacheEntry, 'ts'>) {
+  _sessionCache[pid] = { ...data, ts: Date.now() };
+}
+function invalidateCache(pid: string) {
+  delete _sessionCache[pid];
+}
+
+// ─── Stable constants (outside component to avoid re-allocation) ───────────────
+const MONTH_NAMES = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const DAY_ABBR    = ['أحد','إثن','ثلا','أرب','خمي','جمع','سبت'];
+
+// ─── Skeleton ──────────────────────────────────────────────────────────────────
+const SkeletonMemory = () => (
+  <div className="rounded-[2.8rem] overflow-hidden bg-white dark:bg-white/[0.03] border border-black/5 dark:border-white/6 animate-pulse shadow-md">
+    <div className="h-48 bg-rose-500/8 dark:bg-rose-500/5" />
+    <div className="p-7 space-y-3">
+      <div className="h-5 bg-black/6 dark:bg-white/8 rounded-xl w-3/4 mr-0 ml-auto" />
+      <div className="h-3.5 bg-black/4 dark:bg-white/5 rounded-xl w-full" />
+      <div className="h-3.5 bg-black/4 dark:bg-white/5 rounded-xl w-2/3 ml-auto" />
+    </div>
+  </div>
+);
+
+const SkeletonEvent = () => (
+  <div className="rounded-[2rem] bg-white dark:bg-white/[0.03] border border-black/5 dark:border-white/6 animate-pulse p-5 flex items-center gap-4 shadow-sm">
+    <div className="w-14 h-14 rounded-[1.2rem] bg-rose-500/8 flex-shrink-0" />
+    <div className="flex-1 space-y-2.5">
+      <div className="h-5 bg-black/6 dark:bg-white/8 rounded-xl w-3/4 ml-auto" />
+      <div className="h-3 bg-black/4 dark:bg-white/5 rounded-xl w-1/3 ml-auto" />
+    </div>
+  </div>
+);
+
+// ─── MemoryItem ────────────────────────────────────────────────────────────────
+const MemoryItem = memo(({ item, idx, viewMode, onDelete, onOpenGallery, getRelativeTime }: any) => {
+  const [imgLoaded, setImgLoaded] = useState(false);
   const hasImages = item.images && item.images.length > 0;
+  const isFirst = idx === 0;
 
   return (
-    <div className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-12 relative items-start w-full`}>
+    <div className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-7 relative items-start w-full`}>
+
+      {/* Timeline dot */}
       {viewMode === 'timeline' && (
-        <div className="flex flex-col items-center w-12 shrink-0 pt-1 relative z-10 text-center">
-          <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] opacity-80">{monthNames[item.date.getMonth()]}</span>
-          <span className="text-3xl font-black text-foreground tracking-tighter my-1">{item.date.getDate()}</span>
-          <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} className="mt-4 w-3 h-3 rounded-full border-[3px] border-background shadow-lg bg-rose-500" />
+        <div className="flex flex-col items-center w-10 shrink-0 pt-2 relative z-10 text-center">
+          <span className="text-[8px] font-black text-rose-500/50 uppercase tracking-widest leading-none">{MONTH_NAMES[item.date.getMonth()]}</span>
+          <span className="text-2xl font-black text-foreground leading-none my-1.5">{item.date.getDate()}</span>
+          <div className="w-3 h-3 rounded-full bg-rose-500 border-[3px] border-background shadow-md shadow-rose-500/30" />
         </div>
       )}
 
-      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex-1 min-w-0 w-full mb-4">
-        <div className="glass rounded-[3rem] overflow-hidden border-white/20 group transition-all duration-700 hover:shadow-2xl">
-          {hasImages && (
-            <div className={`relative bg-muted/5 transition-all duration-500 ${showImages ? '' : 'h-24'}`}>
-              <AnimatePresence>
-                {showImages ? (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="cursor-pointer"
-                    onClick={() => onOpenGallery(item.images!, 0)}
-                  >
-                    {item.images.length === 1 ? (
-                      <motion.img
-                        initial={{ opacity: 0 }}
-                        whileInView={{ opacity: 1 }}
-                        viewport={{ once: true }}
-                        src={`${item.images[0].image_url}?width=800&quality=70`}
-                        loading={idx === 0 ? "eager" : "lazy"}
-                        decoding="async"
-                        fetchPriority={idx === 0 ? "high" : "auto"} // Optimization
-                        className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-[2s]"
-                      />
-                    ) : item.images.length === 2 ? (
-                      <div className="grid grid-cols-2 gap-0.5 h-48">
-                        {item.images.map((img: any, imgIdx: number) => (
-                          <motion.img
-                            key={imgIdx}
-                            initial={{ opacity: 0 }}
-                            whileInView={{ opacity: 1 }}
-                            viewport={{ once: true }}
-                            src={`${img.image_url}?width=400&quality=60`}
-                            loading="lazy"
-                            decoding="async"
-                            className="w-full h-full object-cover"
-                            onClick={(e) => { e.stopPropagation(); onOpenGallery(item.images!, imgIdx); }}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-3 gap-0.5 h-48">
-                        {item.images.slice(0, 3).map((img: any, imgIdx: number) => (
-                          <motion.img
-                            key={imgIdx}
-                            initial={{ opacity: 0 }}
-                            whileInView={{ opacity: 1 }}
-                            viewport={{ once: true }}
-                            src={`${img.image_url}?width=400&quality=60`}
-                            loading="lazy"
-                            decoding="async"
-                            className={`w-full h-full object-cover ${imgIdx === 2 && item.images!.length > 3 ? 'brightness-50' : ''}`}
-                            onClick={(e) => { e.stopPropagation(); onOpenGallery(item.images!, imgIdx); }}
-                          />
-                        ))}
-                        {item.images.length > 3 && (
-                          <div className="absolute bottom-0 right-0 w-1/3 h-full flex items-center justify-center pointer-events-none">
-                            <span className="text-white text-2xl font-black drop-shadow-lg">+{item.images.length - 3}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </motion.div>
-                ) : (
-                  <div
-                    onClick={() => setShowImages(true)}
-                    className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-transparent to-black/20 cursor-pointer group/btn"
-                  >
-                    {/* Blurred Background Preview if possible, or just a button */}
-                    <div className="absolute inset-0 overflow-hidden opacity-30 blur-xl">
-                      <img src={`${item.images[0].image_url}?width=100&quality=10`} className="w-full h-full object-cover" />
-                    </div>
-                    <button className="relative z-10 px-6 py-2 glass rounded-full text-xs font-black uppercase tracking-widest text-foreground/80 group-hover/btn:scale-110 transition-transform flex items-center gap-2">
-                      <ImageIcon className="w-4 h-4" />
-                      عرض {item.images.length} صور
-                    </button>
-                  </div>
-                )}
-              </AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-50px' }}
+        transition={{ type: 'spring', stiffness: 90, damping: 18 }}
+        className="flex-1 min-w-0 w-full mb-2"
+      >
+        <div className="bg-white dark:bg-white/[0.03] border border-black/5 dark:border-white/6 rounded-[2.8rem] overflow-hidden group shadow-lg shadow-black/4 dark:shadow-black/25 hover:shadow-xl transition-shadow duration-500">
 
-              {showImages && item.images.length > 1 && (
-                <div className="absolute bottom-3 left-3 bg-black/60 border border-white/10 text-white px-3 py-1.5 rounded-lg text-[8px] font-black flex items-center gap-2 backdrop-blur-md">
-                  <ImageIcon className="w-3 h-3 text-primary" />
-                  <span>{item.images.length} صور - انقر للعرض</span>
+          {/* Images */}
+          {hasImages && (
+            <div className="relative overflow-hidden cursor-pointer" onClick={() => onOpenGallery(item.images, 0)}>
+              {/* Placeholder shown until image loads */}
+              <div className={`absolute inset-0 bg-rose-500/5 transition-opacity duration-500 ${imgLoaded ? 'opacity-0' : 'opacity-100'}`} />
+
+              {item.images.length === 1 ? (
+                <img
+                  src={item.images[0].image_url}
+                  loading={isFirst ? 'eager' : 'lazy'}
+                  decoding="async"
+                  onLoad={() => setImgLoaded(true)}
+                  className={`w-full h-52 object-cover transition-all duration-700 group-hover:scale-105 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                />
+              ) : item.images.length === 2 ? (
+                <div className="grid grid-cols-2 gap-px h-52">
+                  {item.images.map((img: any, i: number) => (
+                    <img key={i} src={img.image_url} loading="lazy" decoding="async"
+                      className="w-full h-full object-cover"
+                      onClick={e => { e.stopPropagation(); onOpenGallery(item.images, i); }} />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-px h-52">
+                  {item.images.slice(0, 3).map((img: any, i: number) => (
+                    <div key={i} className="relative">
+                      <img src={img.image_url} loading="lazy" decoding="async"
+                        className={`w-full h-full object-cover ${i === 2 && item.images.length > 3 ? 'brightness-[0.45]' : ''}`}
+                        onClick={e => { e.stopPropagation(); onOpenGallery(item.images, i); }} />
+                      {i === 2 && item.images.length > 3 && (
+                        <span className="absolute inset-0 flex items-center justify-center text-white text-2xl font-black pointer-events-none">
+                          +{item.images.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Photo count */}
+              {item.images.length > 1 && (
+                <div className="absolute bottom-3 left-3 bg-black/55 backdrop-blur-md border border-white/10 text-white px-3 py-1 rounded-[0.65rem] text-[9px] font-black flex items-center gap-1.5">
+                  <ImageIcon className="w-3 h-3" />
+                  {item.images.length} صور
                 </div>
               )}
             </div>
           )}
-          <div className="p-8 space-y-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 text-right">
-                <History className="w-4 h-4 text-rose-500/40" />
-                <h3 className="font-black text-xl text-foreground tracking-tight">{item.title}</h3>
-              </div>
-              <button onClick={() => onDelete(item.id, 'memory')} className="w-10 h-10 flex items-center justify-center glass border-white/10 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/10"><Trash2 className="w-4 h-4" /></button>
+
+          {/* Content */}
+          <div className="p-7">
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <button
+                onClick={() => onDelete(item.id, 'memory')}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-500/8 text-rose-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/15 flex-shrink-0 mt-0.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+              <h3 className="font-black text-lg text-foreground tracking-tight text-right leading-snug">{item.title}</h3>
             </div>
-            <p className="text-[13px] text-muted-foreground font-bold leading-[1.7] opacity-80 text-right">{item.description}</p>
-            <div className="pt-6 flex items-center justify-between border-t border-white/10">
-              <div className="flex items-center gap-2.5 text-muted-foreground/60">
-                <Clock className="w-3.5 h-3.5" />
-                <span className="text-[9px] font-black uppercase tracking-widest">{getRelativeTime(item.date)}</span>
+            {item.description && (
+              <p className="text-[13px] text-muted-foreground/60 font-medium leading-relaxed text-right mb-5">{item.description}</p>
+            )}
+            <div className="flex items-center justify-between pt-4 border-t border-black/4 dark:border-white/5">
+              <div className="w-9 h-9 rounded-xl bg-rose-500/8 flex items-center justify-center">
+                <Heart className="w-4 h-4 text-rose-500 fill-rose-500/20" />
               </div>
-              <div className="w-10 h-10 rounded-xl glass border-white/20 flex items-center justify-center text-rose-500 shadow-inner group-hover:scale-110 transition-transform"><Heart className="w-5 h-5 fill-rose-500/10" /></div>
+              <span className="text-[9px] font-black text-muted-foreground/35 uppercase tracking-widest">
+                {getRelativeTime(item.date)}
+              </span>
             </div>
           </div>
         </div>
       </motion.div>
     </div>
   );
-};
+});
 
-// Memoized Event Item
-const EventItem = ({ item, idx, viewMode, onDelete, getRelativeTime, monthNames }: any) => {
+// ─── EventItem ─────────────────────────────────────────────────────────────────
+const EventItem = memo(({ item, viewMode, onDelete, getRelativeTime }: any) => {
+  const isSpecial = item.event_type === 'special';
+
   return (
-    <div className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-12 relative items-start w-full`}>
+    <div className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-7 relative items-start w-full`}>
+
+      {/* Timeline dot */}
       {viewMode === 'timeline' && (
-        <div className="flex flex-col items-center w-12 shrink-0 pt-1 relative z-10 text-center">
-          <span className="text-[9px] font-black text-primary uppercase tracking-[0.2em] opacity-80">{monthNames[item.date.getMonth()]}</span>
-          <span className="text-3xl font-black text-foreground tracking-tighter my-1">{item.date.getDate()}</span>
-          <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} className="mt-4 w-3 h-3 rounded-full border-[3px] border-background shadow-lg bg-primary" />
+        <div className="flex flex-col items-center w-10 shrink-0 pt-2 relative z-10 text-center">
+          <span className="text-[8px] font-black text-rose-500/50 uppercase tracking-widest leading-none">{MONTH_NAMES[item.date.getMonth()]}</span>
+          <span className="text-2xl font-black text-foreground leading-none my-1.5">{item.date.getDate()}</span>
+          <div className={`w-3 h-3 rounded-full border-[3px] border-background shadow-md ${isSpecial ? 'bg-rose-500 shadow-rose-500/30' : 'bg-indigo-500 shadow-indigo-500/25'}`} />
         </div>
       )}
 
-      <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex-1 min-w-0 w-full mb-4">
-        <div className="glass rounded-[2.5rem] p-6 border-white/20 flex items-center justify-between group hover:shadow-xl transition-all duration-500">
-          <div className="flex items-center gap-6">
-            <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-2xl ${item.event_type === 'special' ? 'bg-primary shadow-primary/20' : 'bg-muted/10 text-muted-foreground'}`}>
-              {item.event_type === 'special' ? <Sparkles className="w-7 h-7" /> : <CalendarIcon className="w-7 h-7" />}
-            </div>
-            <div className="text-right">
-              <h3 className="font-black text-lg text-foreground mb-1 tracking-tight">{item.title}</h3>
-              <div className="flex flex-col gap-1.5">
-                {item.event_time && <span className="text-[9px] font-black text-muted-foreground/40 flex items-center gap-2 justify-end uppercase tracking-widest"><Clock className="w-3 h-3" />{item.event_time}</span>}
-                {item.location && <span className="text-[9px] font-black text-muted-foreground/40 flex items-center gap-2 justify-end uppercase tracking-widest"><MapPin className="w-3 h-3" />{item.location}</span>}
-              </div>
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-50px' }}
+        transition={{ type: 'spring', stiffness: 90, damping: 18 }}
+        className="flex-1 min-w-0 w-full mb-2"
+      >
+        <div className="bg-white dark:bg-white/[0.03] border border-black/5 dark:border-white/6 rounded-[2rem] p-5 flex items-center gap-4 group shadow-md shadow-black/3 dark:shadow-black/20 hover:shadow-lg transition-shadow duration-400">
+          <div className={`w-14 h-14 rounded-[1.2rem] flex items-center justify-center text-white shadow-lg flex-shrink-0 ${isSpecial ? 'bg-gradient-to-br from-rose-400 to-rose-600 shadow-rose-500/25' : 'bg-gradient-to-br from-indigo-400 to-indigo-600 shadow-indigo-500/20'}`}>
+            {isSpecial ? <Sparkles className="w-6 h-6" /> : <CalendarIcon className="w-6 h-6" />}
+          </div>
+          <div className="flex-1 text-right min-w-0">
+            <h3 className="font-black text-base text-foreground tracking-tight truncate">{item.title}</h3>
+            <div className="flex flex-col gap-1 mt-1.5">
+              {item.event_time && (
+                <span className="text-[9px] font-bold text-muted-foreground/45 flex items-center gap-1.5 justify-end">
+                  <Clock className="w-3 h-3" />{item.event_time}
+                </span>
+              )}
+              {item.location && (
+                <span className="text-[9px] font-bold text-muted-foreground/45 flex items-center gap-1.5 justify-end">
+                  <MapPin className="w-3 h-3" />{item.location}
+                </span>
+              )}
             </div>
           </div>
-          <div className="flex flex-col items-end gap-4 shrink-0">
-            <button onClick={() => onDelete(item.id, 'event')} className="w-9 h-9 flex items-center justify-center glass border-white/10 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/10"><Trash2 className="w-3.5 h-3.5" /></button>
-            <span className="px-5 py-2.5 glass border-primary/20 rounded-xl text-[9px] font-black text-primary uppercase tracking-widest">{getRelativeTime(item.date)}</span>
+          <div className="flex flex-col items-end gap-2.5 shrink-0">
+            <button
+              onClick={() => onDelete(item.id, 'event')}
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-rose-500/8 text-rose-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/15"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+            <span className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-wide ${isSpecial ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-500'}`}>
+              {getRelativeTime(item.date)}
+            </span>
           </div>
         </div>
       </motion.div>
     </div>
   );
-};
+});
 
+// ─── Main Component ────────────────────────────────────────────────────────────
 export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }: CalendarScreenProps) {
-  const [events, setEvents] = useState<any[]>([]);
-  const [memories, setMemories] = useState<any[]>([]);
-  const [greetings, setGreetings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  const [showAddEventForm, setShowAddEventForm] = useState(false);
-  const [showAddMemoryForm, setShowAddMemoryForm] = useState(false);
-  const [showAddRealEventForm, setShowAddRealEventForm] = useState(false);
+  // ── Initial state from cache (no loading flash on re-visit) ──
+  const cached = partnershipId ? readCache(partnershipId) : null;
+
+  const [events,   setEvents]   = useState<any[]>(cached?.events   ?? []);
+  const [memories, setMemories] = useState<any[]>(cached?.memories ?? []);
+  const [greetings,setGreetings]= useState<any[]>(cached?.greetings ?? []);
+  const [loading,  setLoading]  = useState(!cached);
+  const [hasMore,  setHasMore]  = useState(cached?.hasMore ?? true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Forms
+  const [showAddEventForm,    setShowAddEventForm]    = useState(false);
+  const [showAddMemoryForm,   setShowAddMemoryForm]   = useState(false);
+  const [showAddRealEventForm,setShowAddRealEventForm]= useState(false);
   const [showAddGreetingForm, setShowAddGreetingForm] = useState(false);
 
-  const [eventForm, setEventForm] = useState({ title: '', event_date: '', event_time: '', location: '', event_type: 'other' });
-  const [memoryForm, setMemoryForm] = useState({ title: '', memory_date: new Date().toISOString().split('T')[0], description: '' });
-  const [greetingForm, setGreetingForm] = useState({ title: '', target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], message: '' });
+  const [eventForm,   setEventForm]   = useState({ title: '', event_date: '', event_time: '', location: '', event_type: 'other' });
+  const [memoryForm,  setMemoryForm]  = useState({ title: '', memory_date: new Date().toISOString().split('T')[0], description: '' });
+  const [greetingForm,setGreetingForm]= useState({ title: '', target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], message: '' });
   const [editingGreetingId, setEditingGreetingId] = useState<string | null>(null);
-  const [selectedImages, setSelectedImages] = useState<{ file: File, preview: string }[]>([]);
-
-  // Image gallery state - for viewing all images of a memory
-  const [galleryImages, setGalleryImages] = useState<string[]>([]);
-  const [galleryIndex, setGalleryIndex] = useState(0);
-  const [showGallery, setShowGallery] = useState(false);
-
-  const [limit, setLimit] = useState(6); // Reduced initial load for performance
-  const [hasMore, setHasMore] = useState(true);
-  const [initialLoadDone, setInitialLoadDone] = useState(false); // Track if first load completed
-  const [loadingMore, setLoadingMore] = useState(false); // Track if loading more (not initial)
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [viewMode, setViewMode] = useState<'timeline' | 'grid'>('timeline');
+  const [selectedImages, setSelectedImages] = useState<{ file: File; preview: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const activeDateRef = useRef<HTMLButtonElement>(null);
-  const loadMoreRef = useRef<HTMLDivElement>(null);
 
-  // Open gallery with all images of a memory
-  const openGallery = useCallback((images: { image_url: string }[], startIndex: number = 0) => {
-    setGalleryImages(images.map(img => img.image_url));
-    setGalleryIndex(startIndex);
+  // Gallery
+  const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [galleryIndex,  setGalleryIndex]  = useState(0);
+  const [showGallery,   setShowGallery]   = useState(false);
+
+  // Navigation
+  const [viewMode, setViewMode]       = useState<'timeline' | 'grid'>('timeline');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  // Calendar strip shows the current month by default
+  const [stripMonth, setStripMonth]   = useState(() => {
+    const d = new Date(); d.setDate(1); return d;
+  });
+
+  const loadMoreRef   = useRef<HTMLDivElement>(null);
+  const activeDateRef = useRef<HTMLButtonElement>(null);
+
+  // ── Data loading ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!partnershipId) return;
+    if (cached) {
+      // Show cached data immediately, silently refresh in background after 1s
+      const refresh = setTimeout(() => doFullLoad(partnershipId, true), 1000);
+      return () => clearTimeout(refresh);
+    }
+    doFullLoad(partnershipId, false);
+  }, [partnershipId]);
+
+  async function doFullLoad(pid: string, background: boolean) {
+    if (!background) setLoading(true);
+
+    // Phase 1: 3 items fast → unblock UI
+    if (!background) {
+      const [qe, qm] = await Promise.all([
+        supabase.from('calendar_events').select('id,title,event_date,event_time,location,event_type')
+          .eq('partnership_id', pid).order('event_date', { ascending: false }).limit(3),
+        supabase.from('memories').select('id,title,memory_date,description,images:memory_images(image_url)')
+          .eq('partnership_id', pid).order('memory_date', { ascending: false }).limit(3),
+      ]);
+      if (qe.data) setEvents(qe.data);
+      if (qm.data) setMemories(qm.data);
+      setLoading(false);
+    }
+
+    // Phase 2: full page
+    const [evRes, memRes, grRes] = await Promise.all([
+      supabase.from('calendar_events').select('*')
+        .eq('partnership_id', pid).order('event_date', { ascending: false }).limit(PAGE_SIZE),
+      supabase.from('memories').select('*,images:memory_images(image_url)')
+        .eq('partnership_id', pid).order('memory_date', { ascending: false }).limit(PAGE_SIZE),
+      supabase.from('occasion_greetings').select('*')
+        .eq('partnership_id', pid).eq('sender_id', userId).order('target_date', { ascending: false }),
+    ]);
+
+    const newEvents   = evRes.data  ?? events;
+    const newMemories = memRes.data ?? memories;
+    const newGreetings= grRes.data  ?? greetings;
+    const more = (memRes.data?.length ?? 0) >= PAGE_SIZE;
+
+    setEvents(newEvents);
+    setMemories(newMemories);
+    setGreetings(newGreetings);
+    setHasMore(more);
+    setLoading(false);
+
+    writeCache(pid, { events: newEvents, memories: newMemories, greetings: newGreetings, hasMore: more });
+  }
+
+  // Incremental load-more: only fetches the NEXT page, appends to existing
+  const loadMore = useCallback(async () => {
+    if (!partnershipId || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+
+    const offset = memories.length;
+    const { data } = await supabase
+      .from('memories')
+      .select('*,images:memory_images(image_url)')
+      .eq('partnership_id', partnershipId)
+      .order('memory_date', { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
+
+    if (data) {
+      const merged = [...memories, ...data];
+      const more = data.length === PAGE_SIZE;
+      setMemories(merged);
+      setHasMore(more);
+      writeCache(partnershipId, {
+        events, memories: merged, greetings, hasMore: more,
+      });
+    }
+    setLoadingMore(false);
+  }, [partnershipId, memories, events, greetings, loadingMore, hasMore]);
+
+  // Intersection Observer
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasMore || loading) return;
+    const obs = new IntersectionObserver(
+      entries => { if (entries[0].isIntersecting) loadMore(); },
+      { threshold: 0.1 },
+    );
+    obs.observe(loadMoreRef.current);
+    return () => obs.disconnect();
+  }, [loadMore, hasMore, loading]);
+
+  // Scroll selected date into view
+  useEffect(() => {
+    activeDateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }, [selectedDate]);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const getRelativeTime = useCallback((date: Date) => {
+    const diff = Math.ceil(Math.abs(new Date().getTime() - date.getTime()) / 86400000);
+    const past = date < new Date();
+    if (diff === 0) return 'اليوم';
+    if (diff === 1) return past ? 'أمس' : 'غداً';
+    return past ? `منذ ${diff} يوم` : `بعد ${diff} يوم`;
+  }, []);
+
+  const openGallery = useCallback((images: { image_url: string }[], start = 0) => {
+    setGalleryImages(images.map(i => i.image_url));
+    setGalleryIndex(start);
     setShowGallery(true);
   }, []);
 
-  // Navigate gallery
-  const nextImage = useCallback(() => {
-    setGalleryIndex(prev => (prev + 1) % galleryImages.length);
-  }, [galleryImages.length]);
+  const nextImage = useCallback(() => setGalleryIndex(p => (p + 1) % galleryImages.length), [galleryImages.length]);
+  const prevImage = useCallback(() => setGalleryIndex(p => (p - 1 + galleryImages.length) % galleryImages.length), [galleryImages.length]);
 
-  const prevImage = useCallback(() => {
-    setGalleryIndex(prev => (prev - 1 + galleryImages.length) % galleryImages.length);
-  }, [galleryImages.length]);
+  const deleteItem = useCallback(async (id: string, type: 'event' | 'memory' | 'greeting') => {
+    if (type === 'greeting' && !window.confirm('هل أنت متأكد من حذف هذه المعايدة؟')) return;
+    const table = type === 'event' ? 'calendar_events' : type === 'memory' ? 'memories' : 'occasion_greetings';
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (!error) {
+      if (partnershipId) invalidateCache(partnershipId);
+      if (type === 'event')    setEvents(p => p.filter(x => x.id !== id));
+      else if (type === 'memory')   setMemories(p => p.filter(x => x.id !== id));
+      else setGreetings(p => p.filter(x => x.id !== id));
+    }
+  }, [partnershipId]);
 
-  // Intersection Observer for lazy loading more memories - only after initial load
-  useEffect(() => {
-    if (!loadMoreRef.current || !hasMore || !initialLoadDone) return;
+  // ── Computed ───────────────────────────────────────────────────────────────
+  const timelineItems = useMemo(() => [
+    ...events.map(e => ({ ...e, type: 'event'  as const, date: new Date(e.event_date)  })),
+    ...memories.map(m => ({ ...m, type: 'memory' as const, date: new Date(m.memory_date) })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime()), [events, memories]);
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !loading && !loadingMore && hasMore) {
-          setLoadingMore(true);
-          setLimit(prev => prev + 6);
-        }
-      },
-      { threshold: 0.1 }
+  const filteredItems = useMemo(() => {
+    if (viewMode === 'timeline') return timelineItems;
+    return timelineItems.filter(item =>
+      item.date.toDateString() === selectedDate.toDateString()
     );
+  }, [timelineItems, selectedDate, viewMode]);
 
-    observer.observe(loadMoreRef.current);
-    return () => observer.disconnect();
-  }, [loading, hasMore, initialLoadDone, loadingMore]);
+  const stripDays = useMemo(() => {
+    const year = stripMonth.getFullYear();
+    const month = stripMonth.getMonth();
+    const total = new Date(year, month + 1, 0).getDate();
+    return Array.from({ length: total }, (_, i) => new Date(year, month, i + 1));
+  }, [stripMonth]);
 
-  useEffect(() => {
-    if (activeDateRef.current) {
-      activeDateRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
-  }, [selectedDate, viewMode]);
-
-  const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
-
-  useEffect(() => {
-    if (partnershipId) {
-      loadTimelineData();
-    }
-  }, [partnershipId, limit]);
-
-  const loadTimelineData = async () => {
-    if (!partnershipId) return;
-
-    // Phase 1: ULTRA-QUICK Load (Latest items only, very few columns)
-    const [quickEvents, quickMemories] = await Promise.all([
-      supabase.from('calendar_events').select('id, title, event_date, event_time, location, event_type').eq('partnership_id', partnershipId).order('event_date', { ascending: false }).limit(3),
-      supabase.from('memories').select('id, title, memory_date, description, images:memory_images(image_url)').eq('partnership_id', partnershipId).order('memory_date', { ascending: false }).limit(3)
-    ]);
-
-    if (quickEvents.data) setEvents(quickEvents.data);
-    if (quickMemories.data) setMemories(quickMemories.data);
-    setLoading(false);
-
-    // Phase 2: FULL Initial Load (up to limit)
-    const [eventsResult, memoriesResult, greetingsResult] = await Promise.all([
-      supabase.from('calendar_events').select('*').eq('partnership_id', partnershipId).order('event_date', { ascending: false }).limit(limit),
-      supabase.from('memories').select('*, images:memory_images(image_url)').eq('partnership_id', partnershipId).order('memory_date', { ascending: false }).limit(limit),
-      supabase.from('occasion_greetings').select('*').eq('partnership_id', partnershipId).eq('sender_id', userId).order('target_date', { ascending: false })
-    ]);
-
-    if (eventsResult.data) setEvents(eventsResult.data);
-    if (greetingsResult.data) setGreetings(greetingsResult.data);
-    if (memoriesResult.data) {
-      setMemories(memoriesResult.data);
-      setHasMore(memoriesResult.data.length >= limit);
-    }
-
-    setLoadingMore(false);
-    setInitialLoadDone(true);
-  };
-
-  const fetchEvents = async () => {
-    const { data } = await supabase.from('calendar_events').select('*').eq('partnership_id', partnershipId).order('event_date', { ascending: false }).limit(limit);
-    if (data) setEvents(data);
-  };
-
-  const fetchMemories = async () => {
-    const { data } = await supabase.from('memories').select('*, images:memory_images(image_url)').eq('partnership_id', partnershipId).order('memory_date', { ascending: false }).limit(limit);
-    if (data) setMemories(data);
-  };
-
-  const fetchGreetings = async () => {
-    const { data } = await supabase.from('occasion_greetings').select('*').eq('partnership_id', partnershipId).eq('sender_id', userId).order('target_date', { ascending: false });
-    if (data) setGreetings(data);
-  };
-
+  // ── Form handlers ──────────────────────────────────────────────────────────
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!partnershipId) return;
     setIsSubmitting(true);
     const { error } = await supabase.from('calendar_events').insert({
-      partnership_id: partnershipId,
-      created_by_user_id: userId,
-      ...eventForm
+      partnership_id: partnershipId, created_by_user_id: userId, ...eventForm,
     });
-
     if (!error) {
       setShowAddRealEventForm(false);
-      fetchEvents();
       setEventForm({ title: '', event_date: '', event_time: '', location: '', event_type: 'other' });
+      if (partnershipId) invalidateCache(partnershipId);
+      doFullLoad(partnershipId, true);
+      toast.success('تم تثبيت الوعد في السجل ✨');
     }
     setIsSubmitting(false);
   };
@@ -346,249 +439,213 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
     e.preventDefault();
     if (!partnershipId || isSubmitting) return;
     setIsSubmitting(true);
-
     try {
-      const { data: memory, error: mError } = await supabase.from('memories').insert({ partnership_id: partnershipId, created_by_user_id: userId, ...memoryForm }).select().single();
+      const { data: memory, error: mError } = await supabase
+        .from('memories').insert({ partnership_id: partnershipId, created_by_user_id: userId, ...memoryForm })
+        .select().single();
 
       if (!mError && memory && selectedImages.length > 0) {
-        const uploadedUrls = [];
-        // Dynamically import to avoid top-level failures
         const { compressImage } = await import('../../utils/imageOptimizer');
-
+        const uploadedUrls: { memory_id: string; image_url: string }[] = [];
         for (const img of selectedImages) {
-          // Compress image before upload (max 1200px width, 70% quality)
-          let fileToUpload = img.file;
-          try {
-            fileToUpload = await compressImage(img.file, { maxWidth: 1200, quality: 0.7 });
-          } catch (err) {
-            console.warn("Image compression failed, uploading original.", err);
-          }
-
-          const fileExt = 'jpg';
-          const fileName = `${Math.random()}.${fileExt}`;
-          const filePath = `${partnershipId}/${memory.id}/${fileName}`;
-
-          const { error: uploadError } = await supabase.storage.from('memories').upload(filePath, fileToUpload);
-
-          if (!uploadError) {
-            const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(filePath);
+          let file = img.file;
+          try { file = await compressImage(img.file, { maxWidth: 1200, quality: 0.7 }); } catch {}
+          const path = `${partnershipId}/${memory.id}/${Math.random()}.jpg`;
+          const { error: upErr } = await supabase.storage.from('memories').upload(path, file);
+          if (!upErr) {
+            const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(path);
             uploadedUrls.push({ memory_id: memory.id, image_url: publicUrl });
           }
         }
         if (uploadedUrls.length > 0) await supabase.from('memory_images').insert(uploadedUrls);
       }
-
       if (!mError) {
         setShowAddMemoryForm(false);
-        fetchMemories();
         setMemoryForm({ title: '', memory_date: new Date().toISOString().split('T')[0], description: '' });
         setSelectedImages([]);
+        if (partnershipId) invalidateCache(partnershipId);
+        doFullLoad(partnershipId, true);
+        toast.success('تم حفظ الذكرى في خزانة العمر 💖');
       }
-    } finally {
-      setIsSubmitting(false);
-    }
+    } finally { setIsSubmitting(false); }
   };
 
   const handleCreateGreeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!partnershipId || isSubmitting) return;
     setIsSubmitting(true);
-    
-    // Convert date string to ISO date with time for accurate countdown target
     const targetDateObj = new Date(greetingForm.target_date);
     targetDateObj.setHours(0, 0, 0, 0);
-
     const payload = {
-      partnership_id: partnershipId,
-      sender_id: userId,
-      title: greetingForm.title,
-      target_date: targetDateObj.toISOString(),
-      message: greetingForm.message,
-      is_opened: false
+      partnership_id: partnershipId, sender_id: userId,
+      title: greetingForm.title, target_date: targetDateObj.toISOString(),
+      message: greetingForm.message, is_opened: false,
     };
-
     let error;
     if (editingGreetingId) {
-      const res = await supabase.from('occasion_greetings').update(payload).eq('id', editingGreetingId);
-      error = res.error;
+      ({ error } = await supabase.from('occasion_greetings').update(payload).eq('id', editingGreetingId));
     } else {
-      const res = await supabase.from('occasion_greetings').insert(payload);
-      error = res.error;
+      ({ error } = await supabase.from('occasion_greetings').insert(payload));
     }
-
     if (!error) {
       setShowAddGreetingForm(false);
       setEditingGreetingId(null);
-      fetchGreetings();
       setGreetingForm({ title: '', target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], message: '' });
-      // Notify success
-      alert(editingGreetingId ? "تم التعديل بنجاح!" : "تم إيداع المعايدة بنجاح.. ستظهر لشريكك قبل موعدها بيومين! 💌");
+      if (partnershipId) invalidateCache(partnershipId);
+      doFullLoad(partnershipId, true);
+      toast.success(editingGreetingId ? 'تم تعديل المعايدة ✏️' : 'تم إيداع المعايدة بنجاح 💌 ستظهر لشريكك قبل موعدها بيومين!');
     } else {
-      alert("تأكد أنك قمت بإنشاء جدول المعايدات في Supabase!");
+      toast.error('تأكد أنك قمت بإنشاء جدول المعايدات في Supabase!');
     }
     setIsSubmitting(false);
   };
 
-  const deleteItem = async (id: string, type: 'event' | 'memory' | 'greeting') => {
-    // Cannot rely on user alert for native functionality in a custom dashboard but okay for simple use cases
-    if (type === 'greeting' && !window.confirm('هل أنت متأكد من حذف هذه المعايدة؟')) return;
-
-    const table = type === 'event' ? 'calendar_events' : type === 'memory' ? 'memories' : 'occasion_greetings';
-    const { error } = await supabase.from(table).delete().eq('id', id);
-    if (!error) {
-      if (type === 'event') fetchEvents();
-      else if (type === 'memory') fetchMemories();
-      else fetchGreetings();
-    }
+  // ── Image picker helper ────────────────────────────────────────────────────
+  const pickImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    Array.from(e.target.files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => setSelectedImages(p => [...p, { file, preview: ev.target?.result as string }]);
+      reader.readAsDataURL(file);
+    });
   };
 
-  const timelineItems = useMemo(() => {
-    const combined = [
-      ...events.map(e => ({ ...e, type: 'event' as const, date: new Date(e.event_date) })),
-      ...memories.map(m => ({ ...m, type: 'memory' as const, date: new Date(m.memory_date) }))
-    ].sort((a, b) => b.date.getTime() - a.date.getTime());
-    return combined;
-  }, [events, memories]);
-
-  const filteredItems = useMemo(() => {
-    if (viewMode === 'timeline') return timelineItems;
-    return timelineItems.filter(item =>
-      item.date.getDate() === selectedDate.getDate() &&
-      item.date.getMonth() === selectedDate.getMonth() &&
-      item.date.getFullYear() === selectedDate.getFullYear()
-    );
-  }, [timelineItems, selectedDate, viewMode]);
-
-  const getRelativeTime = (date: Date) => {
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const isPast = date.getTime() < now.getTime();
-    if (diffDays === 0) return 'اليوم';
-    if (diffDays === 1) return isPast ? 'أمس' : 'غداً';
-    return isPast ? `منذ ${diffDays} يوم` : `بعد ${diffDays} يوم`;
-  };
-
-  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-  const currentMonthDays = useMemo(() => {
-    const days = [];
-    const year = selectedDate.getFullYear();
-    const month = selectedDate.getMonth();
-    const totalDays = getDaysInMonth(year, month);
-    for (let i = 1; i <= totalDays; i++) days.push(new Date(year, month, i));
-    return days;
-  }, [selectedDate]);
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 bg-background flex flex-col relative h-full mood-love">
-      {/* Memories Atmospheric Aura */}
-      <div className="fixed inset-0 pointer-events-none -z-10">
-        <div className="absolute top-[-10%] left-[-10%] w-[100%] h-[70%] bg-rose-500/10 blur-[150px] rounded-full opacity-60" />
+    <div dir="rtl" className="flex-1 bg-[#fff8f8] dark:bg-[#0b0407] flex flex-col relative h-full">
+
+      {/* Ambient */}
+      <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+        <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.12, 0.2, 0.12] }} transition={{ duration: 12, repeat: Infinity }}
+          className="absolute -top-1/4 -right-1/4 w-[90%] h-[80%] bg-rose-500/20 dark:bg-rose-600/12 rounded-full blur-[140px]" />
+        <div className="absolute bottom-0 left-0 w-[60%] h-[50%] bg-pink-500/8 dark:bg-pink-500/5 rounded-full blur-[120px]" />
       </div>
 
-      <header className="px-8 pt-10 pb-6 sticky top-0 bg-background/40 backdrop-blur-3xl z-30">
-        <div className="flex items-center justify-between mb-8">
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => onNavigate('home')}
-            className="w-12 h-12 flex items-center justify-center glass rounded-2xl border-white/60 shadow-xl text-foreground/40"
-          >
-            <ArrowLeft className="w-5 h-5" />
+      {/* ─── Header ─── */}
+      <header className="px-6 pt-10 pb-4 sticky top-0 bg-[#fff8f8]/75 dark:bg-[#0b0407]/75 backdrop-blur-2xl z-30 border-b border-rose-900/5 dark:border-white/5">
+
+        {/* Top row */}
+        <div className="flex items-center justify-between mb-5">
+          <motion.button whileTap={{ scale: 0.88 }} onClick={() => onNavigate('home')}
+            className="w-11 h-11 flex items-center justify-center bg-black/5 dark:bg-white/7 rounded-[1.1rem] border border-black/5 dark:border-white/8">
+            <ArrowLeft className="w-5 h-5 text-foreground/50" />
           </motion.button>
+
           <div className="text-center">
-            <h1 className="text-xl font-black text-foreground tracking-tighter">سجل المسافات</h1>
-            <p className="text-[9px] font-black text-rose-600/40 uppercase tracking-[0.4em]">أثر الخطوات.. ومرفأ الذكريات</p>
+            <h1 className="text-xl font-black text-foreground tracking-tight">سجل المسافات</h1>
+            <p className="text-[9px] font-black text-rose-500/50 uppercase tracking-[0.35em] mt-0.5">أثر الخطوات ومرفأ الذكريات</p>
           </div>
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setShowAddEventForm(true)}
-            className="w-12 h-12 bg-rose-500 text-white rounded-2xl flex items-center justify-center shadow-2xl shadow-rose-500/20"
-          >
-            <Plus className="w-6 h-6" />
+
+          <motion.button whileTap={{ scale: 0.88 }} onClick={() => setShowAddEventForm(true)}
+            className="w-11 h-11 bg-gradient-to-br from-rose-500 to-rose-600 text-white rounded-[1.1rem] flex items-center justify-center shadow-lg shadow-rose-500/30">
+            <Plus className="w-5 h-5" />
           </motion.button>
         </div>
 
-        <div className="flex items-center gap-3 overflow-x-auto pb-4 scrollbar-hide px-2">
-          {currentMonthDays.map((day, i) => {
-            const isSelected = day.getDate() === selectedDate.getDate() && day.getMonth() === selectedDate.getMonth();
-            const dayEvents = timelineItems.filter(item =>
-              item.date.getDate() === day.getDate() &&
-              item.date.getMonth() === day.getMonth() &&
-              item.date.getFullYear() === day.getFullYear()
-            );
+        {/* Month nav + strip */}
+        <div className="space-y-3">
+          {/* Month navigation */}
+          <div className="flex items-center justify-between px-1">
+            <motion.button whileTap={{ scale: 0.9 }}
+              onClick={() => setStripMonth(d => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-black/5 dark:bg-white/7 text-foreground/50">
+              <ChevronLeft className="w-4 h-4" />
+            </motion.button>
+            <button
+              onClick={() => { setStripMonth(new Date(new Date().getFullYear(), new Date().getMonth(), 1)); setSelectedDate(new Date()); }}
+              className="text-[11px] font-black text-foreground/60 uppercase tracking-[0.25em] hover:text-rose-500 transition-colors"
+            >
+              {MONTH_NAMES[stripMonth.getMonth()]} {stripMonth.getFullYear()}
+            </button>
+            <motion.button whileTap={{ scale: 0.9 }}
+              onClick={() => setStripMonth(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-black/5 dark:bg-white/7 text-foreground/50">
+              <ChevronRight className="w-4 h-4" />
+            </motion.button>
+          </div>
 
-            return (
-              <motion.button
-                key={i}
-                ref={isSelected ? activeDateRef as any : null}
-                onClick={() => {
-                  setSelectedDate(day);
-                  setViewMode('grid');
-                }}
-                whileTap={{ scale: 0.95 }}
-                className={`flex flex-col items-center min-w-[50px] py-3 rounded-2xl transition-all border ${isSelected ? 'bg-rose-500 border-rose-500 shadow-xl shadow-rose-500/20 text-white' : 'glass border-white/20 text-muted-foreground'
+          {/* Day strip */}
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {stripDays.map((day, i) => {
+              const isSelected = day.toDateString() === selectedDate.toDateString();
+              const isToday    = day.toDateString() === new Date().toDateString();
+              const dots = timelineItems.filter(it => it.date.toDateString() === day.toDateString());
+              return (
+                <motion.button
+                  key={i}
+                  ref={isSelected ? activeDateRef as any : null}
+                  whileTap={{ scale: 0.92 }}
+                  onClick={() => { setSelectedDate(day); setViewMode('grid'); }}
+                  className={`flex flex-col items-center min-w-[46px] py-2.5 px-2 rounded-2xl transition-all flex-shrink-0 ${
+                    isSelected
+                      ? 'bg-gradient-to-b from-rose-500 to-rose-600 shadow-lg shadow-rose-500/25 text-white'
+                      : 'bg-white/60 dark:bg-white/4 border border-black/5 dark:border-white/7 text-muted-foreground'
                   }`}
-              >
-                <span className="text-[8px] font-black uppercase opacity-60 mb-1">{monthNames[day.getMonth()]}</span>
-                <span className="text-base font-black">{day.getDate()}</span>
-                <div className="mt-2 flex gap-1">
-                  {dayEvents.slice(0, 3).map((_, idx) => (
-                    <div key={idx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-rose-500'}`} />
-                  ))}
-                </div>
-              </motion.button>
-            );
-          })}
-        </div>
+                >
+                  <span className={`text-[8px] font-black uppercase tracking-widest mb-1 ${isSelected ? 'text-white/70' : 'text-muted-foreground/40'}`}>
+                    {DAY_ABBR[day.getDay()]}
+                  </span>
+                  <span className={`text-base font-black leading-none ${isToday && !isSelected ? 'text-rose-500' : ''}`}>
+                    {day.getDate()}
+                  </span>
+                  <div className="mt-1.5 flex gap-0.5 h-1">
+                    {dots.slice(0, 3).map((_, di) => (
+                      <div key={di} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/70' : 'bg-rose-500/50'}`} />
+                    ))}
+                  </div>
+                </motion.button>
+              );
+            })}
+          </div>
 
-        <div className="flex items-center justify-between px-2 mt-2">
-          <button
-            onClick={() => setViewMode(viewMode === 'timeline' ? 'grid' : 'timeline')}
-            className="flex items-center gap-2 text-[10px] font-black text-rose-500 glass border-rose-500/20 px-5 py-3 rounded-2xl transition-all hover:bg-rose-500 hover:text-white"
-          >
-            {viewMode === 'timeline' ? <LayoutGrid className="w-3.5 h-3.5" /> : <History className="w-3.5 h-3.5" />}
-            {viewMode === 'timeline' ? 'استعراض باليوم' : 'الوثيقة الكاملة'}
-          </button>
-          <div className="text-[10px] font-black text-rose-600/30 tracking-[0.2em] uppercase">
-            {viewMode === 'timeline' ? 'كرونولوجيا المودة' : `${monthNames[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`}
+          {/* View toggle */}
+          <div className="flex items-center justify-between px-1">
+            <motion.button whileTap={{ scale: 0.95 }}
+              onClick={() => setViewMode(v => v === 'timeline' ? 'grid' : 'timeline')}
+              className="flex items-center gap-2 text-[10px] font-black text-rose-500 bg-rose-500/8 border border-rose-500/15 px-4 py-2 rounded-[0.9rem] hover:bg-rose-500/15 transition-colors">
+              {viewMode === 'timeline' ? <LayoutGrid className="w-3.5 h-3.5" /> : <History className="w-3.5 h-3.5" />}
+              {viewMode === 'timeline' ? 'استعراض اليوم' : 'الوثيقة الكاملة'}
+            </motion.button>
+            <span className="text-[9px] font-black text-rose-600/30 tracking-[0.2em] uppercase">
+              {viewMode === 'timeline' ? 'كرونولوجيا المودة' : `${MONTH_NAMES[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`}
+            </span>
           </div>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-8 py-8 pb-40 scrollbar-hide">
-      
-        {/* Greetings Dashboard */}
+      {/* ─── Content ─── */}
+      <div className="flex-1 overflow-y-auto px-5 py-6 pb-40 scrollbar-hide">
+
+        {/* Greetings section */}
         {greetings.length > 0 && (
-          <div className="mb-12">
-            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground mb-4 flex items-center gap-2">
+          <div className="mb-10">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/50 mb-3 flex items-center gap-2 px-1">
               <Gift className="w-3.5 h-3.5 text-amber-500" /> معايداتك المخبأة
             </h3>
-            <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-              {greetings.map(greeting => (
-                <div key={greeting.id} className="min-w-[200px] glass rounded-[2rem] p-5 border-white/20 relative group shrink-0">
+            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+              {greetings.map(g => (
+                <div key={g.id} className="min-w-[185px] bg-white dark:bg-white/[0.03] border border-amber-500/15 rounded-[2rem] p-5 relative group shrink-0 shadow-md">
                   <div className="flex justify-between items-start mb-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${greeting.is_opened ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                      {greeting.is_opened ? <MailOpen className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
+                    <div className={`w-10 h-10 rounded-[0.9rem] flex items-center justify-center ${g.is_opened ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                      {g.is_opened ? <MailOpen className="w-5 h-5" /> : <Mail className="w-5 h-5" />}
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => {
-                        setEditingGreetingId(greeting.id);
-                        setGreetingForm({
-                          title: greeting.title,
-                          target_date: new Date(greeting.target_date).toISOString().split('T')[0],
-                          message: greeting.message
-                        });
-                        setShowAddGreetingForm(true);
-                      }} className="w-8 h-8 flex items-center justify-center glass border-white/10 text-muted-foreground rounded-lg hover:bg-white/10 hover:text-white active:scale-95"><Edit2 className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => deleteItem(greeting.id, 'greeting')} className="w-8 h-8 flex items-center justify-center glass border-white/10 text-rose-500 rounded-lg hover:bg-rose-500/10 active:scale-95"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => { setEditingGreetingId(g.id); setGreetingForm({ title: g.title, target_date: new Date(g.target_date).toISOString().split('T')[0], message: g.message }); setShowAddGreetingForm(true); }}
+                        className="w-8 h-8 flex items-center justify-center bg-black/5 dark:bg-white/5 text-muted-foreground rounded-lg">
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => deleteItem(g.id, 'greeting')}
+                        className="w-8 h-8 flex items-center justify-center bg-rose-500/8 text-rose-500 rounded-lg">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-                  <h4 className="font-black text-sm text-foreground mb-1">{greeting.title}</h4>
-                  <div className="flex items-center justify-between mt-4">
-                    <span className="text-[9px] font-black uppercase text-muted-foreground/60">{new Date(greeting.target_date).toLocaleDateString('ar-EG')}</span>
-                    <span className={`text-[9px] font-black uppercase px-3 py-1.5 rounded-lg ${greeting.is_opened ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'}`}>
-                      {greeting.is_opened ? 'تم الفتح ورؤيتها' : 'قيد الانتظار'}
+                  <h4 className="font-black text-sm text-foreground mb-3 leading-tight">{g.title}</h4>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[8px] font-black uppercase px-2.5 py-1 rounded-lg ${g.is_opened ? 'bg-emerald-500/12 text-emerald-500' : 'bg-amber-500/12 text-amber-500'}`}>
+                      {g.is_opened ? 'تم الفتح' : 'قيد الانتظار'}
                     </span>
+                    <span className="text-[8px] font-bold text-muted-foreground/40">{new Date(g.target_date).toLocaleDateString('ar-EG')}</span>
                   </div>
                 </div>
               ))}
@@ -596,278 +653,258 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
           </div>
         )}
 
+        {/* Timeline line */}
         <div className="relative">
           {viewMode === 'timeline' && timelineItems.length > 0 && (
-            <div className="absolute right-7 top-0 bottom-0 w-[1px] bg-gradient-to-b from-primary/40 via-primary/10 to-transparent rounded-full" />
+            <div className="absolute right-[1.15rem] top-0 bottom-0 w-px bg-gradient-to-b from-rose-500/30 via-rose-500/10 to-transparent" />
           )}
 
-          <div className="space-y-16">
-            {filteredItems.length === 0 && !loading && (
-              <div className="flex flex-col items-center justify-center py-28 text-center space-y-8 opacity-20">
-                <Compass className="w-20 h-20" />
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-black text-foreground">بقعة بيضاء في السجل</h3>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] max-w-[240px] leading-relaxed">لم يخط قلم المودة أثراً في هذه المحطة بعد.. ربما حان وقت المبادرة؟</p>
-                </div>
-              </div>
+          <div className="space-y-10">
+
+            {/* Skeleton */}
+            {loading && (
+              <>
+                <SkeletonMemory />
+                <SkeletonEvent />
+                <SkeletonMemory />
+              </>
             )}
 
-            {filteredItems.map((item, idx) => {
-              if (item.type === 'memory') {
-                return (
-                  <MemoryItem
-                    key={item.id}
-                    item={item}
-                    idx={idx}
-                    viewMode={viewMode}
-                    onDelete={deleteItem}
-                    onOpenGallery={openGallery}
-                    getRelativeTime={getRelativeTime}
-                    monthNames={monthNames}
-                  />
-                );
-              }
-              return (
-                <EventItem
-                  key={item.id}
-                  item={item}
-                  idx={idx}
-                  viewMode={viewMode}
-                  onDelete={deleteItem}
-                  getRelativeTime={getRelativeTime}
-                  monthNames={monthNames}
-                />
-              );
-            })}
+            {/* Empty state */}
+            {!loading && filteredItems.length === 0 && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center py-28 text-center">
+                <div className="w-20 h-20 rounded-3xl bg-rose-500/8 flex items-center justify-center mb-5">
+                  <Compass className="w-10 h-10 text-rose-400/30" />
+                </div>
+                <h3 className="text-xl font-black text-foreground/20 mb-2">بقعة بيضاء في السجل</h3>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/20 max-w-[220px] leading-relaxed">
+                  لم يخط قلم المودة أثراً هنا بعد
+                </p>
+              </motion.div>
+            )}
 
-            {/* Infinite scroll trigger - only shows after initial data is loaded */}
-            {hasMore && initialLoadDone && (
-              <div ref={loadMoreRef} className="flex justify-center pt-8 pb-12">
+            {/* Items */}
+            {!loading && filteredItems.map((item, idx) =>
+              item.type === 'memory'
+                ? <MemoryItem key={item.id} item={item} idx={idx} viewMode={viewMode} onDelete={deleteItem} onOpenGallery={openGallery} getRelativeTime={getRelativeTime} />
+                : <EventItem  key={item.id} item={item} idx={idx} viewMode={viewMode} onDelete={deleteItem} getRelativeTime={getRelativeTime} />
+            )}
+
+            {/* Infinite scroll trigger */}
+            {!loading && hasMore && (
+              <div ref={loadMoreRef} className="flex justify-center py-6">
                 {loadingMore && (
-                  <div className="flex items-center gap-3 text-muted-foreground/40">
-                    <div className="w-5 h-5 border-2 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">جاري تحميل المزيد...</span>
+                  <div className="flex items-center gap-3 text-muted-foreground/35">
+                    <div className="w-4 h-4 border-2 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
+                    <span className="text-[9px] font-black uppercase tracking-widest">جاري التحميل...</span>
                   </div>
                 )}
               </div>
             )}
 
-            {!hasMore && timelineItems.length > 0 && (
-              <div className="flex justify-center pt-8 pb-12">
-                <span className="text-[10px] font-black text-muted-foreground/20 uppercase tracking-widest">تم تحميل جميع الذكريات ✨</span>
+            {!loading && !hasMore && timelineItems.length > 0 && (
+              <div className="flex justify-center py-6">
+                <span className="text-[9px] font-black text-muted-foreground/20 uppercase tracking-widest">كل الذكريات محملة ✨</span>
               </div>
             )}
           </div>
         </div>
       </div>
 
+      {/* ─── Modals ─── */}
       <AnimatePresence>
+
+        {/* Picker: what to add */}
         {showAddEventForm && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-8">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => setShowAddEventForm(false)} />
-            <motion.div initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 30 }} className="relative w-full max-w-sm glass rounded-[3.5rem] p-12 shadow-2xl z-10 border-white/30">
-              <h2 className="text-2xl font-black mb-10 text-center text-foreground tracking-tighter">تدوين أثر جديد</h2>
-              <div className="space-y-8">
-                <button onClick={() => { setShowAddEventForm(false); setShowAddMemoryForm(true); }} className="w-full p-10 glass border-white/20 rounded-[3rem] flex items-center gap-7 transition-all hover:border-rose-500/30 group">
-                  <div className="w-16 h-16 rounded-[1.8rem] bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform"><Camera className="w-8 h-8" /></div>
-                  <div className="text-right">
-                    <h4 className="font-black text-xl text-foreground mb-1">مشهد للذكرى</h4>
-                    <p className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-widest leading-relaxed">توثيق بصري للحظة عابرة</p>
-                  </div>
-                </button>
-                <button onClick={() => { setShowAddEventForm(false); setShowAddRealEventForm(true); }} className="w-full p-10 glass border-white/20 rounded-[3rem] flex items-center gap-7 transition-all hover:border-primary/30 group">
-                  <div className="w-16 h-16 rounded-[1.8rem] bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform"><Target className="w-8 h-8" /></div>
-                  <div className="text-right">
-                    <h4 className="font-black text-xl text-foreground mb-1">وعد قادم</h4>
-                    <p className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-widest leading-relaxed">تخطيط لمسافة لم نقطعها بعد</p>
-                  </div>
-                </button>
-                <button onClick={() => { 
-                  setEditingGreetingId(null);
-                  setGreetingForm({ title: '', target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], message: '' });
-                  setShowAddEventForm(false); 
-                  setShowAddGreetingForm(true); 
-                }} className="w-full p-10 glass border-amber-500/20 rounded-[3rem] flex items-center gap-7 transition-all hover:border-amber-500/50 group bg-amber-500/5">
-                  <div className="w-16 h-16 rounded-[1.8rem] bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform"><Gift className="w-8 h-8" /></div>
-                  <div className="text-right">
-                    <h4 className="font-black text-xl text-foreground mb-1">معايدة سرية 💌</h4>
-                    <p className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest leading-relaxed">رسالة ستظهر قبل المناسبة القادمة بـ 48 ساعة</p>
-                  </div>
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-
-        {showAddGreetingForm && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-8">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => { setShowAddGreetingForm(false); setEditingGreetingId(null); }} />
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="relative w-full max-w-sm glass rounded-[3.5rem] p-12 border-amber-500/30">
-              <h2 className="text-3xl font-black mb-10 text-foreground tracking-tighter">{editingGreetingId ? 'تعديل المعايدة ✏️' : 'معايدة مخبأة 💌'}</h2>
-              <form onSubmit={handleCreateGreeting} className="space-y-10">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">المناسبة القادمة</label>
-                  <input required className="w-full h-18 glass rounded-2xl px-6 text-lg font-black border-white/10 text-foreground focus:border-amber-500 transition-all" placeholder="مثلاً: يوم ميلادها، عيد الفطر..." value={greetingForm.title} onChange={e => setGreetingForm({ ...greetingForm, title: e.target.value })} />
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">تاريخ المناسبة</label>
-                  <input type="date" required className="w-full h-16 glass rounded-2xl px-5 text-sm font-black border-white/10 text-foreground font-sans focus:border-amber-500 transition-all" value={greetingForm.target_date} onChange={e => setGreetingForm({ ...greetingForm, target_date: e.target.value })} />
-                  <p className="text-[8px] text-muted-foreground/40 text-center px-4 font-black">المظروف التفاعلي سيظهر على الشاشة الرئيسية قبل الموعد بـ 48 ساعة</p>
-                </div>
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">رسالة العهد</label>
-                  <textarea required className="w-full h-32 glass rounded-3xl p-6 text-sm font-black border-white/10 text-foreground focus:border-amber-500 transition-all resize-none leading-[1.8]" placeholder="اكتب ما بقلبك هنا..." value={greetingForm.message} onChange={e => setGreetingForm({ ...greetingForm, message: e.target.value })} />
-                </div>
-                <Button type="submit" disabled={isSubmitting} className="w-full h-18 rounded-[2rem] text-lg font-black shadow-2xl shadow-amber-500/20 bg-amber-500 text-white">{editingGreetingId ? 'حفظ التعديلات' : 'إخفاء الرسالة للموعد'}</Button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-
-        {showAddRealEventForm && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-8">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => setShowAddRealEventForm(false)} />
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="relative w-full max-w-sm glass rounded-[3.5rem] p-12 border-white/30">
-              <h2 className="text-3xl font-black mb-10 text-foreground tracking-tighter">وعد مشترك</h2>
-              <form onSubmit={handleCreateEvent} className="space-y-10">
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">ماهية الوعد</label>
-                  <input required className="w-full h-18 glass rounded-2xl px-6 text-lg font-black border-white/10 text-foreground focus:border-primary transition-all" placeholder="عنوان يلمس القلب..." value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-3"><label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">اليوم</label><input type="date" required className="w-full h-16 glass rounded-2xl px-5 text-sm font-black border-white/10 text-foreground font-sans focus:border-primary transition-all" value={eventForm.event_date} onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })} /></div>
-                  <div className="space-y-3"><label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">الساعة</label><input type="time" className="w-full h-16 glass rounded-2xl px-5 text-sm font-black border-white/10 text-foreground font-sans focus:border-primary transition-all" value={eventForm.event_time} onChange={e => setEventForm({ ...eventForm, event_time: e.target.value })} /></div>
-                </div>
-                <Button type="submit" disabled={isSubmitting} className="w-full h-18 rounded-[2rem] text-lg font-black shadow-2xl shadow-primary/20 bg-primary">تثبيت في السجل</Button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-
-        {showAddMemoryForm && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-8">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => setShowAddMemoryForm(false)} />
-            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }} className="relative w-full max-w-md glass rounded-[3.5rem] p-12 border-white/30 max-h-[90vh] overflow-y-auto scrollbar-hide">
-              <h2 className="text-3xl font-black mb-10 text-foreground tracking-tighter text-center">تخليد مشهد</h2>
-              <form onSubmit={handleCreateMemory} className="space-y-10">
-                <div className="space-y-4">
-                  <label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">النافذة البصرية (يمكنك اختيار أكثر من صورة)</label>
-
-                  {selectedImages.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-4">
-                      {selectedImages.map((img, idx) => (
-                        <div key={idx} className="aspect-square relative rounded-2xl overflow-hidden border border-white/10 group">
-                          <img src={img.preview} className="w-full h-full object-cover" />
-                          <button type="button" onClick={() => setSelectedImages(prev => prev.filter((_, i) => i !== idx))} className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center backdrop-blur-md opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-4 h-4" /></button>
-                        </div>
-                      ))}
-                      <label className="aspect-square rounded-2xl glass border-dashed border-2 border-white/10 flex items-center justify-center flex-col cursor-pointer hover:border-primary/40 transition-all text-muted-foreground/20 hover:text-primary">
-                        <Plus className="w-8 h-8" />
-                        <input type="file" multiple accept="image/*" className="hidden" onChange={e => {
-                          if (e.target.files) {
-                            Array.from(e.target.files).forEach(file => {
-                              const reader = new FileReader();
-                              reader.onload = (ev) => setSelectedImages(prev => [...prev, { file, preview: ev.target?.result as string }]);
-                              reader.readAsDataURL(file);
-                            });
-                          }
-                        }} />
-                      </label>
+          <div className="fixed inset-0 z-[60] flex items-end justify-center">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddEventForm(false)} />
+            <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 28 }}
+              className="relative w-full max-w-sm bg-white dark:bg-zinc-950 rounded-t-[3rem] p-8 pb-12 shadow-2xl z-10 border-t border-black/5 dark:border-white/8 mx-auto">
+              <div className="w-10 h-1 bg-black/10 dark:bg-white/15 rounded-full mx-auto mb-8" />
+              <h2 className="text-xl font-black mb-6 text-center text-foreground tracking-tighter">تدوين أثر جديد</h2>
+              <div className="space-y-3">
+                {[
+                  { Icon: Camera, bg: 'bg-rose-500/10 text-rose-500', title: 'مشهد للذكرى', sub: 'توثيق بصري للحظة عابرة', action: () => { setShowAddEventForm(false); setShowAddMemoryForm(true); } },
+                  { Icon: Target, bg: 'bg-primary/10 text-primary', title: 'وعد قادم', sub: 'تخطيط لمسافة لم نقطعها بعد', action: () => { setShowAddEventForm(false); setShowAddRealEventForm(true); } },
+                  { Icon: Gift, bg: 'bg-amber-500/10 text-amber-500', title: 'معايدة سرية 💌', sub: 'تظهر لشريكك قبل المناسبة بـ 48 ساعة', action: () => { setEditingGreetingId(null); setGreetingForm({ title: '', target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], message: '' }); setShowAddEventForm(false); setShowAddGreetingForm(true); } },
+                ].map(({ Icon, bg, title, sub, action }) => (
+                  <button key={title} onClick={action}
+                    className="w-full p-5 bg-black/2 dark:bg-white/3 border border-black/5 dark:border-white/7 rounded-[1.8rem] flex items-center gap-5 text-right hover:bg-black/5 dark:hover:bg-white/6 transition-colors group">
+                    <div className={`w-14 h-14 rounded-[1.3rem] ${bg} flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                      <Icon className="w-7 h-7" />
                     </div>
-                  ) : (
-                    <label className="aspect-[2/1] rounded-[2.5rem] glass border-dashed border-2 border-white/10 flex items-center justify-center flex-col cursor-pointer hover:border-primary/40 transition-all text-muted-foreground/20 group hover:bg-muted/5">
-                      <div className="w-16 h-16 rounded-2xl bg-muted/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform"><Upload className="w-6 h-6" /></div>
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em]">اختيار صور للذكرى</span>
-                      <input type="file" multiple accept="image/*" className="hidden" onChange={e => {
-                        if (e.target.files) {
-                          Array.from(e.target.files).forEach(file => {
-                            const reader = new FileReader();
-                            reader.onload = (ev) => setSelectedImages(prev => [...prev, { file, preview: ev.target?.result as string }]);
-                            reader.readAsDataURL(file);
-                          });
-                        }
-                      }} />
-                    </label>
-                  )}
-                </div>
-                <div className="space-y-3"><label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">مسمى اللحظة</label><input required className="w-full h-18 glass rounded-2xl px-6 text-lg font-black border-white/10 text-foreground focus:border-primary transition-all" placeholder="عنوان يختصر الشعور..." value={memoryForm.title} onChange={e => setMemoryForm({ ...memoryForm, title: e.target.value })} /></div>
-                <div className="space-y-3"><label className="text-[10px] font-black mr-2 text-muted-foreground/40 uppercase tracking-[0.2em]">أثر مكتوب</label><textarea className="w-full h-32 glass rounded-[2rem] p-6 text-base font-bold border-white/10 resize-none text-foreground focus:border-primary transition-all leading-relaxed" placeholder="كيف كانت دقات القلب حينها؟" value={memoryForm.description} onChange={e => setMemoryForm({ ...memoryForm, description: e.target.value })} /></div>
-                <Button type="submit" disabled={isSubmitting} className="w-full h-18 rounded-[2.5rem] text-xl font-black shadow-2xl shadow-rose-500/20 bg-rose-500">حفظ في خزانة العمر</Button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-
-        {showGallery && galleryImages.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/98 flex flex-col backdrop-blur-3xl"
-            onClick={() => setShowGallery(false)}
-          >
-            {/* Close button */}
-            <button
-              onClick={() => setShowGallery(false)}
-              className="absolute top-10 right-10 w-16 h-16 bg-black/40 border border-white/10 rounded-2xl flex items-center justify-center text-white z-50 transition-transform active:scale-95 shadow-2xl"
-            >
-              <X className="w-8 h-8" />
-            </button>
-
-            {/* Image counter */}
-            <div className="absolute top-10 left-10 bg-black/40 border border-white/10 px-5 py-3 rounded-2xl text-white text-sm font-black z-50">
-              {galleryIndex + 1} / {galleryImages.length}
-            </div>
-
-            {/* Main image */}
-            <div className="flex-1 flex items-center justify-center p-8" onClick={(e) => e.stopPropagation()}>
-              <motion.img
-                key={galleryIndex}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.2 }}
-                src={galleryImages[galleryIndex]}
-                className="max-w-full max-h-full object-contain rounded-[2rem] shadow-2xl border border-white/5"
-              />
-            </div>
-
-            {/* Navigation arrows */}
-            {galleryImages.length > 1 && (
-              <>
-                <button
-                  onClick={(e) => { e.stopPropagation(); prevImage(); }}
-                  className="absolute left-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-black/50 border border-white/10 rounded-full flex items-center justify-center text-white transition-all hover:bg-white/10 active:scale-95"
-                >
-                  <ChevronLeft className="w-7 h-7" />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); nextImage(); }}
-                  className="absolute right-6 top-1/2 -translate-y-1/2 w-14 h-14 bg-black/50 border border-white/10 rounded-full flex items-center justify-center text-white transition-all hover:bg-white/10 active:scale-95"
-                >
-                  <ChevronRight className="w-7 h-7" />
-                </button>
-              </>
-            )}
-
-            {/* Thumbnail dots / mini previews */}
-            {galleryImages.length > 1 && (
-              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/50 border border-white/10 px-6 py-4 rounded-2xl backdrop-blur-md">
-                {galleryImages.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={(e) => { e.stopPropagation(); setGalleryIndex(idx); }}
-                    className={`transition-all ${idx === galleryIndex ? 'ring-2 ring-primary scale-110' : 'opacity-50 hover:opacity-100'}`}
-                  >
-                    <img
-                      src={img}
-                      className="w-12 h-12 object-cover rounded-lg"
-                    />
+                    <div>
+                      <h4 className="font-black text-base text-foreground mb-0.5">{title}</h4>
+                      <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest">{sub}</p>
+                    </div>
                   </button>
                 ))}
               </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Memory form */}
+        {showAddMemoryForm && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => setShowAddMemoryForm(false)} />
+            <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 20 }}
+              className="relative w-full max-w-md bg-white dark:bg-zinc-950 rounded-[3rem] p-8 shadow-2xl z-10 border border-black/5 dark:border-white/8 max-h-[90vh] overflow-y-auto scrollbar-hide">
+              <h2 className="text-2xl font-black mb-8 text-foreground tracking-tighter text-center">تخليد مشهد</h2>
+              <form onSubmit={handleCreateMemory} className="space-y-6">
+                {/* Image picker */}
+                <div>
+                  <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-3">النافذة البصرية</label>
+                  {selectedImages.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {selectedImages.map((img, i) => (
+                        <div key={i} className="aspect-square relative rounded-2xl overflow-hidden group">
+                          <img src={img.preview} className="w-full h-full object-cover" />
+                          <button type="button" onClick={() => setSelectedImages(p => p.filter((_, j) => j !== i))}
+                            className="absolute top-2 right-2 w-7 h-7 bg-black/60 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <label className="aspect-square rounded-2xl border-2 border-dashed border-black/10 dark:border-white/10 flex items-center justify-center cursor-pointer hover:border-rose-500/40 transition-colors">
+                        <Plus className="w-8 h-8 text-muted-foreground/30" />
+                        <input type="file" multiple accept="image/*" className="hidden" onChange={pickImages} />
+                      </label>
+                    </div>
+                  ) : (
+                    <label className="aspect-[2/1] rounded-[2rem] border-2 border-dashed border-black/10 dark:border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-rose-500/40 transition-colors group bg-black/1 dark:bg-white/1">
+                      <Upload className="w-8 h-8 text-muted-foreground/25 mb-2 group-hover:text-rose-400 transition-colors" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/30">اختيار صور</span>
+                      <input type="file" multiple accept="image/*" className="hidden" onChange={pickImages} />
+                    </label>
+                  )}
+                </div>
+                <div>
+                  <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-2">مسمى اللحظة</label>
+                  <input required className="w-full h-14 bg-black/3 dark:bg-white/4 border border-black/5 dark:border-white/8 rounded-2xl px-5 text-base font-black text-foreground outline-none focus:ring-2 focus:ring-rose-500/25 text-right"
+                    placeholder="عنوان يختصر الشعور..." value={memoryForm.title} onChange={e => setMemoryForm({ ...memoryForm, title: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-2">أثر مكتوب</label>
+                  <textarea className="w-full h-28 bg-black/3 dark:bg-white/4 border border-black/5 dark:border-white/8 rounded-2xl p-5 text-sm font-medium text-foreground resize-none outline-none focus:ring-2 focus:ring-rose-500/25 text-right leading-relaxed"
+                    placeholder="كيف كانت دقات القلب حينها؟" value={memoryForm.description} onChange={e => setMemoryForm({ ...memoryForm, description: e.target.value })} />
+                </div>
+                <Button type="submit" disabled={isSubmitting}
+                  className="w-full h-14 rounded-2xl text-base font-black shadow-lg shadow-rose-500/20 bg-rose-500 text-white">
+                  {isSubmitting ? 'جاري الحفظ...' : 'حفظ في خزانة العمر'}
+                </Button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Event form */}
+        {showAddRealEventForm && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => setShowAddRealEventForm(false)} />
+            <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 20 }}
+              className="relative w-full max-w-sm bg-white dark:bg-zinc-950 rounded-[3rem] p-8 shadow-2xl z-10 border border-black/5 dark:border-white/8">
+              <h2 className="text-2xl font-black mb-8 text-foreground tracking-tighter">وعد مشترك</h2>
+              <form onSubmit={handleCreateEvent} className="space-y-5">
+                <div>
+                  <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-2">ماهية الوعد</label>
+                  <input required className="w-full h-14 bg-black/3 dark:bg-white/4 border border-black/5 dark:border-white/8 rounded-2xl px-5 text-base font-black text-foreground outline-none focus:ring-2 focus:ring-rose-500/25 text-right"
+                    placeholder="عنوان يلمس القلب..." value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-2">اليوم</label>
+                    <input type="date" required className="w-full h-12 bg-black/3 dark:bg-white/4 border border-black/5 dark:border-white/8 rounded-2xl px-4 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-rose-500/25"
+                      value={eventForm.event_date} onChange={e => setEventForm({ ...eventForm, event_date: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-2">الساعة</label>
+                    <input type="time" className="w-full h-12 bg-black/3 dark:bg-white/4 border border-black/5 dark:border-white/8 rounded-2xl px-4 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-rose-500/25"
+                      value={eventForm.event_time} onChange={e => setEventForm({ ...eventForm, event_time: e.target.value })} />
+                  </div>
+                </div>
+                <Button type="submit" disabled={isSubmitting}
+                  className="w-full h-14 rounded-2xl text-base font-black shadow-lg shadow-rose-500/20 bg-rose-500 text-white">
+                  {isSubmitting ? 'جاري الحفظ...' : 'تثبيت في السجل'}
+                </Button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Greeting form */}
+        {showAddGreetingForm && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={() => { setShowAddGreetingForm(false); setEditingGreetingId(null); }} />
+            <motion.div initial={{ scale: 0.92, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.92, y: 20 }}
+              className="relative w-full max-w-sm bg-white dark:bg-zinc-950 rounded-[3rem] p-8 shadow-2xl z-10 border border-amber-500/20 max-h-[90vh] overflow-y-auto scrollbar-hide">
+              <h2 className="text-2xl font-black mb-8 text-foreground tracking-tighter">
+                {editingGreetingId ? 'تعديل المعايدة ✏️' : 'معايدة مخبأة 💌'}
+              </h2>
+              <form onSubmit={handleCreateGreeting} className="space-y-5">
+                <div>
+                  <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-2">المناسبة القادمة</label>
+                  <input required className="w-full h-14 bg-black/3 dark:bg-white/4 border border-black/5 dark:border-white/8 rounded-2xl px-5 text-base font-black text-foreground outline-none focus:ring-2 focus:ring-amber-500/25 text-right"
+                    placeholder="مثلاً: يوم ميلادها، عيد الفطر..." value={greetingForm.title} onChange={e => setGreetingForm({ ...greetingForm, title: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-2">تاريخ المناسبة</label>
+                  <input type="date" required className="w-full h-12 bg-black/3 dark:bg-white/4 border border-black/5 dark:border-white/8 rounded-2xl px-4 text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-amber-500/25"
+                    value={greetingForm.target_date} onChange={e => setGreetingForm({ ...greetingForm, target_date: e.target.value })} />
+                  <p className="text-[8px] text-muted-foreground/30 text-center mt-2 font-bold">يظهر المظروف قبل الموعد بـ 48 ساعة</p>
+                </div>
+                <div>
+                  <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-2">رسالة العهد</label>
+                  <textarea required className="w-full h-28 bg-black/3 dark:bg-white/4 border border-black/5 dark:border-white/8 rounded-2xl p-5 text-sm font-medium text-foreground resize-none outline-none focus:ring-2 focus:ring-amber-500/25 text-right leading-relaxed"
+                    placeholder="اكتب ما بقلبك هنا..." value={greetingForm.message} onChange={e => setGreetingForm({ ...greetingForm, message: e.target.value })} />
+                </div>
+                <Button type="submit" disabled={isSubmitting}
+                  className="w-full h-14 rounded-2xl text-base font-black shadow-lg shadow-amber-500/20 bg-amber-500 text-white">
+                  {isSubmitting ? 'جاري الحفظ...' : (editingGreetingId ? 'حفظ التعديلات' : 'إخفاء الرسالة للموعد')}
+                </Button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Image gallery */}
+        {showGallery && galleryImages.length > 0 && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/97 flex flex-col backdrop-blur-3xl"
+            onClick={() => setShowGallery(false)}>
+            <button onClick={() => setShowGallery(false)}
+              className="absolute top-10 right-6 w-12 h-12 bg-white/10 border border-white/10 rounded-2xl flex items-center justify-center text-white z-50 active:scale-95">
+              <X className="w-6 h-6" />
+            </button>
+            <div className="absolute top-10 left-6 bg-white/10 border border-white/10 px-4 py-2 rounded-2xl text-white text-sm font-black z-50">
+              {galleryIndex + 1} / {galleryImages.length}
+            </div>
+            <div className="flex-1 flex items-center justify-center p-8" onClick={e => e.stopPropagation()}>
+              <motion.img key={galleryIndex} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.2 }}
+                src={galleryImages[galleryIndex]}
+                className="max-w-full max-h-full object-contain rounded-[2rem] shadow-2xl border border-white/5" />
+            </div>
+            {galleryImages.length > 1 && (
+              <>
+                <button onClick={e => { e.stopPropagation(); prevImage(); }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 border border-white/10 rounded-full flex items-center justify-center text-white active:scale-95">
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+                <button onClick={e => { e.stopPropagation(); nextImage(); }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/10 border border-white/10 rounded-full flex items-center justify-center text-white active:scale-95">
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              </>
             )}
           </motion.div>
         )}
+
       </AnimatePresence>
     </div>
   );
