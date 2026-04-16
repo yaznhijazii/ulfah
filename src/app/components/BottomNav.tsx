@@ -17,7 +17,7 @@ export function BottomNav({ currentScreen, onNavigate }: BottomNavProps) {
 
     return (
         <div className="w-full">
-            <nav className="w-full h-[84px] bg-background/80 backdrop-blur-3xl border-t border-border/50 flex items-center px-1 pb-safe shadow-[0_-20px_50px_rgba(0,0,0,0.05)]">
+            <nav className="w-full bg-background/80 backdrop-blur-3xl border-t border-border/50 flex items-center px-1 pt-3 pb-[calc(env(safe-area-inset-bottom)+12px)] shadow-[0_-20px_50px_rgba(0,0,0,0.05)]">
                 {navItems.map((item) => {
                     const isActive = currentScreen === item.id;
                     const Icon = item.icon;
