@@ -188,7 +188,7 @@ function App() {
   };
 
   return (
-    <div className={`min-h-screen bg-background mesh-gradient flex justify-center font-sans text-foreground antialiased selection:bg-mood-home/20 relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
+    <div className={`fixed inset-0 h-[100dvh] bg-background mesh-gradient flex justify-center font-sans text-foreground antialiased selection:bg-mood-home/20 relative overflow-hidden ${isDarkMode ? 'dark' : ''}`}>
       {/* Animated Background Blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[60px] animate-float" />
@@ -196,7 +196,7 @@ function App() {
         <div className="absolute top-[20%] right-[-5%] w-[30%] h-[30%] bg-mood-love/10 rounded-full blur-[50px] animate-float-slow" />
       </div>
 
-      <div className="w-full max-w-[480px] bg-background/60 backdrop-blur-xl h-screen relative border-x border-border/20 overflow-hidden flex flex-col z-10 transition-all duration-300 shadow-2xl">
+      <div className="w-full max-w-[480px] bg-background/60 backdrop-blur-xl h-[100dvh] relative border-x border-border/20 overflow-hidden flex flex-col z-10 transition-all duration-300 shadow-2xl">
         {!userId ? (
           <div className="flex-1 flex flex-col">
             {renderLoggedOut()}
