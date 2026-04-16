@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Music, Plus, Heart, Trash2, X, ExternalLink, Play, Radio, Volume2, Pause } from 'lucide-react';
+import { ArrowLeft, Music, Plus, Heart, Trash2, X, ExternalLink, Play, Radio, Pause } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface Song {
@@ -28,6 +28,8 @@ const MUSIC_COLORS = [
     'from-teal-500 to-cyan-600',
     'from-blue-500 to-indigo-600',
 ];
+
+const PROGRESS = 33; // mock progress % shown on each card
 
 export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }: PlaylistScreenProps) {
     const [songs, setSongs] = useState<Song[]>([]);
@@ -68,10 +70,19 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
         if (!audioRef.current) return;
         if (isRadioPlaying) {
             audioRef.current.pause();
+            setIsRadioPlaying(false);
         } else {
-            audioRef.current.play().catch(e => console.error("Audio play failed:", e));
+            audioRef.current.load();
+            const playPromise = audioRef.current.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => setIsRadioPlaying(true))
+                    .catch(e => {
+                        console.error('Audio play failed:', e);
+                        setIsRadioPlaying(false);
+                    });
+            }
         }
-        setIsRadioPlaying(!isRadioPlaying);
     };
 
     const fetchPartnerName = async () => {
@@ -88,10 +99,7 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
     };
 
     const fetchSongs = async () => {
-        if (!partnershipId) {
-            setLoading(false);
-            return;
-        }
+        if (!partnershipId) { setLoading(false); return; }
         setLoading(true);
         try {
             const { data, error } = await supabase
@@ -99,14 +107,10 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                 .select('*')
                 .eq('partnership_id', partnershipId)
                 .order('created_at', { ascending: false });
-            
-            if (error) {
-                console.error("Error fetching songs:", error);
-                return;
-            }
+            if (error) { console.error('Error fetching songs:', error); return; }
             setSongs(data || []);
         } catch (e) {
-            console.error("Fetch catch error:", e);
+            console.error('Fetch catch error:', e);
         } finally {
             setLoading(false);
         }
@@ -114,10 +118,7 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
 
     const handleAdd = async () => {
         if (!newSong.title.trim()) return;
-        if (!partnershipId) {
-            alert("خطأ: لم يتم العثور على اشتراك نشط. يرجى إعادة تحميل التطبيق.");
-            return;
-        }
+        if (!partnershipId) { alert('خطأ: لم يتم العثور على اشتراك نشط.'); return; }
 
         const songData = {
             partnership_id: partnershipId,
@@ -129,18 +130,12 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
         };
 
         const { error } = await supabase.from('playlist_songs').insert(songData);
-        
-        if (error) {
-            console.error("Error adding song:", error);
-            alert(`فشل في إضافة الأغنية: ${error.message}`);
-            return;
-        }
+        if (error) { console.error('Error adding song:', error); alert(`فشل: ${error.message}`); return; }
 
         setNewSong({ title: '', artist: '', note: '', url: '' });
         setIsAdding(false);
         fetchSongs();
     };
-
 
     const handleLike = async (song: Song) => {
         const likes = song.likes || [];
@@ -156,9 +151,6 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
         setSongs(prev => prev.filter(s => s.id !== id));
     };
 
-    const myCount = songs.filter(s => s.added_by === userId).length;
-    const partnerCount = songs.length - myCount;
-
     return (
         <div className={`flex flex-col h-full ${isDarkMode ? 'dark' : ''} bg-background`}>
             <style>{`
@@ -167,16 +159,8 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                     50% { height: 12px; }
                 }
                 .bar-anim { animation: bar-grow 1s infinite ease-in-out; }
-                
-                @keyframes spin-slow {
-                    from { transform: rotate(0deg); }
-                    to { transform: rotate(360deg); }
-                }
-                .animate-spin-slow {
-                    animation: spin-slow 8s linear infinite;
-                }
             `}</style>
-            
+
             {/* Background */}
             <div className="fixed inset-0 pointer-events-none -z-10">
                 <div className="absolute top-[-15%] right-[-10%] w-[80%] h-[60%] bg-violet-500/8 blur-[150px] rounded-full" />
@@ -184,8 +168,8 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
             </div>
 
             {/* Header */}
-            <header className="px-8 pt-12 pb-6 sticky top-0 z-40 bg-background/60 backdrop-blur-3xl" dir="rtl">
-                <div className="flex items-center justify-between mb-6">
+            <header className="px-6 pt-12 pb-5 sticky top-0 z-40 bg-background/60 backdrop-blur-3xl" dir="rtl">
+                <div className="flex items-center justify-between">
                     <motion.button
                         whileTap={{ scale: 0.9 }}
                         onClick={() => onNavigate('home')}
@@ -207,33 +191,33 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                 </div>
             </header>
 
-            {/* Radio Player (Hidden Audio) */}
-            <audio ref={audioRef} src="http://andromeda.shoutca.st:8192/;" crossOrigin="anonymous" />
+            {/* Hidden Radio Audio */}
+            <audio ref={audioRef} src="https://stream.zeno.fm/f3ymqg4v98puv" crossOrigin="anonymous" playsInline preload="none" />
 
-            {/* Songs list */}
-            <div className="flex-1 overflow-y-auto px-8 pb-32 pt-4 scrollbar-hide" dir="rtl">
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto px-5 pb-32 pt-4 scrollbar-hide" dir="rtl">
+
                 {/* ── LIVE RADIO CARD ── */}
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mb-8 relative overflow-hidden rounded-[2.8rem] p-6 border border-rose-500/20 bg-rose-500/[0.03] backdrop-blur-3xl group"
+                    className="mb-6 relative overflow-hidden rounded-[2rem] p-5 border border-rose-500/20 bg-rose-500/[0.03] backdrop-blur-3xl"
                 >
-                    <div className="absolute inset-0 bg-gradient-to-r from-rose-500/[0.05] to-violet-500/[0.05] opacity-50" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-rose-500/[0.05] to-violet-500/[0.05]" />
                     <div className="relative z-10 flex items-center justify-between">
                         <div className="flex items-center gap-4">
                             <motion.button
-                                whileHover={{ scale: 1.1 }}
                                 whileTap={{ scale: 0.9 }}
                                 onClick={toggleRadio}
                                 className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg ${isRadioPlaying ? 'bg-rose-500 text-white animate-pulse' : 'bg-white/80 dark:bg-white/10 text-rose-500'}`}
                             >
-                                {isRadioPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                                {isRadioPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" className="ml-0.5" />}
                             </motion.button>
                             <div className="text-right">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="relative flex h-2 w-2">
-                                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isRadioPlaying ? 'bg-rose-500' : 'bg-zinc-400'}`}></span>
-                                        <span className={`relative inline-flex rounded-full h-2 w-2 ${isRadioPlaying ? 'bg-rose-500' : 'bg-zinc-400'}`}></span>
+                                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isRadioPlaying ? 'bg-rose-500' : 'bg-zinc-400'}`} />
+                                        <span className={`relative inline-flex rounded-full h-2 w-2 ${isRadioPlaying ? 'bg-rose-500' : 'bg-zinc-400'}`} />
                                     </span>
                                     <h3 className="text-sm font-black text-foreground tracking-tighter">راديو ألفة المباشر ✨</h3>
                                 </div>
@@ -246,7 +230,7 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                     </div>
 
                     {isRadioPlaying && (
-                        <motion.div 
+                        <motion.div
                             initial={{ opacity: 0, height: 0 }}
                             animate={{ opacity: 1, height: 'auto' }}
                             className="mt-4 flex items-center justify-center gap-1.5 h-6"
@@ -255,13 +239,15 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                                 <motion.div
                                     key={i}
                                     animate={{ height: [4, 16, 8, 20, 4] }}
-                                    transition={{ repeat: Infinity, duration: 1 + Math.random(), ease: "easeInOut" }}
+                                    transition={{ repeat: Infinity, duration: 1 + Math.random(), ease: 'easeInOut' }}
                                     className="w-[3px] bg-rose-500/40 rounded-full"
                                 />
                             ))}
                         </motion.div>
                     )}
                 </motion.div>
+
+                {/* ── SONGS LIST ── */}
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-40">
                         <div className="w-10 h-10 border-[3px] border-violet-500 border-t-transparent rounded-full animate-spin" />
@@ -287,7 +273,7 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                         </motion.button>
                     </motion.div>
                 ) : (
-                    <div className="space-y-8">
+                    <div className="space-y-5">
                         {songs.map((song, idx) => {
                             const isMe = song.added_by === userId;
                             const isLiked = song.likes?.includes(userId);
@@ -297,105 +283,107 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                             return (
                                 <motion.div
                                     key={song.id}
-                                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    transition={{ delay: idx * 0.05 }}
-                                    className="group relative"
+                                    initial={{ opacity: 0, y: 24 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: idx * 0.06, ease: [0.22, 1, 0.36, 1] }}
                                 >
-                                    {/* The Music Identity Card */}
-                                    <div className="relative z-10 bg-white/70 dark:bg-white/[0.04] backdrop-blur-3xl border border-white/60 dark:border-white/[0.08] rounded-[2.8rem] p-6 shadow-2xl shadow-black/[0.03] transition-all hover:shadow-black/[0.06] overflow-hidden flex flex-col">
-                                        
-                                        {/* Top Header */}
-                                        <div className="flex items-center justify-between mb-5">
-                                            <span className="text-[11px] font-bold text-muted-foreground/40">{dateStr}</span>
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex gap-0.5 items-end h-3 pr-2 border-r border-black/5 dark:border-white/10">
-                                                    {[0.7, 0.4, 0.8, 0.5].map((s, i) => (
-                                                        <div key={i} className="w-[3px] bg-rose-500/40 rounded-full bar-anim" style={{ animationDelay: `${i * 0.2}s`, height: `${s * 100}%` }} />
-                                                    ))}
-                                                </div>
-                                                <div className={`px-3 py-1 rounded-full text-[10px] font-black tracking-tight ${isMe ? 'bg-indigo-500/10 text-indigo-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                                                    {isMe ? 'أنا' : partnerName}
-                                                </div>
-                                            </div>
-                                        </div>
+                                    {/* ── Song Card ── */}
+                                    <div className="bg-white/80 dark:bg-white/[0.05] backdrop-blur-3xl border border-white/70 dark:border-white/10 rounded-[2rem] overflow-hidden shadow-xl shadow-black/[0.04]">
 
-                                        {/* Main Song Section */}
-                                        <div className="flex items-center justify-between mb-6 gap-4">
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="text-xl font-black text-foreground leading-tight tracking-tighter mb-1.5 truncate">{song.title}</h3>
-                                                <div className="flex items-center gap-1.5 text-muted-foreground/50">
-                                                    <Music size={12} strokeWidth={3} />
-                                                    <p className="text-sm font-bold truncate">{song.artist || 'فنان غير معروف'}</p>
-                                                </div>
+                                        {/* Gradient Banner with song info + play */}
+                                        <div className={`relative h-20 bg-gradient-to-r ${colorClass} flex items-center justify-between px-5`}>
+                                            <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full bg-white/10" />
+                                            <div className="absolute -right-2 -bottom-4 w-16 h-16 rounded-full bg-white/10" />
+
+                                            <div className="relative z-10 flex-1 min-w-0 pr-2">
+                                                <h3 className="text-lg font-black text-white leading-tight tracking-tighter truncate text-right">{song.title}</h3>
+                                                <p className="text-[11px] font-bold text-white/70 truncate text-right mt-1">{song.artist || 'فنان غير معروف'}</p>
                                             </div>
+
                                             <motion.button
-                                                whileHover={{ scale: 1.05 }}
-                                                whileTap={{ scale: 0.95 }}
+                                                whileHover={{ scale: 1.08 }}
+                                                whileTap={{ scale: 0.92 }}
                                                 onClick={() => handlePlay(song)}
-                                                className={`w-[4.5rem] h-[4.5rem] shrink-0 rounded-[1.8rem] bg-gradient-to-br ${colorClass} flex items-center justify-center shadow-xl text-white relative overflow-hidden group/play`}
+                                                className="relative z-10 w-12 h-12 rounded-2xl bg-white/25 backdrop-blur-sm border border-white/40 flex items-center justify-center shadow-lg shrink-0 ml-3"
                                             >
-                                                <Play className="w-8 h-8 fill-current ml-1 relative z-10 transition-transform group-hover/play:scale-110" />
-                                                <div className="absolute inset-0 bg-black/10 opacity-0 group-hover/play:opacity-100 transition-opacity" />
+                                                <Play className="w-5 h-5 fill-white text-white ml-0.5" />
                                             </motion.button>
                                         </div>
 
-                                        {/* Mock Playback Progress */}
-                                        <div className="mb-6 relative w-full px-1">
-                                            <div className="h-1.5 bg-zinc-100 dark:bg-white/5 rounded-full overflow-hidden">
-                                                <div className="h-full bg-rose-500/40 w-1/3 rounded-full relative" />
+                                        {/* Progress Bar — LTR so dot sits at right end of filled track */}
+                                        <div className="px-5 pt-3 pb-1" dir="ltr">
+                                            <div className="relative h-[5px] bg-zinc-100 dark:bg-white/10 rounded-full">
+                                                {/* Filled track */}
+                                                <div
+                                                    className={`absolute inset-y-0 left-0 rounded-full bg-gradient-to-r ${colorClass} opacity-70`}
+                                                    style={{ width: `${PROGRESS}%` }}
+                                                />
+                                                {/* Thumb dot: centered vertically, horizontally offset by -50% so it sits exactly at the end */}
+                                                <div
+                                                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-[14px] h-[14px] rounded-full bg-rose-500 border-2 border-white shadow-[0_0_10px_rgba(244,63,94,0.7)] z-10"
+                                                    style={{ left: `${PROGRESS}%` }}
+                                                />
                                             </div>
-                                            <div className="absolute left-[33%] top-[-3px] w-3 h-3 bg-rose-500 rounded-full shadow-[0_0_8px_rgba(244,63,94,0.6)]" />
-                                            <div className="flex justify-between mt-2 opacity-40 text-[9px] font-black" dir="ltr">
+                                            <div className="flex justify-between mt-1.5 text-[10px] font-bold text-muted-foreground/40">
                                                 <span>0:00</span>
                                                 <span>3:45</span>
                                             </div>
                                         </div>
 
-                                        {/* Centered Note */}
+                                        {/* Note */}
                                         {song.note && (
-                                            <div className="mb-6 mx-1">
-                                                <div className="relative p-5 bg-black/[0.02] dark:bg-white/[0.02] border border-black/[0.04] dark:border-white/[0.04] rounded-3xl">
-                                                    <div className="absolute right-3 top-2 text-[32px] font-serif text-rose-500/10">“</div>
-                                                    <p className="text-[13px] font-bold text-foreground/70 leading-relaxed italic text-center relative z-10">
+                                            <div className="mx-5 mb-2 mt-1" dir="rtl">
+                                                <div className="relative p-4 bg-zinc-50/80 dark:bg-white/[0.03] border border-zinc-100 dark:border-white/5 rounded-2xl">
+                                                    <span className="absolute right-3 top-1 text-2xl font-serif text-rose-400/20">"</span>
+                                                    <p className="text-[12px] font-semibold text-foreground/60 leading-relaxed italic text-center">
                                                         "{song.note}"
                                                     </p>
                                                 </div>
                                             </div>
                                         )}
 
-                                        {/* Bottom Actions Bar */}
-                                        <div className="flex items-center justify-between pt-4 border-t border-black/5 dark:border-white/[0.05]">
-                                            <div className="flex gap-4">
+                                        {/* Actions Row */}
+                                        <div className="flex items-center justify-between px-5 py-3 border-t border-black/[0.04] dark:border-white/[0.05]" dir="rtl">
+                                            <span className="text-[10px] font-bold text-muted-foreground/35">{dateStr}</span>
+
+                                            <div className="flex items-center gap-2">
+                                                {/* Added-by badge */}
+                                                <div className={`px-2.5 py-0.5 rounded-full text-[9px] font-black ${isMe ? 'bg-indigo-500/10 text-indigo-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                                                    {isMe ? 'أنا' : partnerName}
+                                                </div>
+
+                                                {/* Like */}
                                                 <motion.button
-                                                    whileTap={{ scale: 0.8 }}
+                                                    whileTap={{ scale: 0.75 }}
                                                     onClick={() => handleLike(song)}
-                                                    className={`group/heart flex items-center gap-2 px-4 py-2 rounded-full transition-all ${isLiked ? 'bg-rose-500 text-white' : 'glass border-white/20 text-rose-400'}`}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black transition-all ${isLiked ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30' : 'text-rose-400 bg-rose-50 dark:bg-rose-500/10'}`}
                                                 >
-                                                    <Heart className="w-4 h-4" fill={isLiked ? 'currentColor' : 'none'} />
-                                                    <span className="text-[11px] font-black">{song.likes?.length || 0}</span>
+                                                    <Heart className="w-3.5 h-3.5" fill={isLiked ? 'currentColor' : 'none'} />
+                                                    {song.likes?.length || 0}
                                                 </motion.button>
-                                                
+
+                                                {/* Open link */}
                                                 {song.url && (
                                                     <motion.button
                                                         whileTap={{ scale: 0.8 }}
                                                         onClick={() => handlePlay(song)}
-                                                        className="w-10 h-10 rounded-full glass border-white/20 flex items-center justify-center text-indigo-500"
+                                                        className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-400"
                                                     >
-                                                        <ExternalLink className="w-4 h-4" />
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                    </motion.button>
+                                                )}
+
+                                                {/* Delete */}
+                                                {isMe && (
+                                                    <motion.button
+                                                        whileTap={{ scale: 0.8 }}
+                                                        onClick={() => handleDelete(song.id)}
+                                                        className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-500/10 flex items-center justify-center text-rose-300 hover:text-rose-500 transition-colors"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
                                                     </motion.button>
                                                 )}
                                             </div>
-
-                                            {isMe && (
-                                                <motion.button
-                                                    whileTap={{ scale: 0.8 }}
-                                                    onClick={() => handleDelete(song.id)}
-                                                    className="text-rose-400/30 hover:text-rose-500 transition-colors p-2"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </motion.button>
-                                            )}
                                         </div>
                                     </div>
                                 </motion.div>
@@ -405,10 +393,10 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                 )}
             </div>
 
-            {/* Add modal */}
+            {/* ── ADD MODAL ── */}
             <AnimatePresence>
                 {isAdding && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                    <div className="fixed inset-0 z-[100] flex items-end justify-center">
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -417,25 +405,24 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                             className="absolute inset-0 bg-black/40 backdrop-blur-md"
                         />
                         <motion.div
-                            initial={{ scale: 0.9, y: 30 }}
-                            animate={{ scale: 1, y: 0 }}
-                            exit={{ scale: 0.9, y: 30 }}
-                            className="w-full max-w-md glass border-white/30 p-8 rounded-[3rem] relative z-10"
+                            initial={{ y: '100%' }}
+                            animate={{ y: 0 }}
+                            exit={{ y: '100%' }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                            className="w-full max-w-lg glass border-white/30 p-8 rounded-t-[2.5rem] relative z-10 pb-10"
                             dir="rtl"
                         >
-                            <div className="flex justify-between items-center mb-8">
+                            <div className="flex justify-between items-center mb-6">
                                 <h3 className="text-xl font-black tracking-tighter">أضف أغنية 🎵</h3>
                                 <button onClick={() => setIsAdding(false)} className="w-10 h-10 glass border-white/20 rounded-2xl flex items-center justify-center text-foreground/40 hover:text-rose-500 transition-colors">
                                     <X className="w-4 h-4" />
                                 </button>
                             </div>
-
                             <div className="space-y-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-black text-muted-foreground/40 mr-1 uppercase tracking-[0.2em]">اسم الأغنية *</label>
                                     <input
-                                        type="text"
-                                        placeholder="مثلاً: Lover..."
+                                        type="text" placeholder="مثلاً: Lover..."
                                         className="w-full h-12 px-4 glass border-white/10 rounded-xl text-sm font-bold focus:border-violet-500 transition-all outline-none"
                                         value={newSong.title}
                                         onChange={e => setNewSong({ ...newSong, title: e.target.value })}
@@ -444,8 +431,7 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-black text-muted-foreground/40 mr-1 uppercase tracking-[0.2em]">الفنان</label>
                                     <input
-                                        type="text"
-                                        placeholder="اسم المغني أو الفرقة"
+                                        type="text" placeholder="اسم المغني أو الفرقة"
                                         className="w-full h-12 px-4 glass border-white/10 rounded-xl text-sm font-bold focus:border-violet-500 transition-all outline-none"
                                         value={newSong.artist}
                                         onChange={e => setNewSong({ ...newSong, artist: e.target.value })}
@@ -464,8 +450,7 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                                 <div className="space-y-1.5">
                                     <label className="text-[9px] font-black text-muted-foreground/40 mr-1 uppercase tracking-[0.2em]">رابط (اختياري)</label>
                                     <input
-                                        type="url"
-                                        placeholder="رابط Spotify أو YouTube..."
+                                        type="url" placeholder="رابط Spotify أو YouTube..."
                                         className="w-full h-12 px-4 glass border-white/10 rounded-xl text-sm font-bold focus:border-violet-500 transition-all outline-none"
                                         value={newSong.url}
                                         onChange={e => setNewSong({ ...newSong, url: e.target.value })}
@@ -484,7 +469,7 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                 )}
             </AnimatePresence>
 
-            {/* Play Modal */}
+            {/* ── YOUTUBE PLAY MODAL ── */}
             <AnimatePresence>
                 {playingSong && (
                     <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
@@ -518,11 +503,9 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                                     <X size={20} />
                                 </button>
                             </div>
-
                             <div className="aspect-video w-full">
                                 <iframe
-                                    width="100%"
-                                    height="100%"
+                                    width="100%" height="100%"
                                     src={`https://www.youtube.com/embed/${getYoutubeId(playingSong.url!)}?autoplay=1`}
                                     title="YouTube video player"
                                     frameBorder="0"
@@ -530,7 +513,6 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                                     allowFullScreen
                                 />
                             </div>
-
                             {playingSong.note && (
                                 <div className="p-6 bg-zinc-800/50" dir="rtl">
                                     <p className="text-zinc-400 text-xs italic leading-relaxed font-bold">"{playingSong.note}"</p>
