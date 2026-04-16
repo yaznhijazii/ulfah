@@ -811,32 +811,96 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         className="col-span-2 relative group cursor-pointer"
                     >
                         <div className="absolute -inset-4 bg-rose-500/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-full" />
-                        <div className="relative aspect-[4/3] w-full max-w-[320px] mx-auto select-none perspective-1000">
-                            <motion.div whileHover={{ rotateY: 2, rotateX: 2 }} className="w-full h-full transition-transform duration-500">
-                                <img src="/assets/love_notes/card-base.png" className="absolute inset-0 w-full h-full object-contain pointer-events-none z-0 drop-shadow-2xl" />
+                        <div className="relative aspect-[272/409] w-full max-w-[280px] mx-auto select-none perspective-1000 mt-4 mb-8">
+                            <motion.div whileHover={{ rotateY: 2, rotateX: 2 }} className="w-full h-full transition-transform duration-500 relative">
+                                <img src="/assets/love_notes/card-base.png" className="absolute inset-x-0 bottom-0 w-full h-[85%] object-cover pointer-events-none z-0 drop-shadow-2xl" />
+                                
                                 {latestNote ? (
-                                    <div className="absolute inset-0 flex items-center justify-center z-10 px-[15%] pt-[5%] pb-[15%]">
-                                        <div className="relative w-full h-full flex items-center justify-center rotate-[-1.5deg]">
-                                            <img src="/assets/love_notes/card-paper.png" className="absolute inset-0 w-full h-full object-contain shadow-sm" />
-                                            {(() => {
-                                                const isAuthor = latestNote.author_id === userId;
-                                                const [rawFont] = latestNote.font_style?.split('|') || [latestNote.font_style || 'font-ruqaa'];
-                                                const fontClass = (rawFont === 'font-cedarville') ? 'font-cedarville' : 'font-ruqaa';
-                                                return (
-                                                    <div className="relative z-20 w-[85%] h-[65%] flex flex-col items-center justify-center p-4 text-center overflow-hidden">
-                                                        <p className={`text-[1.1rem] text-black/80 leading-snug line-clamp-3 ${fontClass}`}>{latestNote.content}</p>
-                                                        <div className="flex items-center gap-2 mt-3 opacity-40">
-                                                            <div className="h-px w-3 bg-black" />
-                                                            <span className={`text-[0.7rem] italic ${fontClass}`}>{isAuthor ? 'أنا' : (latestNote.author?.name || 'شريك حياتي')}</span>
-                                                            <div className="h-px w-3 bg-black" />
+                                    <>
+                                        {(() => {
+                                            const isAuthor = latestNote.author_id === userId;
+                                            const [rawFont, flowersPart] = latestNote.font_style?.includes('|') 
+                                                ? latestNote.font_style.split('|') 
+                                                : [latestNote.font_style || 'font-ruqaa', ''];
+                                            const fontClass = (rawFont === 'font-cedarville') ? 'font-cedarville' : 'font-ruqaa';
+                                            const activeFlowers = flowersPart?.split(',').filter(Boolean) || [];
+                                            const flowersData = [
+                                                { id: 'flower-1', url: '/assets/love_notes/flower-1.png' },
+                                                { id: 'flower-2', url: '/assets/love_notes/flower-2.png' },
+                                                { id: 'flower-3', url: '/assets/love_notes/flower-3.png' },
+                                                { id: 'flower-4', url: '/assets/love_notes/flower-4.png' },
+                                                { id: 'flower-5', url: '/assets/love_notes/flower-5.png' },
+                                                { id: 'flower-6', url: '/assets/love_notes/flower-6.png' },
+                                                { id: 'flower-7', url: '/assets/love_notes/flower-7.png' },
+                                            ];
+
+                                            return (
+                                                <>
+                                                    <div className="absolute top-0 inset-x-0 h-[60%] z-0 pointer-events-none overflow-hidden">
+                                                        {activeFlowers.map((fid, idx) => {
+                                                            const flower = flowersData.find(f => f.id === fid);
+                                                            if (!flower) return null;
+                                                            const slots = [
+                                                                { x: '-5%', y: '30%', rotate: 0, scale: 1.25, z: 7 },
+                                                                { x: '-18%', y: '32%', rotate: -12, scale: 1.1, z: 6 },
+                                                                { x: '10%', y: '35%', rotate: 10, scale: 1.15, z: 5 },
+                                                                { x: '25%', y: '42%', rotate: 22, scale: 1.0, z: 4 },
+                                                                { x: '-28%', y: '40%', rotate: -22, scale: 1.0, z: 3 },
+                                                                { x: '5%', y: '45%', rotate: 5, scale: 0.95, z: 2 },
+                                                                { x: '-8%', y: '48%', rotate: -8, scale: 0.95, z: 1 }
+                                                            ];
+                                                            const slot = slots[idx % slots.length];
+                                                            return (
+                                                                <div 
+                                                                    key={`home-flower-${idx}`}
+                                                                    className="w-[32%] absolute"
+                                                                    style={{ 
+                                                                        left: '50%', top: slot.y, marginLeft: slot.x, 
+                                                                        transform: `scale(${slot.scale}) rotate(${slot.rotate}deg)`, 
+                                                                        transformOrigin: 'bottom center', zIndex: slot.z
+                                                                    }}
+                                                                >
+                                                                    <img src={flower.url} className="w-full drop-shadow-md object-contain" />
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+
+                                                    <div className="absolute left-[12.5%] top-[34.2%] w-[75%] aspect-square shadow-xl overflow-hidden z-10 rotate-[-1.5deg]">
+                                                        <img src="/assets/love_notes/card-paper.png" className="w-full h-full object-cover" />
+                                                        <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+                                                            <div className="w-full max-h-full overflow-hidden flex flex-col items-center">
+                                                                <p className={`text-[1.2rem] font-bold text-black/85 leading-tight line-clamp-4 ${fontClass}`}>
+                                                                    {latestNote.content}
+                                                                </p>
+                                                                <span className={`text-[0.65rem] text-black/40 italic mt-4 self-end shrink-0 ${fontClass}`}>
+                                                                    — {isAuthor ? 'أنا' : (latestNote.author?.name || 'شريك حياتي')}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                );
-                                            })()}
-                                        </div>
-                                    </div>
+
+                                                    <img src="/assets/love_notes/card-mask.png" className="absolute inset-x-0 bottom-0 w-full h-[85%] object-cover pointer-events-none z-30 opacity-80" />
+
+                                                    <div className="absolute left-[17%] bottom-[16%] z-40 px-2">
+                                                        <p className={`text-[0.65rem] text-black/40 font-black ${fontClass} opacity-80`}>
+                                                            {fontClass === 'font-ruqaa' ? 'إلى: ' : 'To: '} أنا
+                                                        </p>
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
+                                    </>
                                 ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center z-20"><p className="text-[11px] font-black text-rose-500/40 uppercase tracking-[0.3em] text-center bg-rose-500/5 px-4 py-2 rounded-full border border-rose-500/10">أضف بسمتك الوجدانية</p></div>
+                                    <>
+                                        <div className="absolute left-[12.5%] top-[34.2%] w-[75%] aspect-square shadow-xl overflow-hidden z-10 flex items-center justify-center">
+                                            <img src="/assets/love_notes/card-paper.png" className="absolute inset-0 w-full h-full object-cover" />
+                                            <div className="relative z-20 px-4 py-2 border border-rose-500/10 rounded-full bg-rose-500/5 backdrop-blur-sm">
+                                                <p className="text-[11px] font-black text-rose-500/50 uppercase tracking-[0.3em] text-center">أضف بسمتك الوجدانية</p>
+                                            </div>
+                                        </div>
+                                        <img src="/assets/love_notes/card-mask.png" className="absolute inset-x-0 bottom-0 w-full h-[85%] object-cover pointer-events-none z-30 opacity-80" />
+                                    </>
                                 )}
                             </motion.div>
                         </div>
