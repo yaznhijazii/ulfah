@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Music, Plus, Heart, Trash2, X, ExternalLink, Play, Radio, Pause } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { toast } from 'sonner';
 
 interface Song {
     id: string;
@@ -57,7 +58,10 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
     };
 
     const handlePlay = (song: Song) => {
-        if (!song.url) return;
+        if (!song.url) {
+            toast.error('رابط الموسيقى غير متوفر');
+            return;
+        }
         const ytId = getYoutubeId(song.url);
         if (ytId) {
             setPlayingSong(song);
@@ -71,15 +75,26 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
         if (isRadioPlaying) {
             audioRef.current.pause();
             setIsRadioPlaying(false);
+            toast.info('تم إيقاف الراديو');
         } else {
-            audioRef.current.load();
+            toast.loading('جاري تشغيل الراديو...', { id: 'radio-play' });
+            
+            // Re-assign src to ensure browser recognizes it as a fresh user-initiated request if needed
+            if (!audioRef.current.src || audioRef.current.src.includes('undefined') || !audioRef.current.src.includes('radio.co')) {
+                audioRef.current.src = "https://streamer.radio.co/sf2fa6ce9d/listen";
+            }
+
             const playPromise = audioRef.current.play();
             if (playPromise !== undefined) {
                 playPromise
-                    .then(() => setIsRadioPlaying(true))
+                    .then(() => {
+                        setIsRadioPlaying(true);
+                        toast.success('البث المباشر يعمل الآن 🎶', { id: 'radio-play' });
+                    })
                     .catch(e => {
                         console.error('Audio play failed:', e);
                         setIsRadioPlaying(false);
+                        toast.error('فشل تشغيل البث. تأكد من اتصالك بالإنترنت وحاول مرة أخرى.', { id: 'radio-play' });
                     });
             }
         }
@@ -192,7 +207,7 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
             </header>
 
             {/* Hidden Radio Audio */}
-            <audio ref={audioRef} src="https://stream.zeno.fm/f3ymqg4v98puv" crossOrigin="anonymous" playsInline preload="none" />
+            <audio ref={audioRef} src="https://streamer.radio.co/sf2fa6ce9d/listen" playsInline preload="auto" />
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto px-5 pb-32 pt-4 scrollbar-hide" dir="rtl">
@@ -201,18 +216,18 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mb-6 relative overflow-hidden rounded-[2rem] p-5 border border-rose-500/20 bg-rose-500/[0.03] backdrop-blur-3xl"
+                    whileTap={{ scale: 0.98 }}
+                    onClick={toggleRadio}
+                    className="mb-6 relative overflow-hidden rounded-[2rem] p-5 border border-rose-500/20 bg-rose-500/[0.03] backdrop-blur-3xl cursor-pointer transition-all active:brightness-95"
                 >
-                    <div className="absolute inset-0 bg-gradient-to-r from-rose-500/[0.05] to-violet-500/[0.05]" />
-                    <div className="relative z-10 flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                            <motion.button
-                                whileTap={{ scale: 0.9 }}
-                                onClick={toggleRadio}
-                                className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg ${isRadioPlaying ? 'bg-rose-500 text-white animate-pulse' : 'bg-white/80 dark:bg-white/10 text-rose-500'}`}
+                    <div className="absolute inset-0 bg-gradient-to-r from-rose-500/[0.05] to-violet-500/[0.05] pointer-events-none" />
+                    <div className="relative z-10 flex items-center justify-between pointer-events-none">
+                        <div className="flex items-center gap-4 pointer-events-auto">
+                            <div
+                                className={`w-14 h-14 rounded-full flex items-center justify-center transition-all shadow-lg ${isRadioPlaying ? 'bg-rose-500 text-white animate-pulse' : 'bg-white dark:bg-white/10 text-rose-500 shadow-rose-500/10'}`}
                             >
-                                {isRadioPlaying ? <Pause size={22} fill="currentColor" /> : <Play size={22} fill="currentColor" className="ml-0.5" />}
-                            </motion.button>
+                                {isRadioPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
+                            </div>
                             <div className="text-right">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="relative flex h-2 w-2">
@@ -224,7 +239,7 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                                 <p className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">موسيقى تجمع قلوبكم الآن</p>
                             </div>
                         </div>
-                        <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all pointer-events-auto ${isRadioPlaying ? 'bg-rose-500/20 text-rose-500' : 'bg-rose-500/10 text-rose-500'}`}>
                             <Radio size={20} className={isRadioPlaying ? 'animate-bounce' : ''} />
                         </div>
                     </div>
@@ -303,10 +318,10 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                                             <motion.button
                                                 whileHover={{ scale: 1.08 }}
                                                 whileTap={{ scale: 0.92 }}
-                                                onClick={() => handlePlay(song)}
-                                                className="relative z-10 w-12 h-12 rounded-2xl bg-white/25 backdrop-blur-sm border border-white/40 flex items-center justify-center shadow-lg shrink-0 ml-3"
+                                                onClick={(e) => { e.stopPropagation(); handlePlay(song); }}
+                                                className="relative z-10 w-12 h-12 rounded-full bg-white/30 backdrop-blur-md border border-white/50 flex items-center justify-center shadow-lg shrink-0 ml-3 group/playbtn"
                                             >
-                                                <Play className="w-5 h-5 fill-white text-white ml-0.5" />
+                                                <Play className="w-5 h-5 fill-white text-white ml-0.5 transition-transform group-hover/playbtn:scale-110" />
                                             </motion.button>
                                         </div>
 

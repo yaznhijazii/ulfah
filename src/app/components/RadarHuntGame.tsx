@@ -119,9 +119,14 @@ export function RadarHuntGame({ onBack, userId, userName, partnershipId }: Radar
             <div className="flex flex-col h-full bg-[#0a0a0a] p-6">
                 <div className="flex-1 flex flex-col justify-center gap-6 pb-20">
                     <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-emerald-500/5 rounded-[2.5rem] p-10 text-center border-2 border-emerald-500/20">
-                        <div className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_30px_rgba(16,185,129,0.4)] animate-pulse">
+                        <motion.button 
+                            whileTap={{ scale: 0.9 }}
+                            onClick={createRoom}
+                            disabled={loading}
+                            className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_30px_rgba(16,185,129,0.4)] animate-pulse"
+                        >
                             <Radio className="w-10 h-10" />
-                        </div>
+                        </motion.button>
                         <h2 className="text-2xl font-black mb-3 text-white">الرادار 🛰️</h2>
                         <p className="text-emerald-500/40 font-bold text-sm mb-10 leading-relaxed">حدد هدفاً في الغرفة ودع شريكك يتتبعه عبر إشارات الرادار التي ترسلها!</p>
                         <Button onClick={createRoom} disabled={loading} className="w-full h-16 rounded-2xl text-lg font-black bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg">
