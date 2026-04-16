@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Send, Type, Heart, MessageCircle, Repeat, Share2, Sparkles, Feather, PenLine, Lock, Unlock, Clock, Ghost, X } from 'lucide-react';
-import { Button } from './ui/button';
+import { ArrowLeft, Heart, Feather, PenLine, Ghost, X, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface LoveNotesScreenProps {
@@ -22,83 +21,202 @@ interface Note {
         name: string;
         avatar_url: string;
     };
-    unlock_at?: string | null;
-    unlock_condition?: string | null;
 }
+
+const flowers = [
+    { id: 'flower-1', url: '/assets/love_notes/flower-1.png' },
+    { id: 'flower-2', url: '/assets/love_notes/flower-2.png' },
+    { id: 'flower-3', url: '/assets/love_notes/flower-3.png' },
+    { id: 'flower-4', url: '/assets/love_notes/flower-4.png' },
+    { id: 'flower-5', url: '/assets/love_notes/flower-5.png' },
+    { id: 'flower-6', url: '/assets/love_notes/flower-6.png' },
+    { id: 'flower-7', url: '/assets/love_notes/flower-7.png' },
+];
+
+const NoteCard = ({ 
+    note, 
+    userId, 
+    partnerName, 
+    handleLike, 
+    handleDelete 
+}: { 
+    note: Note; 
+    userId: string; 
+    partnerName: string; 
+    handleLike: (id: string, current: string[]) => void; 
+    handleDelete: (id: string) => void; 
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [rawFont, flowersPart] = note.font_style?.includes('|') 
+        ? note.font_style.split('|') 
+        : [note.font_style || 'font-ruqaa', ''];
+        
+    const fontClass = (rawFont === 'font-cedarville') ? 'font-cedarville' : 'font-ruqaa';
+    const activeFlowers = flowersPart?.split(',').filter(Boolean) || [];
+    const isAuthor = note.author_id === userId;
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            onClick={() => setIsOpen(!isOpen)}
+            className="relative mb-32 cursor-pointer"
+        >
+            <div className="relative aspect-[272/409] w-full max-w-[340px] mx-auto group">
+                <img src="/assets/love_notes/card-base.png" className="absolute inset-x-0 bottom-0 w-full h-[85%] object-cover pointer-events-none z-0" />
+
+                <div className="absolute top-0 inset-x-0 h-[60%] z-0 pointer-events-none overflow-hidden">
+                    <motion.div 
+                        animate={{ y: isOpen ? -40 : 0, scale: isOpen ? 1.05 : 1 }}
+                        className="absolute inset-0"
+                    >
+                        {activeFlowers.map((fid, idx) => {
+                            const flower = flowers.find(f => f.id === fid);
+                            if (!flower) return null;
+                            const slots = [
+                                { x: '-5%', y: '30%', rotate: 0, scale: 1.25, z: 7 },
+                                { x: '-18%', y: '32%', rotate: -12, scale: 1.1, z: 6 },
+                                { x: '10%', y: '35%', rotate: 10, scale: 1.15, z: 5 },
+                                { x: '25%', y: '42%', rotate: 22, scale: 1.0, z: 4 },
+                                { x: '-28%', y: '40%', rotate: -22, scale: 1.0, z: 3 },
+                                { x: '5%', y: '45%', rotate: 5, scale: 0.95, z: 2 },
+                                { x: '-8%', y: '48%', rotate: -8, scale: 0.95, z: 1 }
+                            ];
+                            const slot = slots[idx % slots.length];
+                            return (
+                                <div 
+                                    key={`${note.id}-f-${idx}`}
+                                    className="w-[32%] absolute"
+                                    style={{ 
+                                        left: '50%',
+                                        top: slot.y,
+                                        marginLeft: slot.x,
+                                        transform: `scale(${slot.scale}) rotate(${slot.rotate}deg)`,
+                                        transformOrigin: 'bottom center',
+                                        zIndex: slot.z
+                                    }}
+                                >
+                                    {flower && <img src={flower.url} className="w-full drop-shadow-md object-contain" />}
+                                </div>
+                            );
+                        })}
+                    </motion.div>
+                </div>
+
+                <motion.div 
+                    initial={false}
+                    animate={{ 
+                        y: isOpen ? '-25%' : '0%',
+                        scale: isOpen ? 1.05 : 1,
+                        zIndex: isOpen ? 50 : 10
+                    }}
+                    transition={{ type: 'spring', damping: 20, stiffness: 100 }}
+                    className="absolute left-[12.5%] top-[34.2%] w-[75%] aspect-square shadow-xl overflow-hidden"
+                >
+                    <img src="/assets/love_notes/card-paper.png" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+                        <div className="w-full max-h-full overflow-y-auto paper-content-scroll flex flex-col items-center">
+                            <p className={`text-[1.4rem] md:text-[1.5rem] font-bold text-black/85 leading-tight whitespace-pre-wrap ${fontClass}`}>
+                                {note.content}
+                            </p>
+                            <span className={`text-[0.65rem] text-black/40 italic mt-6 self-end shrink-0 ${fontClass}`}>
+                                — {isAuthor ? partnerName : 'أنا'}
+                            </span>
+                        </div>
+                    </div>
+                </motion.div>
+
+                <img src="/assets/love_notes/card-mask.png" className="absolute inset-x-0 bottom-0 w-full h-[85%] object-cover pointer-events-none z-30 opacity-80" />
+
+                <div className="absolute left-[17%] bottom-[16%] z-40 px-2">
+                    <p className={`text-[0.7rem] text-black/40 font-black ${fontClass} opacity-80`}>
+                        {fontClass === 'font-ruqaa' ? 'إلى: ' : 'To: '} {isAuthor ? partnerName : 'أنا'}
+                    </p>
+                </div>
+
+                <div className="absolute -bottom-8 right-12 z-50 flex gap-4">
+                     {isAuthor && (
+                        <button onClick={(e) => { e.stopPropagation(); handleDelete(note.id); }} className="w-12 h-12 rounded-full bg-white shadow-2xl flex items-center justify-center text-rose-500/30 hover:text-rose-600 transition-all border border-rose-50">
+                            <Trash2 size={24} />
+                        </button>
+                     )}
+                     <button onClick={(e) => { e.stopPropagation(); handleLike(note.id, note.likes || []); }} className={`w-12 h-12 rounded-full bg-white shadow-2xl flex items-center justify-center transition-all border border-rose-50 ${note.likes?.includes(userId) ? 'text-rose-500' : 'text-zinc-300'}`}>
+                        <Heart size={24} fill={note.likes?.includes(userId) ? 'currentColor' : 'none'} />
+                     </button>
+                </div>
+            </div>
+        </motion.div>
+    );
+};
 
 export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode }: LoveNotesScreenProps) {
     const [notes, setNotes] = useState<Note[]>([]);
     const [newNote, setNewNote] = useState('');
-    const [selectedFont, setSelectedFont] = useState('font-normal');
-    const [isWriting, setIsWriting] = useState(false);
+    const [selectedFlowers, setSelectedFlowers] = useState<string[]>([]);
+    const [selectedFont, setSelectedFont] = useState('font-ruqaa');
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'notes' | 'vault'>('notes');
-    const [unlockDate, setUnlockDate] = useState<string>('');
-    const [unlockMood, setUnlockMood] = useState<string>('');
-    const [partnerMood, setPartnerMood] = useState<string | null>(null);
+    const [isWriting, setIsWriting] = useState(false);
+    const [partnerName, setPartnerName] = useState('Habibi');
 
-    const weights = [
-        { name: 'خفيف', value: 'font-light' },
-        { name: 'عادي', value: 'font-normal' },
-        { name: 'متوسط', value: 'font-medium' },
-        { name: 'عريض', value: 'font-bold' },
-        { name: 'داكن', value: 'font-black' },
+    const handwritingFonts = [
+        { name: 'رقعة (عربي)', value: 'font-ruqaa', fontSize: 'text-2xl' },
+        { name: 'Handwriting', value: 'font-cedarville', fontSize: 'text-xl' },
     ];
 
     useEffect(() => {
         if (partnershipId) {
             fetchNotes();
-            fetchPartnerMood();
+            fetchPartnerInfo();
         }
     }, [partnershipId]);
 
-    const fetchPartnerMood = async () => {
+    const fetchPartnerInfo = async () => {
         if (!partnershipId) return;
-        const partnerId = await getPartnerId();
-        if (!partnerId) return;
-
-        const today = new Date().toISOString().split('T')[0];
-        const { data } = await supabase
-            .from('mood_logs')
-            .select('mood')
-            .eq('user_id', partnerId)
-            .eq('mood_date', today)
-            .maybeSingle();
-
-        if (data) setPartnerMood(data.mood);
-    };
-
-    const getPartnerId = async () => {
-        const { data } = await supabase.from('partnerships').select('user1_id, user2_id').eq('id', partnershipId).single();
-        if (!data) return null;
-        return data.user1_id === userId ? data.user2_id : data.user1_id;
+        const { data } = await supabase.from('partnerships').select('user1:user1_id(name), user2:user2_id(name), user1_id').eq('id', partnershipId).single();
+        if (data) {
+            const name = data.user1_id === userId ? (data as any).user2?.name : (data as any).user1?.name;
+            setPartnerName(name || 'Habibi');
+        }
     };
 
     const fetchNotes = async () => {
-        if (!partnershipId) {
-            console.log("Fetch Notes: No Partnership ID provided");
-            return;
-        }
-
-        console.log("Fetching notes for partnership:", partnershipId);
-
+        if (!partnershipId) return;
         const { data, error } = await supabase
             .from('love_notes')
-            .select(`
-                *,
-                author:author_id(name, avatar_url)
-            `)
+            .select('*, author:users!author_id(name, avatar_url)')
             .eq('partnership_id', partnershipId)
             .order('created_at', { ascending: false });
 
-        if (error) {
-            console.error("Fetch Notes Error:", error);
-            return;
-        }
+        if (error) console.error('Error fetching notes:', error);
+        else setNotes(data || []);
+    };
 
-        console.log("Notes fetched successfully:", data);
-        if (data) {
-            setNotes(data);
+    const handleSaveNote = async () => {
+        if (!newNote.trim() || !partnershipId) return;
+        setLoading(true);
+
+        const flowerString = selectedFlowers.join(',');
+        const fontStyle = `${selectedFont}|${flowerString}`;
+
+        try {
+            const { error } = await supabase
+                .from('love_notes')
+                .insert({
+                    content: newNote.trim(),
+                    font_style: fontStyle,
+                    partnership_id: partnershipId,
+                    author_id: userId
+                });
+
+            if (error) throw error;
+            setNewNote('');
+            setSelectedFlowers([]);
+            setIsWriting(false);
+            fetchNotes();
+        } catch (error) {
+            console.error('Error saving note:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -107,321 +225,190 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
         const isLiked = likes.includes(userId);
         let newLikes = isLiked ? likes.filter(id => id !== userId) : [...likes, userId];
 
-        // Optimistic update
         setNotes(prev => prev.map(n => n.id === noteId ? { ...n, likes: newLikes } : n));
-
         try {
-            const { error } = await supabase.from('love_notes').update({ likes: newLikes }).eq('id', noteId);
-            if (error) throw error;
+            await supabase.from('love_notes').update({ likes: newLikes }).eq('id', noteId);
         } catch (err) {
             console.error('Like error:', err);
-            // Revert on error
-            setNotes(prev => prev.map(n => n.id === noteId ? { ...n, likes: likes } : n));
         }
     };
 
     const handleDelete = async (noteId: string) => {
-        if (!confirm('هل أنت متأكد من حذف هذه الخاطرة؟')) return;
-
+        if (!confirm('هل أنت متأكد من مسح هذه الخاطرة؟')) return;
         try {
-            const { error } = await supabase.from('love_notes').delete().eq('id', noteId);
-            if (error) throw error;
+            await supabase.from('love_notes').delete().eq('id', noteId);
             setNotes(prev => prev.filter(n => n.id !== noteId));
         } catch (err) {
             console.error('Delete error:', err);
-            alert('حدث خطأ أثناء الحذف');
         }
     };
 
-    const handleSaveNote = async () => {
-        if (!newNote.trim() || !partnershipId) return;
-        try {
-            const { error } = await supabase.from('love_notes').insert({
-                partnership_id: partnershipId,
-                author_id: userId,
-                content: newNote.trim(),
-                font_style: selectedFont,
-                unlock_at: unlockDate ? new Date(unlockDate).toISOString() : null,
-                unlock_condition: unlockMood || null
-            });
-
-            if (error) throw error;
-
-            setNewNote('');
-            setUnlockDate('');
-            setUnlockMood('');
-            setIsWriting(false);
-            fetchNotes();
-        } catch (err: any) {
-            console.error('Save note error:', err);
-            alert('فشل حفظ الخاطرة: ' + err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const NoteCard = ({ note, index }: { note: Note, index: number }) => {
-        const isLiked = note.likes?.includes(userId);
-        const isAuthor = note.author_id === userId;
-
-        const isLocked = !isAuthor && (
-            (note.unlock_at && new Date(note.unlock_at) > new Date()) ||
-            (note.unlock_condition && partnerMood !== note.unlock_condition)
-        );
-
-        if (isLocked) {
-            return (
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="glass rounded-[3rem] p-8 border-white/50 mb-8 max-w-md mx-auto w-full relative bg-zinc-100/40 dark:bg-black/40 overflow-hidden"
-                >
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-white/10 backdrop-blur-md z-10">
-                        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary animate-pulse">
-                            <Lock className="w-8 h-8" />
-                        </div>
-                        <div className="text-center px-6">
-                            <h3 className="text-xl font-black text-foreground tracking-tight">رسالة مخبوءة</h3>
-                            <p className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-[0.3em] mt-2.5 max-w-[200px] mx-auto leading-relaxed">
-                                {note.unlock_at ? `سوف تزهر هذه الكلمات في ${new Date(note.unlock_at).toLocaleDateString('ar-SA')}` : `تتحرر هذه الرسالة عندما تغادر حالة الـ ${note.unlock_condition === 'sad' ? 'غائم' : note.unlock_condition === 'happy' ? 'مشرق' : note.unlock_condition}`}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="opacity-5 blur-xl select-none pointer-events-none text-right text-3xl">
-                        {note.content.substring(0, 50)}...
-                    </div>
-                </motion.div>
-            );
-        }
-
-        return (
-            <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 30 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ delay: index * 0.1, type: "spring", stiffness: 100 }}
-                className="glass rounded-[3rem] p-8 border-white/50 mb-8 max-w-md mx-auto w-full relative group bg-white/40 overflow-hidden"
-            >
-                {/* Decorative Elements */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-primary/10 transition-colors pointer-events-none" />
-
-                <div className="flex items-center justify-between mb-8 relative z-10">
-                    <div className="flex items-center gap-4 text-right">
-                        <div className="w-12 h-12 rounded-xl bg-secondary border border-white/20 overflow-hidden shadow-2xl">
-                            {note.author?.avatar_url ? (
-                                <img src={note.author.avatar_url} className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary font-black text-lg">
-                                    {note.author?.name?.[0]}
-                                </div>
-                            )}
-                        </div>
-                        <div>
-                            <span className="text-sm font-black text-foreground block">{isAuthor ? 'أنا' : note.author?.name}</span>
-                            <div className="flex items-center gap-1">
-                                <span className="text-[9px] font-black text-rose-500/40 tracking-[0.4em] uppercase">سليل المودة</span>
-                                {(note.unlock_at || note.unlock_condition) && <Unlock className="w-2.5 h-2.5 text-emerald-500/60" />}
-                            </div>
-                        </div>
-                    </div>
-                    {isAuthor && (
-                        <div className="flex gap-2">
-                            {(note.unlock_at || note.unlock_condition) && (
-                                <div className="w-10 h-10 rounded-xl glass border-white/40 flex items-center justify-center text-emerald-500/40">
-                                    <Lock className="w-4 h-4" />
-                                </div>
-                            )}
-                            <motion.button
-                                whileTap={{ scale: 0.9 }}
-                                onClick={() => handleDelete(note.id)}
-                                className="w-10 h-10 rounded-xl glass border-white/40 flex items-center justify-center text-rose-500/40 hover:text-rose-500 transition-all"
-                                title="حذف الخاطرة"
-                            >
-                                <Repeat className="w-5 h-5 rotate-45" />
-                            </motion.button>
-                        </div>
-                    )}
-                    {!isAuthor && (
-                        <div className="w-10 h-10 rounded-2xl glass border-white/40 flex items-center justify-center text-primary/20">
-                            <Sparkles className="w-5 h-5" />
-                        </div>
-                    )}
-                </div>
-
-                <div className={`text-right ${note.font_style} text-3xl leading-[1.5] text-foreground tracking-tight whitespace-pre-wrap mb-12 relative z-10 px-2`}>
-                    {note.content}
-                </div>
-
-                <div className="flex items-center justify-between pt-6 border-t border-primary/5 relative z-10">
-                    <div className="flex items-center gap-8">
-                        <motion.button
-                            whileTap={{ scale: 0.8 }}
-                            onClick={() => handleLike(note.id, note.likes || [])}
-                            className={`flex items-center gap-3 transition-all ${isLiked ? 'text-primary' : 'text-muted-foreground/30 hover:text-primary/60'}`}
-                        >
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isLiked ? 'bg-primary/10 shadow-lg shadow-primary/5' : 'glass border-white/20'}`}>
-                                <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} strokeWidth={2.5} />
-                            </div>
-                            {note.likes && note.likes.length > 0 && <span className="text-[10px] font-black">{note.likes.length}</span>}
-                        </motion.button>
-                        <button className="w-10 h-10 rounded-xl glass border-white/20 flex items-center justify-center text-muted-foreground/30 hover:text-foreground/40 transition-all">
-                            <MessageCircle className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    <div className="text-[9px] font-black text-muted-foreground/20 uppercase tracking-widest bg-black/[0.02] px-4 py-2 rounded-full border border-white/5">
-                        {new Date(note.created_at).toLocaleDateString('ar-SA', { day: 'numeric', month: 'long' })}
-                    </div>
-                </div>
-            </motion.div>
+    const toggleFlower = (id: string) => {
+        setSelectedFlowers(prev => 
+            prev.includes(id) 
+                ? prev.filter(f => f !== id) 
+                : (prev.length < 7 ? [...prev, id] : prev)
         );
     };
 
     return (
-        <div className="flex-1 bg-background flex flex-col relative h-full overflow-hidden mood-love">
-            {/* Romantic Atmospheric Aura - More Sophisticated */}
-            <div className="fixed inset-0 pointer-events-none -z-10">
-                <div className="absolute top-[-10%] right-[-15%] w-[100%] h-[70%] bg-rose-500/[0.08] blur-[180px] rounded-full" />
-                <div className="absolute bottom-[-15%] left-[-10%] w-[90%] h-[60%] bg-violet-500/[0.04] blur-[140px] rounded-full" />
-            </div>
-
-            <header className="px-8 pt-10 pb-6 flex items-center justify-between sticky top-0 bg-background/40 backdrop-blur-3xl z-30">
-                <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => onNavigate('home')}
-                    className="w-12 h-12 flex items-center justify-center glass rounded-[1.4rem] border-white/60 dark:border-white/10 shadow-2xl text-foreground/30 active:scale-90 transition-all font-black"
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                </motion.button>
-                <div className="flex items-center bg-white/40 dark:bg-white/[0.03] rounded-2xl p-1.5 border border-white/60 dark:border-white/5 shadow-inner">
-                    <button
-                        onClick={() => setActiveTab('notes')}
-                        className={`px-6 py-2.5 rounded-[1.2rem] text-[10px] font-black transition-all duration-500 uppercase tracking-widest ${activeTab === 'notes' ? 'bg-rose-500 text-white shadow-xl shadow-rose-500/20' : 'text-foreground/30 hover:text-foreground/50'}`}
+        <div className={`flex flex-col h-full ${isDarkMode ? 'dark bg-zinc-950' : 'bg-rose-50/20'}`}>
+            <header className="px-8 pt-12 pb-6 flex items-center justify-between sticky top-0 z-50 glass border-b border-white/40">
+                <div className="flex items-center gap-4">
+                    <motion.button 
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => onNavigate('home')}
+                        className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white dark:bg-zinc-900 shadow-sm border border-zinc-200 dark:border-zinc-800"
                     >
-                        الرسائل
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('vault')}
-                        className={`px-6 py-2.5 rounded-[1.2rem] text-[10px] font-black transition-all duration-500 uppercase tracking-widest ${activeTab === 'vault' ? 'bg-rose-500 text-white shadow-xl shadow-rose-500/20' : 'text-foreground/30 hover:text-foreground/50'}`}
-                    >
-                        المخبوءة
-                    </button>
+                        <ArrowLeft className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
+                    </motion.button>
+                    <div>
+                        <h1 className="text-xl font-black text-rose-500">أفق الكلمات</h1>
+                        <p className="text-[10px] font-bold text-black/20 dark:text-white/20 uppercase tracking-widest">همسات من الروح</p>
+                    </div>
                 </div>
+                
                 <motion.button
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setIsWriting(!isWriting)}
-                    className={`w-12 h-12 flex items-center justify-center rounded-[1.4rem] glass border shadow-2xl transition-all duration-700 ${isWriting ? 'bg-rose-500 text-white border-rose-500 shadow-rose-500/20' : 'border-white/60 dark:border-white/5 text-rose-500'}`}
+                    className={`w-12 h-12 flex items-center justify-center rounded-3xl transition-all duration-500 shadow-2xl ${isWriting ? 'bg-rose-500 text-white border-rose-500 shadow-rose-500/20' : 'bg-white/40 border border-white/60 text-rose-500'}`}
                 >
                     {isWriting ? <X className="w-5 h-5" /> : <PenLine className="w-5 h-5" />}
                 </motion.button>
             </header>
 
-            <div className="flex-1 overflow-y-auto px-8 pb-40 pt-6 scrollbar-hide">
+            <div className="flex-1 overflow-y-auto px-8 pb-32 pt-10 scrollbar-hide">
                 <AnimatePresence mode="wait">
                     {isWriting ? (
                         <motion.div
                             key="composer"
-                            initial={{ opacity: 0, scale: 0.95, y: 50 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                            className="glass rounded-[3.5rem] p-10 border-white/80 shadow-[0_40px_100px_rgba(0,0,0,0.1)] bg-white/40 relative overflow-hidden"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 20 }}
+                            className="space-y-12"
                         >
-                            <div className="absolute top-0 right-0 p-10 opacity-[0.03] pointer-events-none select-none">
-                                <Feather className="w-40 h-40 text-primary" />
-                            </div>
-
-                            <div className="mb-8 flex items-center gap-3.5 text-rose-500/60 relative z-10">
-                                <div className="w-12 h-12 rounded-[1.4rem] bg-rose-500/5 border border-rose-500/10 flex items-center justify-center shadow-inner">
-                                    <Feather className="w-6 h-6" />
+                            <div className="relative aspect-[272/409] w-full max-w-[300px] mx-auto">
+                                <img src="/assets/love_notes/card-base.png" className="absolute inset-x-0 bottom-0 w-full h-[85%] object-cover z-0" />
+                                <div className="absolute top-0 inset-x-0 h-[60%] z-0 pointer-events-none">
+                                    {selectedFlowers.map((fid, idx) => {
+                                        const flower = flowers.find(f => f.id === fid);
+                                        const slots = [
+                                            { x: '-2%', y: '35%', rotate: 0, scale: 1.2 },
+                                            { x: '-15%', y: '40%', rotate: -15, scale: 1.0 },
+                                            { x: '12%', y: '40%', rotate: 15, scale: 1.05 },
+                                            { x: '22%', y: '45%', rotate: 25, scale: 0.95 },
+                                            { x: '-25%', y: '45%', rotate: -25, scale: 0.95 }
+                                        ];
+                                        const slot = slots[idx % slots.length];
+                                        return (
+                                            <div 
+                                                key={`sel-f-${idx}`}
+                                                className="w-[32%] absolute"
+                                                style={{ left: '50%', top: slot.y, marginLeft: slot.x, transform: `scale(${slot.scale}) rotate(${slot.rotate}deg)`, transformOrigin: 'bottom center' }}
+                                            >
+                                                <img src={flower?.url} className="w-full drop-shadow-md" />
+                                            </div>
+                                        );
+                                    })}
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] font-black uppercase tracking-[0.5em] leading-none mb-1">همس السكينة</span>
-                                    <span className="text-[8px] font-bold opacity-40 uppercase tracking-[0.2em]">اكتب ما يمليه عليك قلبك</span>
+                                <div className="absolute left-[12.5%] top-[34.2%] w-[75%] aspect-square z-10 shadow-lg overflow-hidden">
+                                    <img src="/assets/love_notes/card-paper.png" className="w-full h-full object-cover" />
                                 </div>
-                            </div>
-
-                            <textarea
-                                value={newNote}
-                                onChange={(e) => setNewNote(e.target.value)}
-                                placeholder="صف شعورك الآن..."
-                                className={`w-full min-h-[250px] bg-transparent border-none outline-none text-3xl text-foreground placeholder:text-primary/10 resize-none mb-10 relative z-10 leading-snug ${selectedFont} text-right`}
-                                autoFocus
-                            />
-
-                            <div className="flex items-center gap-3 overflow-x-auto pb-4 scrollbar-hide mb-6 border-b border-primary/5 relative z-10">
-                                {weights.map(weight => (
-                                    <button
-                                        key={weight.value}
-                                        onClick={() => setSelectedFont(weight.value)}
-                                        className={`px-5 py-2.5 rounded-xl text-[9px] font-black whitespace-nowrap transition-all duration-500 border-2 ${selectedFont === weight.value ? 'bg-primary text-white border-primary shadow-2xl shadow-primary/30 scale-105' : 'glass border-white/40 text-primary/40'}`}
-                                    >
-                                        {weight.name}
-                                    </button>
-                                ))}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4 mb-8 relative z-10">
-                                <div className="space-y-2">
-                                    <label className="text-[8px] font-black text-primary/40 uppercase tracking-widest block pr-2">فتح في تاريخ</label>
-                                    <div className="relative">
-                                        <input
-                                            type="date"
-                                            value={unlockDate}
-                                            onChange={(e) => setUnlockDate(e.target.value)}
-                                            className="w-full h-12 glass border-white/40 rounded-xl px-4 text-[10px] font-black text-foreground/60 outline-none focus:border-primary/40"
-                                        />
-                                        <Clock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary/20 pointer-events-none" />
+                                <div className="absolute left-[18.2%] top-[38%] w-[63.5%] h-[40%] z-20 flex flex-col items-center justify-center p-3 text-center overflow-hidden">
+                                    <div className="w-full max-h-full overflow-y-auto paper-content-scroll flex flex-col items-center">
+                                        <p className={`text-[1.2rem] text-black/85 leading-tight whitespace-pre-wrap ${selectedFont}`}>
+                                            {newNote || 'اكتب همستك...'}
+                                        </p>
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[8px] font-black text-primary/40 uppercase tracking-widest block pr-2">فتح عند شعور</label>
-                                    <select
-                                        value={unlockMood}
-                                        onChange={(e) => setUnlockMood(e.target.value)}
-                                        className="w-full h-12 glass border-white/40 rounded-xl px-4 text-[10px] font-black text-foreground/60 outline-none focus:border-primary/40 appearance-none"
-                                    >
-                                        <option value="">لا يوجد شرط</option>
-                                        <option value="happy">مشرق (سعيد)</option>
-                                        <option value="good">جيد</option>
-                                        <option value="okay">عادي</option>
-                                        <option value="sad">غائم (حزين)</option>
-                                    </select>
+                                <img src="/assets/love_notes/card-mask.png" className="absolute inset-x-0 bottom-0 w-full h-[85%] object-cover z-30 opacity-80" />
+                                <div className="absolute left-[17%] bottom-[16%] z-40 px-2">
+                                    <p className={`text-[0.65rem] text-black/40 font-black ${selectedFont} opacity-80`}>
+                                        {selectedFont === 'font-ruqaa' ? 'إلى: ' : 'To: '} {partnerName}
+                                    </p>
                                 </div>
                             </div>
 
-                            <button
-                                onClick={handleSaveNote}
-                                disabled={loading || !newNote.trim()}
-                                className="w-full h-18 bg-rose-500 text-white rounded-[2.2rem] text-lg font-black shadow-xl shadow-rose-500/20 hover:scale-[1.01] active:scale-95 transition-all duration-500 disabled:opacity-30 relative z-10 border-t border-white/20"
-                            >
-                                {loading ? 'جاري تخليد الكلمات...' : 'تسجيل في أفقنا'}
-                            </button>
+                            <div className="space-y-10 glass rounded-[3.5rem] p-8 border-white/60 bg-white/20">
+                                <div className="space-y-4">
+                                    <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest text-right pr-2">اكتب همستك</h4>
+                                    <textarea
+                                        value={newNote}
+                                        onChange={(e) => setNewNote(e.target.value)}
+                                        placeholder="ماذا تود أن تقول لروحك..."
+                                        className="w-full h-32 glass border-white/60 rounded-[2rem] p-6 text-right text-xl outline-none focus:ring-4 ring-rose-500/5 transition-all font-ruqaa"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    {handwritingFonts.map(font => (
+                                        <button
+                                            key={font.value}
+                                            onClick={() => setSelectedFont(font.value)}
+                                            className={`py-5 rounded-2xl glass border-2 transition-all flex flex-col items-center gap-1 ${selectedFont === font.value ? 'border-rose-500 text-rose-500 bg-rose-500/5 shadow-inner' : 'border-white/40 text-black/30'}`}
+                                        >
+                                            <span className={`${font.value} text-3xl font-bold`}>Abc</span>
+                                            <span className="text-[9px] font-black uppercase tracking-tighter opacity-40">{font.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between px-2">
+                                        <span className="text-[10px] font-black text-rose-500/30 uppercase">{selectedFlowers.length} / 7</span>
+                                        <h4 className="text-[10px] font-black text-rose-500 uppercase tracking-widest text-right">أضف زهرة</h4>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-3">
+                                        {flowers.map(flower => (
+                                            <button
+                                                key={flower.id}
+                                                onClick={() => toggleFlower(flower.id)}
+                                                className={`aspect-square rounded-2xl glass border-2 flex items-center justify-center transition-all ${selectedFlowers.includes(flower.id) ? 'border-rose-500 bg-rose-500/10 scale-110 shadow-xl' : 'border-white/40 opacity-50 hover:opacity-100'}`}
+                                            >
+                                                <img src={flower.url} className="w-10 h-10 object-contain" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleSaveNote}
+                                    disabled={loading || !newNote.trim()}
+                                    className="w-full h-20 bg-rose-500 text-white rounded-[2.5rem] font-black text-xl shadow-2xl shadow-rose-500/30 disabled:opacity-20 active:scale-95 transition-all"
+                                >
+                                    {loading ? 'جاري تخليد الكلمات...' : 'إرسال الهمسة'}
+                                </button>
+                            </div>
                         </motion.div>
                     ) : (
-                        <div className="space-y-4">
-                            {(() => {
-                                const filteredNotes = notes.filter(n => {
-                                    const isLocked = n.author_id !== userId && (
-                                        (n.unlock_at && new Date(n.unlock_at) > new Date()) ||
-                                        (n.unlock_condition && partnerMood !== n.unlock_condition)
-                                    );
-                                    return activeTab === 'notes' ? !isLocked : isLocked;
-                                });
-
-                                if (filteredNotes.length === 0) {
-                                    return (
-                                        <div className="flex flex-col items-center justify-center h-96 text-center opacity-20">
-                                            {activeTab === 'notes' ? <Feather className="w-16 h-16 mb-6" /> : <Lock className="w-16 h-16 mb-6" />}
-                                            <p className="font-black text-xl">{activeTab === 'notes' ? 'لا رسائل متاحة' : 'الخزانة فارغة'}</p>
-                                            <p className="text-[10px] font-bold uppercase tracking-widest mt-2">{activeTab === 'notes' ? 'تتحرر الكلمات عندما يحين وقتها' : 'رسائل تنتظر اللحظة المناسبة لتزهر'}</p>
-                                        </div>
-                                    );
-                                }
-
-                                return filteredNotes.map((note, i) => <NoteCard key={note.id} note={note} index={i} />);
-                            })()}
+                        <div className="flex flex-col gap-20">
+                            {notes.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-32 text-center opacity-30">
+                                    <div className="w-20 h-20 rounded-full border-2 border-dashed border-rose-500 flex items-center justify-center mb-6">
+                                        <Ghost size={32} />
+                                    </div>
+                                    <p className="text-xl font-black text-rose-400">لا توجد همسات بعد...</p>
+                                </div>
+                            ) : (
+                                notes.map(note => (
+                                    <NoteCard 
+                                        key={note.id} 
+                                        note={note} 
+                                        userId={userId}
+                                        partnerName={partnerName}
+                                        handleLike={handleLike}
+                                        handleDelete={handleDelete}
+                                    />
+                                ))
+                            )}
                         </div>
                     )}
                 </AnimatePresence>
+            </div>
+
+            <div className="fixed inset-0 pointer-events-none -z-10 overflow-hidden">
+                <div className="absolute top-[-10%] right-[-15%] w-[100%] h-[70%] bg-rose-500/[0.05] blur-[150px] rounded-full" />
+                <div className="absolute bottom-[-15%] left-[-10%] w-[90%] h-[60%] bg-orange-400/[0.03] blur-[120px] rounded-full" />
             </div>
         </div>
     );

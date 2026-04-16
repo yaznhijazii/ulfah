@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Aref+Ruqaa:wght@400;700&family=Amiri:wght@400;700&family=Cedarville+Cursive&display=swap');
+
+.font-ruqaa {
+    font-family: 'Aref Ruqaa', 'Amiri', serif !important;
+}
+
+.font-cedarville {
+    font-family: 'Cedarville Cursive', cursive !important;
+}
+
+/* Force for all paragraphs in the paper container */
+.paper-content-scroll p {
+    font-family: 'Aref Ruqaa', 'Amiri', serif !important;
+    font-size: 1.4rem !important;
+}
+
+.paper-content-scroll .font-cedarville {
+    font-family: 'Cedarville Cursive', cursive !important;
+    font-size: 1.1rem !important;
+}
+
+/* Card specific adjustments */
+.decorated-card-text {
+    @apply leading-relaxed;
+}
+
+.paper-content-scroll::-webkit-scrollbar {
+    width: 2px;
+}
+.paper-content-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.paper-content-scroll::-webkit-scrollbar-thumb {
+    background: rgba(244, 63, 94, 0.2);
+    border-radius: 10px;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
