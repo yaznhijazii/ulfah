@@ -12,12 +12,12 @@ export function BottomNav({ currentScreen, onNavigate }: BottomNavProps) {
         { id: 'calendar', label: 'الذكرى', icon: Calendar, moodClass: 'text-amber-500', glowClass: 'bg-amber-500' },
         { id: 'finance', label: 'المالية', icon: Wallet, moodClass: 'text-emerald-500', glowClass: 'bg-emerald-500' },
         { id: 'games', label: 'ألعابنا', icon: Gamepad2, moodClass: 'text-purple-500', glowClass: 'bg-purple-500' },
-        { id: 'dialogues', label: 'ميثاقنا', icon: MessageCircle, moodClass: 'text-blue-500', glowClass: 'bg-blue-500' },
+        { id: 'dialogues', label: 'عهودنا', icon: MessageCircle, moodClass: 'text-blue-500', glowClass: 'bg-blue-500' },
     ];
 
     return (
         <div className="w-full">
-            <nav className="w-full h-[84px] bg-background/80 backdrop-blur-3xl border-t border-border/50 flex items-center justify-around px-2 pb-safe shadow-[0_-20px_50px_rgba(0,0,0,0.05)]">
+            <nav className="w-full h-[84px] bg-background/80 backdrop-blur-3xl border-t border-border/50 flex items-center px-1 pb-safe shadow-[0_-20px_50px_rgba(0,0,0,0.05)]">
                 {navItems.map((item) => {
                     const isActive = currentScreen === item.id;
                     const Icon = item.icon;
@@ -27,7 +27,7 @@ export function BottomNav({ currentScreen, onNavigate }: BottomNavProps) {
                             key={item.id}
                             whileTap={{ scale: 0.9 }}
                             onClick={() => onNavigate(item.id)}
-                            className={`flex flex-col items-center justify-center gap-2 w-[72px] h-full transition-all duration-500 relative ${isActive ? item.moodClass : 'text-muted-foreground/40 hover:text-foreground/60'
+                            className={`flex flex-col items-center justify-center gap-2 flex-1 h-full transition-all duration-500 relative ${isActive ? item.moodClass : 'text-muted-foreground/40 hover:text-foreground/60'
                                 }`}
                         >
                             <div className="relative z-10 flex flex-col items-center">
@@ -45,7 +45,7 @@ export function BottomNav({ currentScreen, onNavigate }: BottomNavProps) {
                                     />
                                 )}
                             </div>
-                            <span className={`text-[9px] font-black uppercase tracking-[0.2em] transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-30'
+                            <span className={`text-[9px] font-black uppercase tracking-wide transition-all duration-500 ${isActive ? 'opacity-100' : 'opacity-30'
                                 }`}>
                                 {item.label}
                             </span>

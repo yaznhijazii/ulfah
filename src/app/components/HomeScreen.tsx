@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Settings, Heart, Sparkles, ChevronLeft, MapPin, Compass, Gift, Moon, Sun, 
     ShieldCheck, Target, Zap, Navigation, User, Calendar, ArrowUpRight, 
-    Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet
+    Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet, Lock, Music
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Button } from './ui/button';
@@ -36,6 +36,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     const [latestNote, setLatestNote] = useState<any>(null);
     const [myCommitments, setMyCommitments] = useState<any[]>([]);
     const [showMap, setShowMap] = useState(false);
+    const [statsCount, setStatsCount] = useState({ notes: 0, commitments: 0, goals: 0, songs: 0 });
 
     const initialLoadDone = useRef(false);
 
@@ -141,6 +142,15 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 if (myMood) { setSelectedMoodId(myMood.mood); setShowMoodPrompt(false); }
                 if (pMood) setPartnerMood(pMood.mood);
                 setUpcomingEvents(events || []);
+
+                // Fetch stats for عداد اللحظات
+                const [{ count: notesCount }, { count: commitmentsCount }, { count: goalsCount }, { count: songsCount }] = await Promise.all([
+                    supabase.from('love_notes').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId),
+                    supabase.from('commitments').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId),
+                    supabase.from('finance_jars').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId),
+                    supabase.from('playlist_songs').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId),
+                ]);
+                setStatsCount({ notes: notesCount || 0, commitments: commitmentsCount || 0, goals: goalsCount || 0, songs: songsCount || 0 });
 
                 const { data: pLNote } = await supabase.from('love_notes').select('content').eq('author_id', partnerId).order('created_at', { ascending: false }).limit(1).maybeSingle();
                 setAiRecommendation(getAIRecommendation({ mood: pMood?.mood || null, lastNote: pLNote?.content || null }));
@@ -596,6 +606,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                     </motion.div>
                 </section>
 
+
                 {/* --- BENTO GRID SECTIONS --- */}
                 <section className="grid grid-cols-2 gap-5 px-1">
                     <motion.div 
@@ -611,7 +622,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                              <ArrowUpRight size={16} className="text-amber-500/30 group-hover:text-amber-400 dark:group-hover:text-amber-400 transition-colors" />
                         </div>
                         <div>
-                            <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5">أفق أحلامنا</h3>
+                            <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5">خططنا القادمة</h3>
                             <p className="text-[10px] font-bold text-amber-600/50 dark:text-amber-500/60 uppercase tracking-widest">بوصلة الشغف</p>
                         </div>
                     </motion.div>
@@ -634,7 +645,66 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         </div>
                     </motion.div>
 
-                    {/* ── بذرة مودة — PREMIUM SEED CARD (AMBER-GOLD) ── */}
+                    {/* ── دفتر المساء ── */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        whileTap={{ scale: 0.97 }}
+                        viewport={{ once: true }}
+                        onClick={() => {
+                            const hour = new Date().getHours();
+                            if (hour < 21) {
+                                alert("التوقيت لم يحن بعد! 🌙\nدفتر المساء يفتح أبوابه فقط بعد الساعة 9:00 مساءً ليكون ختام يومكم.");
+                            } else {
+                                onNavigate('evening_journal');
+                            }
+                        }}
+                        className={`col-span-1 bg-white/60 dark:bg-white/[0.05] rounded-[2.2rem] p-6 border shadow-sm flex flex-col gap-5 group transition-all ${new Date().getHours() < 21 ? 'border-zinc-200/50 dark:border-white/[0.03] opacity-70 cursor-not-allowed grayscale-[30%]' : 'border-white/80 dark:border-white/[0.08] bg-indigo-500/[0.03] cursor-pointer hover:bg-white dark:hover:bg-white/[0.09] hover:shadow-md'}`}
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-transform shadow-sm ${new Date().getHours() < 21 ? 'bg-zinc-100 dark:bg-white/5 text-zinc-400' : 'bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-500 dark:text-indigo-400 group-hover:scale-110'}`}>
+                                <Moon size={22} />
+                            </div>
+                            {new Date().getHours() < 21 ? (
+                                <div className="text-[9px] font-black bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-zinc-400 px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
+                                    <Lock size={10} /> 9:00 PM
+                                </div>
+                            ) : (
+                                <ArrowUpRight size={16} className="text-indigo-500/30 group-hover:text-indigo-400 transition-colors" />
+                            )}
+                        </div>
+                        <div>
+                            <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5 flex items-center gap-2">
+                                دفتر المساء
+                            </h3>
+                            <p className="text-[10px] font-bold text-indigo-600/40 dark:text-indigo-400/50 uppercase tracking-widest leading-relaxed">
+                                {new Date().getHours() < 21 ? 'يعود الليلة بسؤال جديد' : 'سؤال يومي مشترك'}
+                            </p>
+                        </div>
+                    </motion.div>
+
+                    {/* ── بلايليستنا ── */}
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
+                        whileTap={{ scale: 0.97 }}
+                        viewport={{ once: true }}
+                        onClick={() => onNavigate('playlist')}
+                        className="col-span-1 bg-white/60 dark:bg-white/[0.05] rounded-[2.2rem] p-6 border border-white/80 dark:border-white/[0.08] shadow-sm bg-rose-500/[0.03] flex flex-col gap-5 group cursor-pointer transition-all hover:bg-white dark:hover:bg-white/[0.09] hover:shadow-md"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="w-11 h-11 rounded-2xl bg-rose-500/10 dark:bg-rose-500/15 flex items-center justify-center text-rose-500 dark:text-rose-400 transition-transform group-hover:scale-110 shadow-sm">
+                                <Music size={22} />
+                            </div>
+                            <ArrowUpRight size={16} className="text-rose-500/30 group-hover:text-rose-400 transition-colors" />
+                        </div>
+                        <div>
+                            <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5">بلايليستنا</h3>
+                            <p className="text-[10px] font-bold text-rose-600/40 dark:text-rose-400/50 uppercase tracking-widest">أغاني تجمعنا</p>
+                        </div>
+                    </motion.div>
+
+                    {/* ── صندوق الأمنيات ── */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
                         whileInView={{ opacity: 1, y: 0 }}
@@ -714,7 +784,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                         transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
                                     />
                                     <span className="text-[9px] font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest">
-                                        {aiRecommendation?.title || 'بذرة مودة 🌱'}
+                                        {aiRecommendation?.title || 'بذرة الاخلاص'}
                                     </span>
                                 </div>
                                 {/* Advice text */}
@@ -731,7 +801,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                     </motion.div>
 
                     <div className="col-span-2 flex items-center gap-4 px-2 mt-4">
-                         <h3 className="text-xl font-black tracking-tight text-zinc-800 dark:text-white/90 uppercase">البريد الوجداني</h3>
+                         <h3 className="text-xl font-black tracking-tight text-zinc-800 dark:text-white/90 uppercase">بريد الحب</h3>
                          <div className="h-px flex-1 bg-gradient-to-r from-rose-500/30 dark:from-rose-500/40 to-transparent" />
                     </div>
 
@@ -843,7 +913,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 <section className="space-y-6">
                     <div className="flex items-center justify-between px-2">
                         <div className="flex items-center gap-3">
-                            <h3 className="text-xl font-black tracking-tight text-foreground/90 uppercase">محطاتنا القادمة</h3>
+                            <h3 className="text-xl font-black tracking-tight text-foreground/90 uppercase">أحداث قادمة</h3>
                             <span className="bg-rose-500/10 text-rose-500 px-3 py-1 rounded-full text-[10px] font-black shadow-sm">
                                 {upcomingEvents.length}
                             </span>

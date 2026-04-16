@@ -458,7 +458,7 @@ export function DialogueScreen({ onBack, userId, partnershipId }: DialogueScreen
                         <ArrowLeft className="w-5 h-5" />
                     </motion.button>
                     <div className="text-center">
-                        <h1 className="text-xl font-black text-foreground tracking-tighter">ميثاق المودة</h1>
+                        <h1 className="text-xl font-black text-foreground tracking-tighter">عهودنا</h1>
                         <p className="text-[9px] font-black text-blue-600/40 uppercase tracking-[0.5em] mt-0.5">سجل الحوارات.. ومحطات الاتفاق</p>
                     </div>
                     <motion.button

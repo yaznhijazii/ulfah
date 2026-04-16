@@ -207,12 +207,10 @@ export function FinanceScreen({ userId, partnershipId, isDarkMode, onNavigate }:
                         <ArrowLeft className="w-5 h-5" />
                     </motion.button>
                     <div className="text-center">
-                        <h1 className="text-lg font-black text-foreground tracking-tighter">مرفأ الرخاء</h1>
+                        <h1 className="text-lg font-black text-foreground tracking-tighter">حياتنا المالية</h1>
                         <p className="text-[8px] font-black text-teal-600/40 uppercase tracking-[0.5em]">نماء مشترك لمستقبل واعد</p>
                     </div>
-                    <div className="w-11 h-11 flex items-center justify-center glass rounded-2xl border-white/60 text-amber-500 shadow-xl">
-                        <Shield className="w-5 h-5" />
-                    </div>
+                    <div className="w-11 h-11" />
                 </div>
 
                 <div className="flex gap-4 px-2">

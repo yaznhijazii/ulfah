@@ -717,13 +717,11 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
 
         {/* Picker: what to add */}
         {showAddEventForm && (
-          <div className="fixed inset-0 z-[60] flex items-end justify-center">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowAddEventForm(false)} />
-            <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-              className="relative w-full max-w-sm bg-white dark:bg-zinc-950 rounded-t-[3rem] p-8 pb-12 shadow-2xl z-10 border-t border-black/5 dark:border-white/8 mx-auto">
-              <div className="w-10 h-1 bg-black/10 dark:bg-white/15 rounded-full mx-auto mb-8" />
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-sm bg-white dark:bg-zinc-950 rounded-[3rem] p-8 shadow-2xl z-10 border border-black/5 dark:border-white/8">
               <h2 className="text-xl font-black mb-6 text-center text-foreground tracking-tighter">تدوين أثر جديد</h2>
               <div className="space-y-3">
                 {[

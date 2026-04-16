@@ -92,7 +92,7 @@ export function PromisesScreen({ onNavigate, userId, partnershipId }: PromisesSc
         <div className="w-24 h-24 rounded-[2.5rem] bg-primary/5 border border-white/20 flex items-center justify-center mb-8 shadow-2xl">
           <ShieldCheck className="w-12 h-12 text-primary/40" />
         </div>
-        <h2 className="text-2xl font-black mb-3 tracking-tighter">ميثاق المودة</h2>
+        <h2 className="text-2xl font-black mb-3 tracking-tighter">عهودنا</h2>
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/30 mb-10 leading-relaxed">يرجى إتمام ربط الشريك لتفعيل بنود هذا الميثاق المقدس</p>
         <Button onClick={() => onNavigate('settings')} className="w-full h-16 bg-primary text-white rounded-[2rem] shadow-2xl shadow-primary/20 text-sm font-black uppercase tracking-widest leading-none">إتمام الربط الآن</Button>
       </div>

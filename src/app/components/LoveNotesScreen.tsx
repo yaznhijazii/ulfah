@@ -37,12 +37,14 @@ const NoteCard = ({
     note, 
     userId, 
     partnerName, 
+    myName,
     handleLike, 
     handleDelete 
 }: { 
     note: Note; 
     userId: string; 
     partnerName: string; 
+    myName: string;
     handleLike: (id: string, current: string[]) => void; 
     handleDelete: (id: string) => void; 
 }) => {
@@ -120,7 +122,7 @@ const NoteCard = ({
                                 {note.content}
                             </p>
                             <span className={`text-[0.65rem] text-black/40 italic mt-6 self-end shrink-0 ${fontClass}`}>
-                                — {isAuthor ? partnerName : 'أنا'}
+                                — {isAuthor ? myName : partnerName}
                             </span>
                         </div>
                     </div>
@@ -130,7 +132,7 @@ const NoteCard = ({
 
                 <div className="absolute left-[17%] bottom-[16%] z-40 px-2">
                     <p className={`text-[0.7rem] text-black/40 font-black ${fontClass} opacity-80`}>
-                        {fontClass === 'font-ruqaa' ? 'إلى: ' : 'To: '} {isAuthor ? partnerName : 'أنا'}
+                        {fontClass === 'font-ruqaa' ? 'إلى: ' : 'To: '} {isAuthor ? partnerName : myName}
                     </p>
                 </div>
 
@@ -149,6 +151,164 @@ const NoteCard = ({
     );
 };
 
+// Groups notes by Month/Year and renders them with date dividers + compact preview cards
+function NotesGallery({ notes, userId, partnerName, myName, handleLike, handleDelete }: {
+    notes: Note[];
+    userId: string;
+    partnerName: string;
+    myName: string;
+    handleLike: (id: string, current: string[]) => void;
+    handleDelete: (id: string) => void;
+}) {
+    const [selectedNote, setSelectedNote] = useState<Note | null>(null);
+
+    // Group notes by month label
+    const grouped: { label: string; notes: Note[] }[] = [];
+    const seen = new Map<string, Note[]>();
+    notes.forEach(note => {
+        const d = new Date(note.created_at);
+        const key = d.toLocaleDateString('ar-JO', { month: 'long', year: 'numeric' });
+        if (!seen.has(key)) { seen.set(key, []); grouped.push({ label: key, notes: seen.get(key)! }); }
+        seen.get(key)!.push(note);
+    });
+
+    if (notes.length === 0) {
+        return (
+            <div className="flex flex-col items-center justify-center py-32 text-center opacity-30">
+                <div className="w-20 h-20 rounded-full border-2 border-dashed border-rose-500 flex items-center justify-center mb-6">
+                    <Ghost size={32} />
+                </div>
+                <p className="text-xl font-black text-rose-400">لا توجد رسائل بعد...</p>
+            </div>
+        );
+    }
+
+    return (
+        <>
+            <div className="space-y-10">
+                {grouped.map(group => (
+                    <div key={group.label}>
+                        {/* Month divider */}
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="flex-1 h-px bg-rose-200/40" />
+                            <span className="text-[9px] font-black text-rose-400/60 uppercase tracking-[0.3em] whitespace-nowrap">
+                                {group.label}
+                            </span>
+                            <div className="flex-1 h-px bg-rose-200/40" />
+                        </div>
+
+                        {/* Compact note cards */}
+                        <div className="space-y-3">
+                            {group.notes.map((note, idx) => {
+                                const [rawFont, flowersPart] = note.font_style?.includes('|')
+                                    ? note.font_style.split('|')
+                                    : [note.font_style || 'font-ruqaa', ''];
+                                const fontClass = rawFont === 'font-cedarville' ? 'font-cedarville' : 'font-ruqaa';
+                                const isAuthor = note.author_id === userId;
+                                const senderName = isAuthor ? myName : partnerName;
+                                const recipientName = isAuthor ? partnerName : myName;
+                                const dateStr = new Date(note.created_at).toLocaleDateString('ar-JO', { day: 'numeric', month: 'short' });
+                                const isLiked = note.likes?.includes(userId);
+                                const flowerIds = flowersPart?.split(',').filter(Boolean) || [];
+                                const firstFlower = flowerIds.length > 0 ? flowers.find(f => f.id === flowerIds[0]) : null;
+
+                                return (
+                                    <motion.button
+                                        key={note.id}
+                                        initial={{ opacity: 0, y: 12 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: idx * 0.05 }}
+                                        onClick={() => setSelectedNote(note)}
+                                        className="w-full text-right"
+                                        dir="rtl"
+                                    >
+                                        <div className="flex items-center gap-4 p-4 glass border-white/30 rounded-3xl hover:shadow-xl hover:border-rose-200/40 transition-all duration-300 group">
+                                            {/* Mini envelope icon with optional flower */}
+                                            <div className="relative w-14 h-14 shrink-0">
+                                                <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-300">
+                                                    <img src="/assets/love_notes/card-base.png" className="w-10 h-10 object-contain opacity-70" />
+                                                </div>
+                                                {firstFlower && (
+                                                    <img src={firstFlower.url} className="absolute -top-2 -right-2 w-7 h-7 object-contain drop-shadow-md" />
+                                                )}
+                                            </div>
+
+                                            {/* Content */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="text-[9px] font-black text-rose-400/50 uppercase tracking-widest">{dateStr}</span>
+                                                    <div className="flex items-center gap-1">
+                                                        {isLiked && <Heart size={10} className="text-rose-500 fill-rose-500" />}
+                                                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${isAuthor ? 'bg-rose-100 text-rose-500' : 'bg-amber-100 text-amber-600'}`}>
+                                                            {isAuthor ? 'أرسلتها' : 'استقبلتها'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <p className={`text-sm font-bold text-foreground/70 leading-snug truncate ${fontClass}`}>
+                                                    {note.content}
+                                                </p>
+                                                <p className="text-[9px] text-muted-foreground/40 mt-1 font-black">
+                                                    من {senderName} · إلى {recipientName}
+                                                </p>
+                                            </div>
+
+                                            {/* Arrow */}
+                                            <div className="text-rose-300 shrink-0">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="15 18 9 12 15 6" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </motion.button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Full letter modal */}
+            <AnimatePresence>
+                {selectedNote && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedNote(null)}
+                            className="absolute inset-0 bg-black/30 backdrop-blur-md"
+                        />
+                        <motion.div
+                            initial={{ scale: 0.85, y: 40, opacity: 0 }}
+                            animate={{ scale: 1, y: 0, opacity: 1 }}
+                            exit={{ scale: 0.85, y: 40, opacity: 0 }}
+                            transition={{ type: 'spring', damping: 22, stiffness: 200 }}
+                            className="relative z-10 w-full max-w-[340px]"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <NoteCard
+                                note={selectedNote}
+                                userId={userId}
+                                partnerName={partnerName}
+                                myName={myName}
+                                handleLike={handleLike}
+                                handleDelete={(id) => { handleDelete(id); setSelectedNote(null); }}
+                            />
+                            <motion.button
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setSelectedNote(null)}
+                                className="mt-6 mx-auto flex items-center justify-center w-12 h-12 rounded-full bg-white/80 shadow-xl text-rose-400 border border-rose-100"
+                            >
+                                <X size={20} />
+                            </motion.button>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+        </>
+    );
+}
+
 export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode }: LoveNotesScreenProps) {
     const [notes, setNotes] = useState<Note[]>([]);
     const [newNote, setNewNote] = useState('');
@@ -157,6 +317,7 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
     const [loading, setLoading] = useState(false);
     const [isWriting, setIsWriting] = useState(false);
     const [partnerName, setPartnerName] = useState('Habibi');
+    const [myName, setMyName] = useState('أنا');
 
     const handwritingFonts = [
         { name: 'رقعة (عربي)', value: 'font-ruqaa', fontSize: 'text-2xl' },
@@ -174,8 +335,10 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
         if (!partnershipId) return;
         const { data } = await supabase.from('partnerships').select('user1:user1_id(name), user2:user2_id(name), user1_id').eq('id', partnershipId).single();
         if (data) {
-            const name = data.user1_id === userId ? (data as any).user2?.name : (data as any).user1?.name;
-            setPartnerName(name || 'Habibi');
+            const partnerNameStr = data.user1_id === userId ? (data as any).user2?.name : (data as any).user1?.name;
+            const myNameStr = data.user1_id === userId ? (data as any).user1?.name : (data as any).user2?.name;
+            setPartnerName(partnerNameStr || 'Habibi');
+            setMyName(myNameStr || 'أنا');
         }
     };
 
@@ -263,7 +426,7 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
                         <ArrowLeft className="w-5 h-5 text-zinc-600 dark:text-zinc-400" />
                     </motion.button>
                     <div>
-                        <h1 className="text-xl font-black text-rose-500">أفق الكلمات</h1>
+                        <h1 className="text-xl font-black text-rose-500">رسائل الحب</h1>
                         <p className="text-[10px] font-bold text-black/20 dark:text-white/20 uppercase tracking-widest">همسات من الروح</p>
                     </div>
                 </div>
@@ -381,27 +544,14 @@ export function LoveNotesScreen({ onNavigate, userId, partnershipId, isDarkMode 
                             </div>
                         </motion.div>
                     ) : (
-                        <div className="flex flex-col gap-20">
-                            {notes.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-32 text-center opacity-30">
-                                    <div className="w-20 h-20 rounded-full border-2 border-dashed border-rose-500 flex items-center justify-center mb-6">
-                                        <Ghost size={32} />
-                                    </div>
-                                    <p className="text-xl font-black text-rose-400">لا توجد همسات بعد...</p>
-                                </div>
-                            ) : (
-                                notes.map(note => (
-                                    <NoteCard 
-                                        key={note.id} 
-                                        note={note} 
-                                        userId={userId}
-                                        partnerName={partnerName}
-                                        handleLike={handleLike}
-                                        handleDelete={handleDelete}
-                                    />
-                                ))
-                            )}
-                        </div>
+                        <NotesGallery
+                            notes={notes}
+                            userId={userId}
+                            partnerName={partnerName}
+                            myName={myName}
+                            handleLike={handleLike}
+                            handleDelete={handleDelete}
+                        />
                     )}
                 </AnimatePresence>
             </div>

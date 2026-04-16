@@ -13,6 +13,8 @@ import { AdventureBucketScreen } from './components/AdventureBucketScreen';
 import { FinanceScreen } from './components/FinanceScreen';
 import { OccasionScreen } from './components/OccasionScreen';
 import { WishlistScreen } from './components/WishlistScreen';
+import { PlaylistScreen } from './components/PlaylistScreen';
+import { EveningJournalScreen } from './components/EveningJournalScreen';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster } from 'sonner';
@@ -30,7 +32,9 @@ type Screen =
   | 'finance'
   | 'adventure_bucket'
   | 'occasion'
-  | 'wishlist';
+  | 'wishlist'
+  | 'playlist'
+  | 'evening_journal';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
@@ -167,6 +171,10 @@ function App() {
         return <OccasionScreen onBack={() => handleNavigate('home')} isDarkMode={isDarkMode} userId={userId} partnershipId={partnershipId} />;
       case 'wishlist':
         return <WishlistScreen onBack={() => handleNavigate('home')} userId={userId} partnershipId={partnershipId} />;
+      case 'playlist':
+        return <PlaylistScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
+      case 'evening_journal':
+        return <EveningJournalScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       default:
         return <HomeScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
     }
@@ -210,7 +218,7 @@ function App() {
               </AnimatePresence>
             </main>
 
-            {['home', 'calendar', 'commitments', 'dialogues', 'finance', 'games', 'love_notes', 'adventure_bucket'].includes(currentScreen) && (
+            {['home', 'calendar', 'commitments', 'dialogues', 'finance', 'games', 'love_notes', 'adventure_bucket', 'playlist', 'evening_journal'].includes(currentScreen) && (
               <footer className="shrink-0 bg-background/80 backdrop-blur-3xl border-t border-border/50 z-50">
                 <BottomNav currentScreen={currentScreen} onNavigate={handleNavigate} />
               </footer>
