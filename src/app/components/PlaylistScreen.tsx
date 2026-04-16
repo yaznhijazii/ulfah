@@ -38,7 +38,6 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
     const [isAdding, setIsAdding] = useState(false);
     const [playingSong, setPlayingSong] = useState<Song | null>(null);
     const [isRadioPlaying, setIsRadioPlaying] = useState(false);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
     const [partnerName, setPartnerName] = useState('شريك');
     const [newSong, setNewSong] = useState({ title: '', artist: '', note: '', url: '' });
 
@@ -48,6 +47,18 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
             fetchPartnerName();
         } else {
             setLoading(false);
+        }
+        const audioEl = document.getElementById('global-radio-ulfah') as HTMLAudioElement;
+        if (audioEl) {
+            setIsRadioPlaying(!audioEl.paused);
+            const onPlay = () => setIsRadioPlaying(true);
+            const onPause = () => setIsRadioPlaying(false);
+            audioEl.addEventListener('play', onPlay);
+            audioEl.addEventListener('pause', onPause);
+            return () => {
+                audioEl.removeEventListener('play', onPlay);
+                audioEl.removeEventListener('pause', onPause);
+            };
         }
     }, [partnershipId]);
 
@@ -71,20 +82,21 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
     };
 
     const toggleRadio = () => {
-        if (!audioRef.current) return;
+        const audioEl = document.getElementById('global-radio-ulfah') as HTMLAudioElement;
+        if (!audioEl) return;
         if (isRadioPlaying) {
-            audioRef.current.pause();
+            audioEl.pause();
             setIsRadioPlaying(false);
             toast.info('تم إيقاف الراديو');
         } else {
             toast.loading('جاري تشغيل الراديو...', { id: 'radio-play' });
             
             // Re-assign src to ensure browser recognizes it as a fresh user-initiated request if needed
-            if (!audioRef.current.src || audioRef.current.src.includes('undefined') || !audioRef.current.src.includes('radio.co')) {
-                audioRef.current.src = "https://streamer.radio.co/sf2fa6ce9d/listen";
+            if (!audioEl.src || audioEl.src.includes('undefined') || !audioEl.src.includes('radio.co')) {
+                audioEl.src = "https://streamer.radio.co/sf2fa6ce9d/listen";
             }
 
-            const playPromise = audioRef.current.play();
+            const playPromise = audioEl.play();
             if (playPromise !== undefined) {
                 playPromise
                     .then(() => {
@@ -206,10 +218,7 @@ export function PlaylistScreen({ onNavigate, userId, partnershipId, isDarkMode }
                 </div>
             </header>
 
-            {/* Hidden Radio Audio */}
-            <audio ref={audioRef} src="https://streamer.radio.co/sf2fa6ce9d/listen" playsInline preload="auto" />
-
-            {/* Content */}
+            {/* Header */}
             <div className="flex-1 overflow-y-auto px-5 pb-32 pt-4 scrollbar-hide" dir="rtl">
 
                 {/* ── LIVE RADIO CARD ── */}

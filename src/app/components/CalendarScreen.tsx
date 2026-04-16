@@ -76,14 +76,16 @@ const MemoryItem = memo(({ item, idx, viewMode, onDelete, onOpenGallery, getRela
   const isFirst = idx === 0;
 
   return (
-    <div className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-7 relative items-start w-full`}>
+    <div className={`flex ${viewMode === 'timeline' ? 'flex-row' : 'flex-col'} gap-7 relative items-center w-full`}>
 
       {/* Timeline dot */}
       {viewMode === 'timeline' && (
-        <div className="flex flex-col items-center w-10 shrink-0 pt-2 relative z-10 text-center">
-          <span className="text-[8px] font-black text-rose-500/50 uppercase tracking-widest leading-none">{MONTH_NAMES[item.date.getMonth()]}</span>
-          <span className="text-2xl font-black text-foreground leading-none my-1.5">{item.date.getDate()}</span>
-          <div className="w-3 h-3 rounded-full bg-rose-500 border-[3px] border-background shadow-md shadow-rose-500/30" />
+        <div className="flex flex-col items-center w-10 shrink-0 relative z-10 text-center">
+          <span className="text-[10px] font-black text-rose-500/40 uppercase tracking-widest leading-none bg-[#fff8f8] dark:bg-[#0b0407] px-1 z-10">{MONTH_NAMES[item.date.getMonth()]}</span>
+          <span className="text-2xl font-black text-foreground leading-none my-2 bg-[#fff8f8] dark:bg-[#0b0407] px-2 z-10">{item.date.getDate()}</span>
+          <div className="relative z-10 bg-[#fff8f8] dark:bg-[#0b0407] p-1 rounded-full">
+            <div className="w-3 h-3 rounded-full bg-rose-500 border-[2.5px] border-[#fff8f8] dark:border-[#0b0407] shadow-md shadow-rose-500/30" />
+          </div>
         </div>
       )}
 
@@ -148,12 +150,20 @@ const MemoryItem = memo(({ item, idx, viewMode, onDelete, onOpenGallery, getRela
           {/* Content */}
           <div className="p-7">
             <div className="flex items-start justify-between gap-3 mb-3">
-              <button
-                onClick={() => onDelete(item.id, 'memory')}
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-500/8 text-rose-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/15 flex-shrink-0 mt-0.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-black/5 dark:bg-white/5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all hover:bg-black/10 flex-shrink-0 mt-0.5"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => onDelete(item.id, 'memory')}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-rose-500/8 text-rose-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/15 flex-shrink-0 mt-0.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <h3 className="font-black text-lg text-foreground tracking-tight text-right leading-snug">{item.title}</h3>
             </div>
             {item.description && (
@@ -179,14 +189,16 @@ const EventItem = memo(({ item, viewMode, onDelete, getRelativeTime }: any) => {
   const isSpecial = item.event_type === 'special';
 
   return (
-    <div className={`flex ${viewMode === 'timeline' ? 'flex-row-reverse' : 'flex-col'} gap-7 relative items-start w-full`}>
+    <div className={`flex ${viewMode === 'timeline' ? 'flex-row' : 'flex-col'} gap-7 relative items-center w-full`}>
 
       {/* Timeline dot */}
       {viewMode === 'timeline' && (
-        <div className="flex flex-col items-center w-10 shrink-0 pt-2 relative z-10 text-center">
-          <span className="text-[8px] font-black text-rose-500/50 uppercase tracking-widest leading-none">{MONTH_NAMES[item.date.getMonth()]}</span>
-          <span className="text-2xl font-black text-foreground leading-none my-1.5">{item.date.getDate()}</span>
-          <div className={`w-3 h-3 rounded-full border-[3px] border-background shadow-md ${isSpecial ? 'bg-rose-500 shadow-rose-500/30' : 'bg-indigo-500 shadow-indigo-500/25'}`} />
+        <div className="flex flex-col items-center w-10 shrink-0 relative z-10 text-center">
+          <span className="text-[10px] font-black text-rose-500/40 uppercase tracking-widest leading-none bg-[#fff8f8] dark:bg-[#0b0407] px-1 z-10">{MONTH_NAMES[item.date.getMonth()]}</span>
+          <span className="text-2xl font-black text-foreground leading-none my-2 bg-[#fff8f8] dark:bg-[#0b0407] px-2 z-10">{item.date.getDate()}</span>
+          <div className="relative z-10 bg-[#fff8f8] dark:bg-[#0b0407] p-1 rounded-full">
+            <div className={`w-3 h-3 rounded-full border-[2.5px] border-[#fff8f8] dark:border-[#0b0407] shadow-md ${isSpecial ? 'bg-rose-500 shadow-rose-500/30' : 'bg-indigo-500 shadow-indigo-500/25'}`} />
+          </div>
         </div>
       )}
 
@@ -256,7 +268,8 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
   const [memoryForm,  setMemoryForm]  = useState({ title: '', memory_date: new Date().toISOString().split('T')[0], description: '' });
   const [greetingForm,setGreetingForm]= useState({ title: '', target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], message: '' });
   const [editingGreetingId, setEditingGreetingId] = useState<string | null>(null);
-  const [selectedImages, setSelectedImages] = useState<{ file: File; preview: string }[]>([]);
+  const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<{ file?: File; preview: string; isOld?: boolean; url?: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Gallery
@@ -382,6 +395,21 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
     setShowGallery(true);
   }, []);
 
+  const editMemory = useCallback((mem: any) => {
+      setEditingMemoryId(mem.id);
+      setMemoryForm({
+          title: mem.title,
+          description: mem.description || '',
+          memory_date: new Date(mem.memory_date).toISOString().split('T')[0]
+      });
+      if (mem.images) {
+          setSelectedImages(mem.images.map((img: any) => ({ preview: img.image_url, isOld: true, url: img.image_url })));
+      } else {
+          setSelectedImages([]);
+      }
+      setShowAddMemoryForm(true);
+  }, []);
+
   const nextImage = useCallback(() => setGalleryIndex(p => (p + 1) % galleryImages.length), [galleryImages.length]);
   const prevImage = useCallback(() => setGalleryIndex(p => (p - 1 + galleryImages.length) % galleryImages.length), [galleryImages.length]);
 
@@ -440,33 +468,68 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
     if (!partnershipId || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      const { data: memory, error: mError } = await supabase
-        .from('memories').insert({ partnership_id: partnershipId, created_by_user_id: userId, ...memoryForm })
-        .select().single();
+      let memoryId = editingMemoryId;
 
-      if (!mError && memory && selectedImages.length > 0) {
-        const { compressImage } = await import('../../utils/imageOptimizer');
-        const uploadedUrls: { memory_id: string; image_url: string }[] = [];
-        for (const img of selectedImages) {
-          let file = img.file;
-          try { file = await compressImage(img.file, { maxWidth: 1200, quality: 0.7 }); } catch {}
-          const path = `${partnershipId}/${memory.id}/${Math.random()}.jpg`;
-          const { error: upErr } = await supabase.storage.from('memories').upload(path, file);
-          if (!upErr) {
-            const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(path);
-            uploadedUrls.push({ memory_id: memory.id, image_url: publicUrl });
+      if (editingMemoryId) {
+          // Update existing
+          const { error: updateErr } = await supabase.from('memories').update({
+              title: memoryForm.title,
+              description: memoryForm.description,
+              memory_date: memoryForm.memory_date
+          }).eq('id', editingMemoryId);
+          if (updateErr) throw updateErr;
+
+          // Delete old images that were removed
+          const { data: oldImages } = await supabase.from('memory_images').select('*').eq('memory_id', editingMemoryId);
+          if (oldImages) {
+              const keptUrls = selectedImages.filter(img => img.isOld).map(img => img.url);
+              const toDelete = oldImages.filter(old => !keptUrls.includes(old.image_url));
+              if (toDelete.length > 0) {
+                 await supabase.from('memory_images').delete().in('id', toDelete.map(d => d.id));
+                 for (const d of toDelete) {
+                    const path = d.image_url.split('/storage/v1/object/public/memories/')[1];
+                    if (path) await supabase.storage.from('memories').remove([path]);
+                 }
+              }
           }
+      } else {
+          // Insert new
+          const { data: memory, error: mError } = await supabase
+            .from('memories').insert({ partnership_id: partnershipId, created_by_user_id: userId, ...memoryForm })
+            .select().single();
+          if (mError) throw mError;
+          memoryId = memory.id;
+      }
+
+      if (memoryId) {
+        const newImages = selectedImages.filter(img => !img.isOld && img.file);
+        if (newImages.length > 0) {
+            const { compressImage } = await import('../../utils/imageOptimizer');
+            const uploadedUrls: { memory_id: string; image_url: string }[] = [];
+            for (const img of newImages) {
+            let file = img.file!;
+            try { file = await compressImage(file, { maxWidth: 1200, quality: 0.7 }); } catch {}
+            const path = `${partnershipId}/${memoryId}/${Math.random()}.jpg`;
+            const { error: upErr } = await supabase.storage.from('memories').upload(path, file);
+            if (!upErr) {
+                const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(path);
+                uploadedUrls.push({ memory_id: memoryId, image_url: publicUrl });
+            }
+            }
+            if (uploadedUrls.length > 0) await supabase.from('memory_images').insert(uploadedUrls);
         }
-        if (uploadedUrls.length > 0) await supabase.from('memory_images').insert(uploadedUrls);
       }
-      if (!mError) {
-        setShowAddMemoryForm(false);
-        setMemoryForm({ title: '', memory_date: new Date().toISOString().split('T')[0], description: '' });
-        setSelectedImages([]);
-        if (partnershipId) invalidateCache(partnershipId);
-        doFullLoad(partnershipId, true);
-        toast.success('تم حفظ الذكرى في خزانة العمر 💖');
-      }
+
+      setShowAddMemoryForm(false);
+      setEditingMemoryId(null);
+      setMemoryForm({ title: '', memory_date: new Date().toISOString().split('T')[0], description: '' });
+      setSelectedImages([]);
+      if (partnershipId) invalidateCache(partnershipId);
+      doFullLoad(partnershipId, true);
+      toast.success(editingMemoryId ? 'تم تحديث الذكرى بنجاح 💖' : 'تم حفظ الذكرى في خزانة العمر 💖');
+    } catch (e) {
+        console.error(e);
+        toast.error('حدث خطأ أثناء حفظ الذكرى');
     } finally { setIsSubmitting(false); }
   };
 
@@ -656,7 +719,7 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
         {/* Timeline line */}
         <div className="relative">
           {viewMode === 'timeline' && timelineItems.length > 0 && (
-            <div className="absolute right-[1.15rem] top-0 bottom-0 w-px bg-gradient-to-b from-rose-500/30 via-rose-500/10 to-transparent" />
+            <div className="absolute right-[1.25rem] top-0 bottom-0 w-px bg-rose-500/5" />
           )}
 
           <div className="space-y-10">
@@ -687,7 +750,7 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
             {/* Items */}
             {!loading && filteredItems.map((item, idx) =>
               item.type === 'memory'
-                ? <MemoryItem key={item.id} item={item} idx={idx} viewMode={viewMode} onDelete={deleteItem} onOpenGallery={openGallery} getRelativeTime={getRelativeTime} />
+                ? <MemoryItem key={item.id} item={item} idx={idx} viewMode={viewMode} onDelete={deleteItem} onEdit={editMemory} onOpenGallery={openGallery} getRelativeTime={getRelativeTime} />
                 : <EventItem  key={item.id} item={item} idx={idx} viewMode={viewMode} onDelete={deleteItem} getRelativeTime={getRelativeTime} />
             )}
 
@@ -787,13 +850,18 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
                     placeholder="عنوان يختصر الشعور..." value={memoryForm.title} onChange={e => setMemoryForm({ ...memoryForm, title: e.target.value })} />
                 </div>
                 <div>
+                  <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-2">تاريخ اللحظة</label>
+                  <input required type="date" className="w-full h-14 bg-black/3 dark:bg-white/4 border border-black/5 dark:border-white/8 rounded-2xl px-5 text-base font-black text-foreground outline-none focus:ring-2 focus:ring-rose-500/25 text-right"
+                    value={memoryForm.memory_date} onChange={e => setMemoryForm({ ...memoryForm, memory_date: e.target.value })} />
+                </div>
+                <div>
                   <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] block mb-2">أثر مكتوب</label>
                   <textarea className="w-full h-28 bg-black/3 dark:bg-white/4 border border-black/5 dark:border-white/8 rounded-2xl p-5 text-sm font-medium text-foreground resize-none outline-none focus:ring-2 focus:ring-rose-500/25 text-right leading-relaxed"
                     placeholder="كيف كانت دقات القلب حينها؟" value={memoryForm.description} onChange={e => setMemoryForm({ ...memoryForm, description: e.target.value })} />
                 </div>
                 <Button type="submit" disabled={isSubmitting}
                   className="w-full h-14 rounded-2xl text-base font-black shadow-lg shadow-rose-500/20 bg-rose-500 text-white">
-                  {isSubmitting ? 'جاري الحفظ...' : 'حفظ في خزانة العمر'}
+                  {isSubmitting ? 'جاري الحفظ...' : editingMemoryId ? 'تحديث الذكرى' : 'حفظ في خزانة العمر'}
                 </Button>
               </form>
             </motion.div>

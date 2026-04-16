@@ -226,6 +226,7 @@ function App() {
           </>
         )}
       </div>
+      <audio id="global-radio-ulfah" src="https://streamer.radio.co/sf2fa6ce9d/listen" preload="none" />
       <Toaster position="top-center" richColors />
     </div>
   );

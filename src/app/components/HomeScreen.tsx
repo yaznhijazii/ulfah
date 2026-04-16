@@ -36,7 +36,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     const [latestNote, setLatestNote] = useState<any>(null);
     const [myCommitments, setMyCommitments] = useState<any[]>([]);
     const [showMap, setShowMap] = useState(false);
-    const [statsCount, setStatsCount] = useState({ notes: 0, commitments: 0, goals: 0, songs: 0 });
+    const [statsCount, setStatsCount] = useState({ notes: 0, commitments: 0, goals: 0, songs: 0, memories: 0, adventures: 0 });
 
     const initialLoadDone = useRef(false);
 
@@ -143,14 +143,30 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 if (pMood) setPartnerMood(pMood.mood);
                 setUpcomingEvents(events || []);
 
-                // Fetch stats for عداد اللحظات
-                const [{ count: notesCount }, { count: commitmentsCount }, { count: goalsCount }, { count: songsCount }] = await Promise.all([
+                // Fetch stats for عداد اللحظات و بستان ألفة
+                const [
+                    { count: notesCount }, 
+                    { count: commitmentsCount }, 
+                    { count: goalsCount }, 
+                    { count: songsCount },
+                    { count: memoriesCount },
+                    { count: adventuresCount }
+                ] = await Promise.all([
                     supabase.from('love_notes').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId),
                     supabase.from('commitments').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId),
                     supabase.from('finance_jars').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId),
                     supabase.from('playlist_songs').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId),
+                    supabase.from('memories').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId),
+                    supabase.from('adventure_items').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId).eq('status', 'completed'),
                 ]);
-                setStatsCount({ notes: notesCount || 0, commitments: commitmentsCount || 0, goals: goalsCount || 0, songs: songsCount || 0 });
+                setStatsCount({ 
+                    notes: notesCount || 0, 
+                    commitments: commitmentsCount || 0, 
+                    goals: goalsCount || 0, 
+                    songs: songsCount || 0,
+                    memories: memoriesCount || 0,
+                    adventures: adventuresCount || 0
+                });
 
                 const { data: pLNote } = await supabase.from('love_notes').select('content').eq('author_id', partnerId).order('created_at', { ascending: false }).limit(1).maybeSingle();
                 setAiRecommendation(getAIRecommendation({ mood: pMood?.mood || null, lastNote: pLNote?.content || null }));
@@ -219,6 +235,15 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
         { id: 'tired', icon: Moon, label: 'تعبان 😴', color: 'text-indigo-500', bg: 'bg-indigo-500/10', glow: 'shadow-indigo-500/20' },
         { id: 'sad', icon: Cloud, label: 'مو بمزاجي 🌧️', color: 'text-rose-500', bg: 'bg-rose-500/10', glow: 'shadow-rose-500/20' },
     ], []);
+    const gardenInfo = useMemo(() => {
+        const points = (statsCount.notes * 2) + (statsCount.memories * 3) + (statsCount.adventures * 5) + (statsCount.commitments * 5) + (statsCount.songs * 1);
+        
+        if (points >= 300) return { level: 5, icon: '🌳✨', label: 'بستان الخلود', color: 'text-emerald-500', next: null, pts: points };
+        if (points >= 150) return { level: 4, icon: '🌸', label: 'زهر المحبة', color: 'text-pink-500', next: 300, pts: points };
+        if (points >= 75)  return { level: 3, icon: '🌳', label: 'شجرة الألفة', color: 'text-green-600', next: 150, pts: points };
+        if (points >= 25)  return { level: 2, icon: '🌿', label: 'غصن الوفاء', color: 'text-emerald-600', next: 75, pts: points };
+        return { level: 1, icon: '🌱', label: 'بذرة مودة', color: 'text-amber-600', next: 25, pts: points };
+    }, [statsCount]);
 
     return (
         <div dir="rtl" className={`flex flex-col min-h-screen bg-[#f8f9fa] dark:bg-[#080010] overflow-x-hidden pb-32 relative font-sans ${isDarkMode ? 'dark' : ''} safe-top`}>
@@ -762,7 +787,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                                 : aiRecommendation?.title?.includes('☕') ? '☕'
                                                 : aiRecommendation?.title?.includes('🌟') ? '🌟'
                                                 : aiRecommendation?.title?.includes('✍') ? '✍️'
-                                                : '🌱'}
+                                                : gardenInfo.icon}
                                         </motion.span>
                                     </div>
                                 </div>
@@ -777,18 +802,23 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                             {/* Content */}
                             <div className="flex-1 min-w-0">
                                 {/* Title pill */}
-                                <div className="inline-flex items-center gap-2 bg-amber-500/10 dark:bg-amber-500/18 border border-amber-400/25 dark:border-amber-500/30 rounded-full px-3 py-1 mb-3">
-                                    <motion.span
-                                        className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 inline-block"
-                                        animate={{ scale: [1, 1.6, 1], opacity: [0.7, 1, 0.7] }}
-                                        transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                                    />
-                                    <span className="text-[9px] font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest">
-                                        {aiRecommendation?.title || 'بذرة الاخلاص'}
-                                    </span>
+                                <div className="flex items-center justify-between mb-3 min-w-0">
+                                    <div className="inline-flex items-center gap-2 bg-amber-500/10 dark:bg-amber-500/18 border border-amber-400/25 dark:border-amber-500/30 rounded-full px-3 py-1">
+                                        <motion.span
+                                            className={`w-1.5 h-1.5 rounded-full ${gardenInfo.level > 1 ? 'bg-emerald-500' : 'bg-amber-500'} inline-block`}
+                                            animate={{ scale: [1, 1.6, 1], opacity: [0.7, 1, 0.7] }}
+                                            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
+                                        />
+                                        <span className="text-[9px] font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest">
+                                            {gardenInfo.label}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 opacity-60">
+                                        <span className="text-[9px] font-black text-amber-700/50 dark:text-amber-400/30">{gardenInfo.pts} نقطة</span>
+                                    </div>
                                 </div>
                                 {/* Advice text */}
-                                <p className="text-[14px] font-bold text-zinc-700 dark:text-white/87 leading-[1.85] tracking-wide">
+                                <p className="text-[14px] font-bold text-zinc-700 dark:text-white/87 leading-[1.85] tracking-wide mb-3">
                                     {aiRecommendation?.advice || 'كن بجانب شريكك دائماً بالكلمة الطيبة والمشاعر الصادقة.'}
                                 </p>
                                 {/* Footer */}

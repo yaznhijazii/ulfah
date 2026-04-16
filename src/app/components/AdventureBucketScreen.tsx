@@ -176,6 +176,24 @@ export function AdventureBucketScreen({ onNavigate, userId, partnershipId }: Adv
         if (!error) setAdventures(adventures.filter(a => a.id !== id));
     };
 
+    const handleImageUpload = async (file: File, advId: string) => {
+        if (!partnershipId) return;
+        setLoading(true);
+        try {
+            const path = `${partnershipId}/adventure/${advId}-${Date.now()}.jpg`;
+            const { error: upErr } = await supabase.storage.from('memories').upload(path, file);
+            if (!upErr) {
+                const { data: { publicUrl } } = supabase.storage.from('memories').getPublicUrl(path);
+                const { error } = await supabase.from('adventure_bucket').update({ image_url: publicUrl }).eq('id', advId);
+                if (!error) {
+                    setAdventures(prev => prev.map(a => a.id === advId ? { ...a, image_url: publicUrl } : a));
+                }
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const filteredAdventures = adventures.filter(a => a.status === activeTab);
 
     return (
@@ -296,7 +314,11 @@ export function AdventureBucketScreen({ onNavigate, userId, partnershipId }: Adv
                                             <div className="flex">
                                                 <div className="flex-1 p-6">
                                                     <div className="flex justify-between items-start mb-6">
-                                                        <div><span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block mb-1">تذكرة العبور</span><h3 className="text-2xl font-black">{adv.title}</h3></div>
+                                                        <div>
+                                                            <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block mb-1">تذكرة العبور</span>
+                                                            <h3 className="text-2xl font-black">{adv.title}</h3>
+                                                            {adv.location && <div className="flex items-center gap-1 mt-1 text-muted-foreground"><MapPin className="w-3 h-3" /><span className="text-[10px] font-bold">{adv.location}</span></div>}
+                                                        </div>
                                                         <Plane className="w-6 h-6 text-indigo-300 -rotate-45" />
                                                     </div>
                                                     <div className="flex justify-between items-center bg-muted/30 rounded-2xl p-4 mb-6">
@@ -319,10 +341,38 @@ export function AdventureBucketScreen({ onNavigate, userId, partnershipId }: Adv
                                     )}
 
                                     {adv.status === 'done' && (
-                                        <div className="relative bg-[#fffbf0] dark:bg-[#2c2c2e] p-4 pb-12 rounded-[2px] shadow-lg rotate-1 hover:rotate-0 transition-transform duration-500 origin-center text-center">
-                                            <div className="bg-black/5 aspect-square rounded-sm mb-4 flex items-center justify-center overflow-hidden"><Camera className="w-12 h-12 text-black/10" /></div>
+                                        <div className="relative bg-[#fffbf0] dark:bg-[#2c2c2e] p-4 pb-12 rounded-[2px] shadow-lg rotate-1 hover:rotate-0 transition-transform duration-500 origin-center text-center group">
+                                            {adv.image_url ? (
+                                                <div className="bg-black/5 aspect-square rounded-sm mb-4 overflow-hidden relative cursor-pointer" onClick={() => {
+                                                    const f = document.createElement('input');
+                                                    f.type = 'file';
+                                                    f.accept = 'image/*';
+                                                    f.onchange = (e) => {
+                                                        const target = e.target as HTMLInputElement;
+                                                        if (target.files && target.files[0]) handleImageUpload(target.files[0], adv.id);
+                                                    };
+                                                    f.click();
+                                                }}>
+                                                    <img src={adv.image_url} alt={adv.title} className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <span className="text-white text-xs font-black">تغيير الصورة</span>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <label className="bg-black/5 aspect-square rounded-sm mb-4 flex items-center justify-center overflow-hidden cursor-pointer relative">
+                                                    <Camera className="w-12 h-12 text-black/10 group-hover:scale-110 transition-transform" />
+                                                    <div className="absolute inset-0 bg-black/10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                        <span className="text-black/50 text-xs font-black">أضف صورة</span>
+                                                    </div>
+                                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                                        if (e.target.files && e.target.files[0]) {
+                                                            handleImageUpload(e.target.files[0], adv.id);
+                                                        }
+                                                    }} />
+                                                </label>
+                                            )}
                                             <h3 className="font-handwriting text-xl font-black text-gray-800 dark:text-gray-200">{adv.title}</h3>
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{new Date().toLocaleDateString()}</p>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{adv.planned_at ? new Date(adv.planned_at).toLocaleDateString() : new Date().toLocaleDateString()}</p>
                                             <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-24 h-8 bg-white/30 backdrop-blur-sm border-l border-r border-white/40 rotate-1 shadow-sm opacity-80" />
                                         </div>
                                     )}
