@@ -10,6 +10,7 @@ interface WordGuessGameProps {
     userId: string;
     userName: string;
     partnershipId: string | null;
+    initialCode?: string;
 }
 
 type GameState = 'menu' | 'lobby' | 'setup' | 'playing' | 'finished';
@@ -39,7 +40,7 @@ interface RoomData {
     };
 }
 
-export function WordGuessGame({ onBack, userId, userName, partnershipId }: WordGuessGameProps) {
+export function WordGuessGame({ onBack, userId, userName, partnershipId, initialCode }: WordGuessGameProps) {
     const [gameState, setGameState] = useState<GameState>('menu');
     const [joinCode, setJoinCode] = useState('');
     const [roomData, setRoomData] = useState<RoomData | null>(null);
@@ -50,6 +51,18 @@ export function WordGuessGame({ onBack, userId, userName, partnershipId }: WordG
     const [guessedWord, setGuessedWord] = useState('');
     const [presence, setPresence] = useState<any>({});
     const [partnerInfo, setPartnerInfo] = useState<{ id: string, name: string } | null>(null);
+
+    useEffect(() => {
+        if (initialCode && gameState === 'menu') {
+            setJoinCode(initialCode);
+        }
+    }, [initialCode, gameState]);
+
+    useEffect(() => {
+        if (initialCode && joinCode === initialCode && gameState === 'menu' && !loading) {
+            joinRoom();
+        }
+    }, [joinCode, initialCode, gameState, loading]);
 
     // Realtime Subscription
     useEffect(() => {

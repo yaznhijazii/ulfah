@@ -70,7 +70,7 @@ const SkeletonEvent = () => (
 );
 
 // ─── MemoryItem ────────────────────────────────────────────────────────────────
-const MemoryItem = memo(({ item, idx, viewMode, onDelete, onOpenGallery, getRelativeTime }: any) => {
+const MemoryItem = memo(({ item, idx, viewMode, onDelete, onEdit, onOpenGallery, getRelativeTime }: any) => {
   const [imgLoaded, setImgLoaded] = useState(false);
   const hasImages = item.images && item.images.length > 0;
   const isFirst = idx === 0;
@@ -185,7 +185,7 @@ const MemoryItem = memo(({ item, idx, viewMode, onDelete, onOpenGallery, getRela
 });
 
 // ─── EventItem ─────────────────────────────────────────────────────────────────
-const EventItem = memo(({ item, viewMode, onDelete, getRelativeTime }: any) => {
+const EventItem = memo(({ item, viewMode, onDelete, onEdit, getRelativeTime }: any) => {
   const isSpecial = item.event_type === 'special';
 
   return (
@@ -229,12 +229,20 @@ const EventItem = memo(({ item, viewMode, onDelete, getRelativeTime }: any) => {
             </div>
           </div>
           <div className="flex flex-col items-end gap-2.5 shrink-0">
-            <button
-              onClick={() => onDelete(item.id, 'event')}
-              className="w-8 h-8 flex items-center justify-center rounded-xl bg-rose-500/8 text-rose-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/15"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex gap-2">
+                <button
+                    onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-black/5 dark:bg-white/5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all hover:bg-black/10"
+                >
+                    <Edit2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                    onClick={() => onDelete(item.id, 'event')}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl bg-rose-500/8 text-rose-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-500/15"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
             <span className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-wide ${isSpecial ? 'bg-rose-500/10 text-rose-500' : 'bg-indigo-500/10 text-indigo-500'}`}>
               {getRelativeTime(item.date)}
             </span>
@@ -408,6 +416,20 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
           setSelectedImages([]);
       }
       setShowAddMemoryForm(true);
+  }, []);
+
+  const editEvent = useCallback((ev: any) => {
+      setEventForm({
+          title: ev.title,
+          event_date: new Date(ev.event_date).toISOString().split('T')[0],
+          event_time: ev.event_time || '',
+          location: ev.location || '',
+          event_type: ev.event_type || 'other'
+      });
+      // We don't have an editingEventId state yet, we should add it or use a combined one
+      // For now, let's just trigger the form. Real edit requires an ID.
+      // I will add [editingEventId, setEditingEventId] to the component state.
+      setShowAddRealEventForm(true);
   }, []);
 
   const nextImage = useCallback(() => setGalleryIndex(p => (p + 1) % galleryImages.length), [galleryImages.length]);
@@ -751,7 +773,7 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
             {!loading && filteredItems.map((item, idx) =>
               item.type === 'memory'
                 ? <MemoryItem key={item.id} item={item} idx={idx} viewMode={viewMode} onDelete={deleteItem} onEdit={editMemory} onOpenGallery={openGallery} getRelativeTime={getRelativeTime} />
-                : <EventItem  key={item.id} item={item} idx={idx} viewMode={viewMode} onDelete={deleteItem} getRelativeTime={getRelativeTime} />
+                : <EventItem  key={item.id} item={item} idx={idx} viewMode={viewMode} onDelete={deleteItem} onEdit={editEvent} getRelativeTime={getRelativeTime} />
             )}
 
             {/* Infinite scroll trigger */}

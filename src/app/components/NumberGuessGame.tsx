@@ -10,6 +10,7 @@ interface NumberGuessGameProps {
     userId: string;
     userName: string;
     partnershipId: string | null;
+    initialCode?: string;
 }
 
 type UiState = 'menu' | 'lobby' | 'setup' | 'playing' | 'finished';
@@ -24,6 +25,7 @@ interface GameStatePayload {
     host_revealed: (string | null)[];
     /** خانات كشفها الضيف وهو يحاول تخمين رقم المضيف */
     guest_revealed: (string | null)[];
+    current_turn: string | null; // The user ID who is currently allowed to guess
     winner: string | null;
 }
 
@@ -47,6 +49,7 @@ function parseGs(raw: unknown): GameStatePayload {
             host_revealed: emptyRevealed(3),
             guest_revealed: emptyRevealed(3),
             winner: null,
+            current_turn: null,
         };
     }
     const hr = Array.isArray(o.host_revealed) ? o.host_revealed : emptyRevealed(L);
@@ -57,6 +60,7 @@ function parseGs(raw: unknown): GameStatePayload {
         guest_secret: o.guest_secret ?? '',
         host_revealed: hr.length === L ? hr : emptyRevealed(L),
         guest_revealed: gr.length === L ? gr : emptyRevealed(L),
+        current_turn: o.current_turn ?? null,
         winner: o.winner ?? null,
     };
 }
@@ -77,7 +81,7 @@ function maskLine(revealed: (string | null)[]): string {
     return revealed.map((c) => (c != null ? c : '•')).join(' ');
 }
 
-export function NumberGuessGame({ onBack, userId, userName, partnershipId }: NumberGuessGameProps) {
+export function NumberGuessGame({ onBack, userId, userName, partnershipId, initialCode }: NumberGuessGameProps) {
     const [digitLength, setDigitLength] = useState<DigitLength>(3);
     const [joinCode, setJoinCode] = useState('');
     const [roomData, setRoomData] = useState<RoomData | null>(null);
@@ -133,7 +137,7 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
                     const isUser1 = data.user1_id === userId;
                     setPartnerInfo({
                         id: isUser1 ? data.user2_id : data.user1_id,
-                        name: isUser1 ? (data.user2 as { name?: string })?.name : (data.user1 as { name?: string })?.name || 'الشريك',
+                        name: (isUser1 ? (data.user2 as { name?: string })?.name : (data.user1 as { name?: string })?.name) || 'الشريك',
                     });
                 }
             });
@@ -149,6 +153,7 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
             guest_secret: '',
             host_revealed: emptyRevealed(L),
             guest_revealed: emptyRevealed(L),
+            current_turn: userId, // Creator starts
             winner: null,
         };
         const { data, error } = await supabase
@@ -182,13 +187,26 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
         }
     };
 
+    useEffect(() => {
+        if (initialCode && !roomData) {
+            setJoinCode(initialCode);
+        }
+    }, [initialCode]);
+
+    useEffect(() => {
+        if (joinCode && initialCode && !roomData) {
+            joinRoom();
+        }
+    }, [joinCode, initialCode]);
+
     const joinRoom = async () => {
-        if (!joinCode.trim()) return;
+        const codeToUse = joinCode || initialCode;
+        if (!codeToUse) return;
         setLoading(true);
         const { data: room, error } = await supabase
             .from('game_rooms')
             .select('*')
-            .eq('room_code', joinCode.toUpperCase())
+            .eq('room_code', codeToUse.toUpperCase())
             .eq('game_type', 'number-guess')
             .eq('status', 'waiting')
             .single();
@@ -249,6 +267,10 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
     const submitGuess = useCallback(async () => {
         if (!roomData || !guessInput.trim()) return;
         const gs = roomData.game_state;
+        if (gs.current_turn !== userId) {
+            toast.error('بانتظار دور الشريك');
+            return;
+        }
         const L = gs.digit_length;
         const g = guessInput.trim();
         if (!validateSecret(g, L)) {
@@ -259,6 +281,7 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
         const opponentSecret = isHost ? gs.guest_secret : gs.host_secret;
         const revealKey = isHost ? 'host_revealed' : 'guest_revealed';
         const prev = isHost ? gs.host_revealed : gs.guest_revealed;
+        const merged = prev.map((val, i) => (val !== null ? val : (g[i] === opponentSecret![i] ? g[i] : null)));
 
         if (g === opponentSecret) {
             const newState: GameStatePayload = { ...gs, winner: userId };
@@ -268,8 +291,8 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
             return;
         }
 
-        const merged = applyPositionalReveal(g, opponentSecret, prev);
-        const newState: GameStatePayload = { ...gs, [revealKey]: merged };
+        const nextTurn = isHost ? roomData.guest_user_id! : roomData.host_user_id;
+        const newState: GameStatePayload = { ...gs, [revealKey]: merged, current_turn: nextTurn };
         await supabase.from('game_rooms').update({ game_state: newState }).eq('id', roomData.id);
 
         const newHits = merged.filter((x, i) => x !== null && prev[i] === null).length;
@@ -447,16 +470,36 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
                 </div>
 
                 <div className="flex-1 flex flex-col gap-4 max-w-md mx-auto w-full">
-                    <p className="text-center font-black text-sm">خمّن رقم شريكك ({L} خانات)</p>
+                    <div className="text-center mb-2">
+                        <p className="font-black text-sm">{gs.current_turn === userId ? 'دورك الآن: ' : `دور ${partnerInfo?.name}: `}خمّن رقم شريكك ({L} خانات)</p>
+                        {gs.current_turn !== userId && (
+                            <motion.span 
+                                animate={{ opacity: [0.4, 1, 0.4] }} 
+                                transition={{ repeat: Infinity, duration: 1.5 }}
+                                className="text-[10px] text-indigo-500 font-bold"
+                            >
+                                بانتظار الشريك يحزر...
+                            </motion.span>
+                        )}
+                    </div>
                     <input
                         inputMode="numeric"
+                        disabled={gs.current_turn !== userId}
                         value={guessInput}
                         onChange={(e) => setGuessInput(e.target.value.replace(/\D/g, '').slice(0, L))}
                         placeholder={Array(L).fill('•').join('')}
-                        className="w-full h-14 rounded-2xl border-2 border-border bg-card text-center text-2xl font-black tracking-[0.4em] outline-none focus:border-amber-500"
+                        className={`w-full h-14 rounded-2xl border-2 bg-card text-center text-2xl font-black tracking-[0.4em] outline-none transition-all ${
+                            gs.current_turn === userId ? 'border-amber-500 shadow-lg shadow-amber-500/10' : 'border-border opacity-50 bg-muted/30'
+                        }`}
                     />
-                    <Button onClick={submitGuess} disabled={guessInput.length !== L || loading} className="h-14 rounded-2xl font-black bg-indigo-600 hover:bg-indigo-700 text-lg">
-                        جرّب التخمين
+                    <Button 
+                        onClick={submitGuess} 
+                        disabled={guessInput.length !== L || loading || gs.current_turn !== userId} 
+                        className={`h-14 rounded-2xl font-black text-lg ${
+                            gs.current_turn === userId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-muted text-muted-foreground'
+                        }`}
+                    >
+                        {gs.current_turn === userId ? 'جرّب التخمين' : 'انتظر دورك'}
                     </Button>
                 </div>
             </div>

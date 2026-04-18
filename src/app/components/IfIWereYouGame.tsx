@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
-import { UserCircle, Send, Heart, CheckCircle2 } from 'lucide-react';
+import { UserCircle, Send, Heart, CheckCircle2, Sparkles, RefreshCw, MessageCircle, X } from 'lucide-react';
+import { SCENARIO_POOL, getRandomScenarios } from '../../utils/scenarioPool';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 
@@ -10,6 +11,7 @@ interface IfIWereYouGameProps {
     userId: string;
     userName: string;
     partnershipId: string | null;
+    initialCode?: string;
 }
 
 interface RoomData {
@@ -29,14 +31,16 @@ function parseState(raw: unknown): RoomData['game_state'] {
     return raw as RoomData['game_state'];
 }
 
-export function IfIWereYouGame({ onBack, userId, userName, partnershipId }: IfIWereYouGameProps) {
+export function IfIWereYouGame({ onBack, userId, userName, partnershipId, initialCode }: IfIWereYouGameProps) {
     const [joinCode, setJoinCode] = useState('');
     const [roomData, setRoomData] = useState<RoomData | null>(null);
     const [loading, setLoading] = useState(false);
     const [scenarioDraft, setScenarioDraft] = useState('');
     const [answerDraft, setAnswerDraft] = useState('');
-    const [presence, setPresence] = useState<Record<string, unknown>>({});
     const [partnerInfo, setPartnerInfo] = useState<{ id: string; name: string } | null>(null);
+    const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+    const [showAiSheet, setShowAiSheet] = useState(false);
+    const [presence, setPresence] = useState<Record<string, any>>({});
 
     useEffect(() => {
         if (!roomData?.id) return;
@@ -59,7 +63,7 @@ export function IfIWereYouGame({ onBack, userId, userName, partnershipId }: IfIW
             .eq('id', partnershipId).single().then(({ data }) => {
                 if (data) {
                     const isUser1 = data.user1_id === userId;
-                    setPartnerInfo({ id: isUser1 ? data.user2_id : data.user1_id, name: isUser1 ? (data.user2 as { name?: string })?.name : (data.user1 as { name?: string })?.name || 'الشريك' });
+                    setPartnerInfo({ id: isUser1 ? data.user2_id : data.user1_id, name: (isUser1 ? (data.user2 as { name?: string })?.name : (data.user1 as { name?: string })?.name) || 'الشريك' });
                 }
             });
     }, [partnershipId, userId]);
@@ -89,10 +93,30 @@ export function IfIWereYouGame({ onBack, userId, userName, partnershipId }: IfIW
         }
     };
 
+    useEffect(() => {
+        if (initialCode && !roomData) {
+            setJoinCode(initialCode);
+            // Small delay to ensure state update before execution if needed, 
+            // though joinRoom doesn't depend on joinCode state directly if we pass it.
+        }
+    }, [initialCode]);
+
+    useEffect(() => {
+        if (joinCode && initialCode && !roomData) {
+            joinRoom();
+        }
+    }, [joinCode, initialCode]);
+
     const joinRoom = async () => {
-        if (!joinCode) return;
+        const codeToUse = joinCode || initialCode;
+        if (!codeToUse) return;
         setLoading(true);
-        const { data: room, error } = await supabase.from('game_rooms').select('*').eq('room_code', joinCode.toUpperCase()).eq('game_type', 'if-i-were-you').eq('status', 'waiting').single();
+        const { data: room, error } = await supabase.from('game_rooms')
+            .select('*')
+            .eq('room_code', codeToUse.toUpperCase())
+            .eq('game_type', 'if-i-were-you')
+            .eq('status', 'waiting')
+            .single();
         if (error || !room) { toast.error('الغرفة غير موجودة'); setLoading(false); return; }
         const { data: updated, error: upErr } = await supabase.from('game_rooms').update({ guest_user_id: userId, status: 'setup' }).eq('id', room.id).select().single();
         if (upErr || !updated) { toast.error('تعذّر الانضمام'); setLoading(false); return; }
@@ -100,13 +124,21 @@ export function IfIWereYouGame({ onBack, userId, userName, partnershipId }: IfIW
         setLoading(false);
     };
 
-    const submitScenario = async () => {
-        if (!roomData || !scenarioDraft.trim()) return;
+    const submitScenario = async (text?: string) => {
+        const finalContent = text || scenarioDraft;
+        if (!roomData || !finalContent.trim()) return;
         setLoading(true);
-        const newState = { ...roomData.game_state, scenario_text: scenarioDraft.trim() };
+        const newState = { ...roomData.game_state, scenario_text: finalContent.trim() };
         await supabase.from('game_rooms').update({ game_state: newState, status: 'playing' }).eq('id', roomData.id);
         setLoading(false);
+        setScenarioDraft('');
+        setShowAiSheet(false);
         toast.success('تم إرسال الموقف للشريك');
+    };
+
+    const generateSuggestions = () => {
+        setAiSuggestions(getRandomScenarios(5));
+        setShowAiSheet(true);
     };
 
     const submitAnswer = async () => {
@@ -176,20 +208,85 @@ export function IfIWereYouGame({ onBack, userId, userName, partnershipId }: IfIW
             );
         }
         return (
-            <div dir="rtl" className="flex flex-col h-full bg-sky-50/30 dark:bg-[#0c0a12] p-6 pt-8">
-                <h2 className="text-xl font-black text-sky-950 dark:text-white mb-2">صف الموقف</h2>
+            <div dir="rtl" className="flex flex-col h-full bg-sky-50/30 dark:bg-[#0c0a12] p-6 pt-8 relative">
+                <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-xl font-black text-sky-950 dark:text-white">صف الموقف</h2>
+                    <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={generateSuggestions}
+                        className="flex items-center gap-2 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-4 py-2 rounded-2xl text-[10px] font-black border border-amber-200 dark:border-amber-700/50"
+                    >
+                        <Sparkles size={14} />
+                        اقتراحات ذكية
+                    </motion.button>
+                </div>
                 <p className="text-sm text-muted-foreground font-bold mb-6">اكتب موقفاً واحداً، ثم اسأل بالصمت: لو كنت مكاني، وش بتسوي؟</p>
+                
                 <textarea
                     value={scenarioDraft}
                     onChange={(e) => setScenarioDraft(e.target.value)}
                     placeholder="مثال: موقف في الشغل أو العائلة يزعجك…"
                     rows={8}
                     dir="rtl"
-                    className="w-full rounded-3xl border-2 border-sky-100 dark:border-white/10 bg-white dark:bg-white/5 p-5 text-base font-bold resize-none focus:ring-2 focus:ring-sky-400 mb-6"
+                    className="w-full rounded-[2.5rem] border-2 border-sky-100 dark:border-white/10 bg-white dark:bg-white/5 p-8 text-base font-bold resize-none focus:ring-2 focus:ring-sky-400 mb-6 shadow-inner outline-none transition-all placeholder:text-sky-200/50"
                 />
-                <Button onClick={submitScenario} disabled={loading || !scenarioDraft.trim()} className="w-full h-14 rounded-2xl font-black bg-sky-600 text-lg">
-                    <Send className="w-5 h-5 ms-2" /> إرسال للشريك
+                
+                <Button 
+                    onClick={() => submitScenario()} 
+                    disabled={loading || !scenarioDraft.trim()} 
+                    className="w-full h-16 rounded-2xl font-black bg-sky-600 hover:bg-sky-700 text-white shadow-xl shadow-sky-600/20 text-lg transition-all"
+                >
+                    إرسال للشريك <Send className="w-5 h-5 ms-3" />
                 </Button>
+
+                {/* AI Suggestions Overlay */}
+                <AnimatePresence>
+                    {showAiSheet && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-white/80 dark:bg-zinc-950/90 backdrop-blur-xl z-50 p-6 flex flex-col"
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg"><Sparkles size={20} /></div>
+                                    <div>
+                                        <h3 className="text-lg font-black text-zinc-900 dark:text-white">مواقف مقترحة</h3>
+                                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest">مستشار مودة الذكي</p>
+                                    </div>
+                                </div>
+                                <motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowAiSheet(false)} className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-white/10 flex items-center justify-center text-zinc-500"><X className="w-5 h-5" /></motion.button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto space-y-4 pb-6 scrollbar-none">
+                                {aiSuggestions.map((s, idx) => (
+                                    <motion.button
+                                        key={idx}
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: idx * 0.1 }}
+                                        onClick={() => {
+                                            setScenarioDraft(s);
+                                            setShowAiSheet(false);
+                                        }}
+                                        className="w-full text-right p-6 rounded-[2rem] bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-white/5 shadow-sm hover:shadow-md hover:border-amber-200 transition-all group"
+                                    >
+                                        <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300 leading-relaxed transition-colors group-hover:text-zinc-950 dark:group-hover:text-white">{s}</p>
+                                    </motion.button>
+                                ))}
+                            </div>
+
+                            <Button 
+                                onClick={generateSuggestions}
+                                variant="outline"
+                                className="w-full h-14 rounded-2xl border-2 border-amber-200 text-amber-600 font-black mb-4 gap-2"
+                            >
+                                <RefreshCw size={18} /> تحديث القائمة
+                            </Button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         );
     }
@@ -212,22 +309,35 @@ export function IfIWereYouGame({ onBack, userId, userName, partnershipId }: IfIW
             }
             return (
                 <div dir="rtl" className="flex flex-col h-full bg-sky-50/30 dark:bg-[#0c0a12] p-6 pt-8">
-                    <p className="text-[10px] font-black text-sky-500 uppercase mb-4">موقف من شريكك</p>
-                    <div className="bg-white dark:bg-white/5 rounded-3xl p-6 border mb-6">
-                        <p className="text-lg font-black leading-relaxed text-start">{gs.scenario_text}</p>
+                    <div className="flex items-center gap-3 mb-5">
+                        <div className="w-10 h-10 rounded-2xl bg-sky-500 text-white flex items-center justify-center shadow-lg"><MessageCircle size={20} /></div>
+                        <div>
+                            <p className="text-[10px] font-black text-sky-500 uppercase tracking-widest leading-none mb-1">موقف من شريكك</p>
+                            <h3 className="text-sm font-black text-sky-900 dark:text-white">وش رح تسوي لو كنت مكانه؟</h3>
+                        </div>
                     </div>
-                    <h3 className="text-sm font-black text-sky-800 dark:text-sky-200 mb-3">لو كنت مكانه… وش رح تسوي؟</h3>
-                    <textarea
-                        value={answerDraft}
-                        onChange={(e) => setAnswerDraft(e.target.value)}
-                        placeholder="اكتب ردك بصراحة 💙"
-                        rows={6}
-                        dir="rtl"
-                        className="w-full rounded-3xl border-2 border-sky-100 dark:border-white/10 bg-white dark:bg-white/5 p-5 font-bold resize-none mb-6 min-h-[140px]"
-                    />
-                    <Button onClick={submitAnswer} disabled={loading || !answerDraft.trim()} className="w-full h-14 rounded-2xl font-black bg-sky-600 text-lg">
-                        إرسال الرد
-                    </Button>
+
+                    <div className="bg-white dark:bg-white/5 rounded-[2.5rem] p-8 border border-sky-100 dark:border-white/10 mb-8 shadow-sm">
+                        <p className="text-lg font-black leading-relaxed text-start text-zinc-800 dark:text-zinc-200">{gs.scenario_text}</p>
+                    </div>
+
+                    <div className="flex-1 flex flex-col">
+                        <textarea
+                            value={answerDraft}
+                            onChange={(e) => setAnswerDraft(e.target.value)}
+                            placeholder="اكتب ردك هنا بكل صراحة 💙..."
+                            rows={6}
+                            dir="rtl"
+                            className="w-full rounded-[2.5rem] border-2 border-sky-100 dark:border-white/10 bg-white dark:bg-white/5 p-8 font-bold resize-none mb-6 min-h-[180px] shadow-inner outline-none focus:ring-2 focus:ring-sky-400 transition-all placeholder:text-sky-200/50"
+                        />
+                        <Button 
+                            onClick={submitAnswer} 
+                            disabled={loading || !answerDraft.trim()} 
+                            className="w-full h-16 rounded-2xl font-black bg-sky-600 hover:bg-sky-700 text-white shadow-xl shadow-sky-600/20 text-lg transition-all"
+                        >
+                            إرسال الرد 💌
+                        </Button>
+                    </div>
                 </div>
             );
         }
@@ -248,7 +358,12 @@ export function IfIWereYouGame({ onBack, userId, userName, partnershipId }: IfIW
                         <p className="font-bold leading-relaxed">{gs.answer_text}</p>
                     </div>
                 </div>
-                <Button onClick={onBack} className="w-full max-w-xs h-14 rounded-2xl font-black bg-sky-700">العودة للألعاب</Button>
+                <div className="w-full max-w-xs flex flex-col gap-4">
+                    <Button onClick={() => {
+                        supabase.from('game_rooms').update({ status: 'setup', game_state: { scenario_text: '', answer_text: null } }).eq('id', roomData.id);
+                    }} className="h-16 rounded-2xl font-black bg-sky-600 text-white shadow-xl shadow-sky-600/20">موقف جديد ✍️</Button>
+                    <Button onClick={onBack} variant="secondary" className="h-14 rounded-2xl font-black bg-white dark:bg-white/5 border-2 border-sky-100 dark:border-white/10 text-sky-800 dark:text-sky-200">العودة للألعاب</Button>
+                </div>
             </div>
         );
     }

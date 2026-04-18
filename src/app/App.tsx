@@ -16,6 +16,7 @@ import { WishlistScreen } from './components/WishlistScreen';
 import { HomeBoxScreen } from './components/HomeBoxScreen';
 import { PlaylistScreen } from './components/PlaylistScreen';
 import { EveningJournalScreen } from './components/EveningJournalScreen';
+import { GameInvitePopup } from './components/GameInvitePopup';
 import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster } from 'sonner';
@@ -53,6 +54,8 @@ function App() {
     const hour = new Date().getHours();
     return hour < 6 || hour >= 18;
   });
+  const [activeInvite, setActiveInvite] = useState<any>(null);
+  const [gameParams, setGameParams] = useState<{ type: string, code: string } | null>(null);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -72,6 +75,38 @@ function App() {
     } else {
       localStorage.removeItem('ulfah_userId');
     }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    // Listen for new game invitations
+    const channel = supabase
+      .channel(`user_notifs_${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`
+        },
+        (payload) => {
+          const notif = payload.new;
+          if (notif.type === 'game_invite') {
+            setActiveInvite(notif);
+            // Auto hide after 15 seconds
+            setTimeout(() => {
+              setActiveInvite((prev: any) => prev?.id === notif.id ? null : prev);
+            }, 15000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId]);
 
   const requestNotificationPermission = async () => {
@@ -146,7 +181,17 @@ function App() {
       case 'calendar':
         return <CalendarScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       case 'games':
-        return <GamesScreen onNavigate={handleNavigate} isDarkMode={isDarkMode} userId={userId} partnershipId={partnershipId} />;
+        return (
+          <GamesScreen 
+            onNavigate={handleNavigate} 
+            isDarkMode={isDarkMode} 
+            userId={userId} 
+            partnershipId={partnershipId} 
+            initialGame={gameParams?.type}
+            initialCode={gameParams?.code}
+            onConsumedParams={() => setGameParams(null)}
+          />
+        );
       case 'commitments':
         return <CommitmentsScreen onBack={() => handleNavigate('home')} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       case 'settings':
@@ -232,6 +277,28 @@ function App() {
       </div>
       <audio id="global-radio-ulfah" src="https://streamer.radio.co/sf2fa6ce9d/listen" preload="none" />
       <Toaster position="top-center" richColors />
+      
+      <AnimatePresence>
+        {activeInvite && (
+          <div className="absolute inset-0 z-[100] pointer-events-none flex items-start justify-center pt-20 px-4">
+            <div className="pointer-events-auto">
+              <GameInvitePopup 
+                key={activeInvite.id}
+                invite={activeInvite}
+                onAccept={(invite) => {
+                  setGameParams({
+                    type: invite.metadata.game_type,
+                    code: invite.metadata.room_code
+                  });
+                  setCurrentScreen('games');
+                  setActiveInvite(null);
+                }}
+                onClose={() => setActiveInvite(null)}
+              />
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

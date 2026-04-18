@@ -10,6 +10,7 @@ interface MindSyncGameProps {
     userId: string;
     userName: string;
     partnershipId: string | null;
+    initialCode?: string;
 }
 
 type GameState = 'menu' | 'lobby' | 'playing' | 'result';
@@ -43,7 +44,7 @@ const CATEGORIES = [
   "أحلى هدية تبادلناها 🎁"
 ];
 
-export function MindSyncGame({ onBack, userId, userName, partnershipId }: MindSyncGameProps) {
+export function MindSyncGame({ onBack, userId, userName, partnershipId, initialCode }: MindSyncGameProps) {
     const [gameState, setGameState] = useState<GameState>('menu');
     const [joinCode, setJoinCode] = useState('');
     const [roomData, setRoomData] = useState<RoomData | null>(null);
@@ -149,10 +150,28 @@ export function MindSyncGame({ onBack, userId, userName, partnershipId }: MindSy
         }
     };
 
+    useEffect(() => {
+        if (initialCode && !roomData) {
+            setJoinCode(initialCode);
+        }
+    }, [initialCode]);
+
+    useEffect(() => {
+        if (joinCode && initialCode && !roomData) {
+            joinRoom();
+        }
+    }, [joinCode, initialCode]);
+
     const joinRoom = async () => {
-        if (!joinCode) return;
+        const codeToUse = joinCode || initialCode;
+        if (!codeToUse) return;
         setLoading(true);
-        const { data: room, error } = await supabase.from('game_rooms').select('*').eq('room_code', joinCode.toUpperCase()).eq('game_type', 'mind-sync').eq('status', 'waiting').single();
+        const { data: room, error } = await supabase.from('game_rooms')
+            .select('*')
+            .eq('room_code', codeToUse.toUpperCase())
+            .eq('game_type', 'mind-sync')
+            .eq('status', 'waiting')
+            .single();
         if (error || !room) { toast.error('الغرفة غير موجودة'); setLoading(false); return; }
         const { data: updated } = await supabase.from('game_rooms').update({ guest_user_id: userId, status: 'playing' }).eq('id', room.id).select().single();
         if (updated) {

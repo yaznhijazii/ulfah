@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-    Settings, Heart, Sparkles, ChevronLeft, MapPin, Compass, Gift, Moon, Sun, 
-    ShieldCheck, Target, Zap, Navigation, User, Calendar, ArrowUpRight, 
+    Settings, Heart, Sparkles, ChevronLeft, MapPin, Compass, Gift, Moon, Sun,
+    ShieldCheck, Target, Zap, Navigation, User, Calendar, ArrowUpRight,
     Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet, Lock, Music, Armchair
 } from 'lucide-react';
 import { Logo } from './Logo';
@@ -48,11 +48,11 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 .from('love_notes')
                 .select('*, author:users!author_id(name, avatar_url)')
                 .eq('partnership_id', partnershipId)
-                .neq('author_id', userId) 
+                .neq('author_id', userId)
                 .order('created_at', { ascending: false })
                 .limit(1)
                 .maybeSingle();
-            
+
             if (data && !error) setLatestNote(data);
         } catch (e) { }
     }, [partnershipId, userId]);
@@ -89,7 +89,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     const updateMyStatus = useCallback(async () => {
         if (!userId) return;
         setIsSyncing(true);
-        let lat = null, lng = null;
+        let lat: number | null = null, lng: number | null = null;
         try {
             if ("geolocation" in navigator) {
                 const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -101,9 +101,9 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
             }
         } catch (e) { }
 
-        await supabase.from('users').update({ 
-            last_seen: new Date().toISOString(), 
-            ...(lat && lng ? { latitude: lat, longitude: lng } : {}) 
+        await supabase.from('users').update({
+            last_seen: new Date().toISOString(),
+            ...(lat !== null && lng !== null ? { latitude: lat, longitude: lng } : {})
         }).eq('id', userId);
         setTimeout(() => setIsSyncing(false), 500);
     }, [userId]);
@@ -126,7 +126,11 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 const partnerId = isUser1 ? p.user2_id : p.user1_id;
 
                 setAvatars({ me: (isUser1 ? p.user1 : p.user2)?.avatar_url, partner: partner?.avatar_url });
-                setPartnerTracking({ last_seen: partner?.last_seen, lat: partner?.latitude, lng: partner?.longitude });
+                setPartnerTracking(prev => {
+                    const next = { last_seen: partner?.last_seen, lat: partner?.latitude, lng: partner?.longitude };
+                    if (prev.last_seen === next.last_seen && prev.lat === next.lat && prev.lng === next.lng) return prev;
+                    return next;
+                });
 
                 const startStr = p.relationship_start_date || p.created_at;
                 const start = new Date(startStr);
@@ -145,9 +149,9 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
 
                 // Fetch stats for عداد اللحظات و بستان ألفة
                 const [
-                    { count: notesCount }, 
-                    { count: commitmentsCount }, 
-                    { count: goalsCount }, 
+                    { count: notesCount },
+                    { count: commitmentsCount },
+                    { count: goalsCount },
                     { count: songsCount },
                     { count: memoriesCount },
                     { count: adventuresCount }
@@ -159,13 +163,17 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                     supabase.from('memories').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId),
                     supabase.from('adventure_items').select('*', { count: 'exact', head: true }).eq('partnership_id', partnershipId).eq('status', 'completed'),
                 ]);
-                setStatsCount({ 
-                    notes: notesCount || 0, 
-                    commitments: commitmentsCount || 0, 
-                    goals: goalsCount || 0, 
-                    songs: songsCount || 0,
-                    memories: memoriesCount || 0,
-                    adventures: adventuresCount || 0
+                setStatsCount(prev => {
+                    const next = {
+                        notes: notesCount || 0,
+                        commitments: commitmentsCount || 0,
+                        goals: goalsCount || 0,
+                        songs: songsCount || 0,
+                        memories: memoriesCount || 0,
+                        adventures: adventuresCount || 0
+                    };
+                    if (JSON.stringify(prev) === JSON.stringify(next)) return prev;
+                    return next;
                 });
 
                 const { data: pLNote } = await supabase.from('love_notes').select('content').eq('author_id', partnerId).order('created_at', { ascending: false }).limit(1).maybeSingle();
@@ -210,13 +218,13 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     };
 
     useEffect(() => {
-        if (partnerTracking.lat && partnerTracking.lng && myLocation.lat && myLocation.lng) {
+        if (partnerTracking.lat !== null && partnerTracking.lng !== null && myLocation.lat !== null && myLocation.lng !== null) {
             const d = calculateDistance(myLocation.lat, myLocation.lng, partnerTracking.lat, partnerTracking.lng);
             setDistance(prev => prev === d ? prev : d);
         }
     }, [myLocation.lat, myLocation.lng, partnerTracking.lat, partnerTracking.lng, calculateDistance]);
 
-    const partnerName = (partnership?.user1_id === userId ? partnership?.user2?.name : partnership?.user1?.name) || 'Habibi';
+    const partnerName = (partnership?.user1_id === userId ? partnership?.user2?.name : partnership?.user1?.name) || 'الشريك';
 
     const isPartnerOnline = () => {
         if (!partnerTracking.last_seen) return false;
@@ -237,11 +245,11 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     ], []);
     const gardenInfo = useMemo(() => {
         const points = (statsCount.notes * 2) + (statsCount.memories * 3) + (statsCount.adventures * 5) + (statsCount.commitments * 5) + (statsCount.songs * 1);
-        
+
         if (points >= 300) return { level: 5, icon: '🌳✨', label: 'بستان الخلود', color: 'text-emerald-500', next: null, pts: points };
         if (points >= 150) return { level: 4, icon: '🌸', label: 'زهر المحبة', color: 'text-pink-500', next: 300, pts: points };
-        if (points >= 75)  return { level: 3, icon: '🌳', label: 'شجرة الألفة', color: 'text-green-600', next: 150, pts: points };
-        if (points >= 25)  return { level: 2, icon: '🌿', label: 'غصن الوفاء', color: 'text-emerald-600', next: 75, pts: points };
+        if (points >= 75) return { level: 3, icon: '🌳', label: 'شجرة الألفة', color: 'text-green-600', next: 150, pts: points };
+        if (points >= 25) return { level: 2, icon: '🌿', label: 'غصن الوفاء', color: 'text-emerald-600', next: 75, pts: points };
         return { level: 1, icon: '🌱', label: 'بذرة مودة', color: 'text-amber-600', next: 25, pts: points };
     }, [statsCount]);
 
@@ -283,14 +291,14 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
             <main className="flex-1 px-5 pt-4 space-y-6">
                 {/* --- SOUL CONNECTION HERO --- */}
                 <section>
-                    <motion.div 
-                        initial={{ opacity: 0, y: 20 }} 
-                        animate={{ opacity: 1, y: 0 }} 
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
                         className="relative bg-white/75 dark:bg-white/[0.04] rounded-[3rem] p-7 border border-white/90 dark:border-white/[0.07] shadow-[0_30px_60px_-12px_rgba(0,0,0,0.06)] dark:shadow-[0_30px_80px_-12px_rgba(244,63,94,0.12)] overflow-visible backdrop-blur-3xl"
                     >
                         <div className="absolute -top-6 -right-6 w-12 h-12 bg-rose-500/10 dark:bg-rose-500/20 blur-2xl rounded-full" />
                         <div className="relative z-10 flex flex-col items-center">
-                            
+
 
                             {/* Avatars Bridge Container — PREMIUM INFINITY */}
                             <div className="w-full relative mb-12 mt-4">
@@ -509,11 +517,10 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                             initial={{ opacity: 0, y: 6 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.4 }}
-                                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border shadow-sm ${
-                                                isPartnerOnline()
+                                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border shadow-sm ${isPartnerOnline()
                                                     ? 'bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-600 border-emerald-200/60'
                                                     : 'bg-white/70 text-zinc-500 border-zinc-200/60 backdrop-blur-md'
-                                            }`}
+                                                }`}
                                         >
                                             {isPartnerOnline() && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />}
                                             <span className="text-[9px] font-black uppercase tracking-wider">
@@ -538,16 +545,16 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                             </div>
 
                             <div className="flex items-center gap-4 w-full">
-                                <motion.div 
-                                    whileTap={{ scale: 0.97 }} 
-                                    onClick={() => setShowMap(true)} 
+                                <motion.div
+                                    whileTap={{ scale: 0.97 }}
+                                    onClick={() => setShowMap(true)}
                                     className="flex-1 h-15 bg-gradient-to-r from-rose-500 to-rose-600 dark:from-rose-600 dark:to-rose-700 rounded-[1.8rem] flex items-center justify-center gap-3 text-white font-black shadow-[0_15px_30px_rgba(244,63,94,0.35)] dark:shadow-[0_15px_40px_rgba(244,63,94,0.25)] cursor-pointer py-4"
                                 >
                                     <MapPin size={20} /><span className="text-[15px] font-black">الخريطة الحية</span>
                                 </motion.div>
-                                <motion.div 
-                                    whileTap={{ scale: 0.92 }} 
-                                    onClick={handleNudge} 
+                                <motion.div
+                                    whileTap={{ scale: 0.92 }}
+                                    onClick={handleNudge}
                                     className="w-15 h-15 bg-white dark:bg-white/10 rounded-[1.8rem] flex items-center justify-center text-rose-500 dark:text-rose-400 shadow-xl dark:shadow-rose-900/20 border border-rose-50 dark:border-white/10 group transition-all hover:bg-rose-50 dark:hover:bg-white/15 cursor-pointer p-4"
                                 >
                                     <Zap size={24} className="group-hover:animate-bounce" />
@@ -634,17 +641,17 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
 
                 {/* --- BENTO GRID SECTIONS --- */}
                 <section className="grid grid-cols-2 gap-5 px-1">
-                    <motion.div 
-                        initial={{ opacity: 0, scale: 0.95 }} 
-                        whileInView={{ opacity: 1, scale: 1 }} 
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
                         whileTap={{ scale: 0.97 }}
-                        viewport={{ once: true }} 
-                        onClick={() => onNavigate('adventure_bucket')} 
+                        viewport={{ once: true }}
+                        onClick={() => onNavigate('adventure_bucket')}
                         className="col-span-1 bg-white/60 dark:bg-white/[0.05] rounded-[2.2rem] p-6 border border-white/80 dark:border-white/[0.08] shadow-sm bg-amber-500/[0.03] flex flex-col gap-5 group cursor-pointer transition-all hover:bg-white dark:hover:bg-white/[0.09] hover:shadow-md"
                     >
                         <div className="flex items-center justify-between">
-                             <div className="w-11 h-11 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 flex items-center justify-center text-amber-600 dark:text-amber-400 transition-transform group-hover:rotate-6 shadow-sm"><Compass size={22} /></div>
-                             <ArrowUpRight size={16} className="text-amber-500/30 group-hover:text-amber-400 dark:group-hover:text-amber-400 transition-colors" />
+                            <div className="w-11 h-11 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 flex items-center justify-center text-amber-600 dark:text-amber-400 transition-transform group-hover:rotate-6 shadow-sm"><Compass size={22} /></div>
+                            <ArrowUpRight size={16} className="text-amber-500/30 group-hover:text-amber-400 dark:group-hover:text-amber-400 transition-colors" />
                         </div>
                         <div>
                             <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5">خططنا القادمة</h3>
@@ -652,17 +659,17 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         </div>
                     </motion.div>
 
-                    <motion.div 
-                        initial={{ opacity: 0, scale: 0.95 }} 
-                        whileInView={{ opacity: 1, scale: 1 }} 
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        whileInView={{ opacity: 1, scale: 1 }}
                         whileTap={{ scale: 0.97 }}
-                        viewport={{ once: true }} 
-                        onClick={() => onNavigate('wishlist')} 
+                        viewport={{ once: true }}
+                        onClick={() => onNavigate('wishlist')}
                         className="col-span-1 bg-white/60 dark:bg-white/[0.05] rounded-[2.2rem] p-6 border border-white/80 dark:border-white/[0.08] shadow-sm bg-indigo-500/[0.03] flex flex-col gap-5 group cursor-pointer transition-all hover:bg-white dark:hover:bg-white/[0.09] hover:shadow-md"
                     >
                         <div className="flex items-center justify-between">
-                             <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/15 flex items-center justify-center text-indigo-500 dark:text-indigo-400 transition-transform group-hover:scale-110 shadow-sm"><Gift size={22} /></div>
-                             <ArrowUpRight size={16} className="text-indigo-500/30 group-hover:text-indigo-400 transition-colors" />
+                            <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/15 flex items-center justify-center text-indigo-500 dark:text-indigo-400 transition-transform group-hover:scale-110 shadow-sm"><Gift size={22} /></div>
+                            <ArrowUpRight size={16} className="text-indigo-500/30 group-hover:text-indigo-400 transition-colors" />
                         </div>
                         <div>
                             <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5">صندوق الأمنيات</h3>
@@ -808,16 +815,16 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                         >
                                             {aiRecommendation?.title?.includes('🕊') ? '🕊️'
                                                 : aiRecommendation?.title?.includes('☕') ? '☕'
-                                                : aiRecommendation?.title?.includes('🌟') ? '🌟'
-                                                : aiRecommendation?.title?.includes('✍') ? '✍️'
-                                                : gardenInfo.icon}
+                                                    : aiRecommendation?.title?.includes('🌟') ? '🌟'
+                                                        : aiRecommendation?.title?.includes('✍') ? '✍️'
+                                                            : gardenInfo.icon}
                                         </motion.span>
                                     </div>
                                 </div>
                                 {/* Today's Arabic day name */}
                                 <div className="bg-amber-500/12 dark:bg-amber-400/15 border border-amber-400/25 dark:border-amber-500/25 rounded-xl px-2.5 py-1 text-center">
                                     <span className="text-[9px] font-black text-amber-700 dark:text-amber-400 tracking-wide">
-                                        {['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'][new Date().getDay()]}
+                                        {['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][new Date().getDay()]}
                                     </span>
                                 </div>
                             </div>
@@ -854,29 +861,29 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                     </motion.div>
 
                     <div className="col-span-2 flex items-center gap-4 px-2 mt-4">
-                         <h3 className="text-xl font-black tracking-tight text-zinc-800 dark:text-white/90 uppercase">بريد الحب</h3>
-                         <div className="h-px flex-1 bg-gradient-to-r from-rose-500/30 dark:from-rose-500/40 to-transparent" />
+                        <h3 className="text-xl font-black tracking-tight text-zinc-800 dark:text-white/90 uppercase">بريد الحب</h3>
+                        <div className="h-px flex-1 bg-gradient-to-r from-rose-500/30 dark:from-rose-500/40 to-transparent" />
                     </div>
 
-                    <motion.div 
-                        whileTap={{ scale: 0.98 }} 
-                        onClick={() => onNavigate('love_notes')} 
+                    <motion.div
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => onNavigate('love_notes')}
                         className="col-span-2 relative group cursor-pointer"
                     >
                         <div className="absolute -inset-4 bg-rose-500/5 blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 rounded-full" />
                         <div className="relative aspect-[272/409] w-full max-w-[280px] mx-auto select-none perspective-1000 mt-4 mb-8">
                             <motion.div whileHover={{ rotateY: 2, rotateX: 2 }} className="w-full h-full transition-transform duration-500 relative">
                                 <img src="/assets/love_notes/card-base.png" className="absolute inset-x-0 bottom-0 w-full h-[85%] object-cover pointer-events-none z-0 drop-shadow-2xl" />
-                                
+
                                 {latestNote ? (
                                     <>
                                         {(() => {
                                             const isAuthor = latestNote.author_id === userId;
-                                            const [rawFont, flowersPart] = latestNote.font_style?.includes('|') 
-                                                ? latestNote.font_style.split('|') 
+                                            const [rawFont, flowersPart] = latestNote.font_style?.includes('|')
+                                                ? latestNote.font_style.split('|')
                                                 : [latestNote.font_style || 'font-ruqaa', ''];
                                             const fontClass = (rawFont === 'font-cedarville') ? 'font-cedarville' : 'font-ruqaa';
-                                            const activeFlowers = flowersPart?.split(',').filter(Boolean) || [];
+                                            const activeFlowers: string[] = flowersPart?.split(',').filter(Boolean) || [];
                                             const flowersData = [
                                                 { id: 'flower-1', url: '/assets/love_notes/flower-1.png' },
                                                 { id: 'flower-2', url: '/assets/love_notes/flower-2.png' },
@@ -890,7 +897,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                             return (
                                                 <>
                                                     <div className="absolute top-0 inset-x-0 h-[60%] z-0 pointer-events-none overflow-hidden">
-                                                        {activeFlowers.map((fid, idx) => {
+                                                        {Array.isArray(activeFlowers) && activeFlowers.map((fid: string, idx: number) => {
                                                             const flower = flowersData.find(f => f.id === fid);
                                                             if (!flower) return null;
                                                             const slots = [
@@ -904,12 +911,12 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                                             ];
                                                             const slot = slots[idx % slots.length];
                                                             return (
-                                                                <div 
+                                                                <div
                                                                     key={`home-flower-${idx}`}
                                                                     className="w-[32%] absolute"
-                                                                    style={{ 
-                                                                        left: '50%', top: slot.y, marginLeft: slot.x, 
-                                                                        transform: `scale(${slot.scale}) rotate(${slot.rotate}deg)`, 
+                                                                    style={{
+                                                                        left: '50%', top: slot.y, marginLeft: slot.x,
+                                                                        transform: `scale(${slot.scale}) rotate(${slot.rotate}deg)`,
                                                                         transformOrigin: 'bottom center', zIndex: slot.z
                                                                     }}
                                                                 >
@@ -961,10 +968,10 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 </section>
 
                 <section>
-                    <motion.div 
-                        initial={{ opacity: 0 }} 
-                        whileInView={{ opacity: 1 }} 
-                        viewport={{ once: true }} 
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        whileInView={{ opacity: 1 }}
+                        viewport={{ once: true }}
                         className="bg-white/65 dark:bg-white/[0.04] rounded-[2.8rem] p-9 relative overflow-visible border border-white/80 dark:border-white/[0.07] shadow-xl dark:shadow-[0_20px_60px_rgba(0,0,0,0.3)]"
                     >
                         <div className="absolute top-[-20px] left-10 w-40 h-40 bg-rose-500/8 dark:bg-rose-600/15 blur-[60px] rounded-full pointer-events-none animate-pulse" />
@@ -983,11 +990,11 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                         {moodsList.map((m) => {
                                             const MoodIconComp = m.icon;
                                             return (
-                                                <motion.button 
-                                                    key={m.id} 
-                                                    onClick={() => handleMoodSelect(m.id)} 
-                                                    whileHover={{ y: -6, scale: 1.05 }} 
-                                                    whileTap={{ scale: 0.95 }} 
+                                                <motion.button
+                                                    key={m.id}
+                                                    onClick={() => handleMoodSelect(m.id)}
+                                                    whileHover={{ y: -6, scale: 1.05 }}
+                                                    whileTap={{ scale: 0.95 }}
                                                     className="flex flex-col items-center gap-4 group/mood"
                                                 >
                                                     <div className={`w-16 h-16 rounded-[1.8rem] glass flex items-center justify-center ${m.color} shadow-lg border-white bg-white/90 dark:bg-zinc-800/90 transition-all group-hover/mood:shadow-rose-500/10`}><MoodIconComp size={28} /></div>
@@ -1047,12 +1054,12 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                             const eventDate = new Date(event.event_date);
                             const daysLeft = Math.ceil((eventDate.getTime() - new Date().setHours(0, 0, 0, 0)) / (1000 * 60 * 60 * 24));
                             return (
-                                <motion.div 
-                                    key={event.id} 
-                                    initial={{ opacity: 0, x: -15 }} 
-                                    whileInView={{ opacity: 1, x: 0 }} 
-                                    transition={{ delay: i * 0.1 }} 
-                                    onClick={() => onNavigate('calendar')} 
+                                <motion.div
+                                    key={event.id}
+                                    initial={{ opacity: 0, x: -15 }}
+                                    whileInView={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: i * 0.1 }}
+                                    onClick={() => onNavigate('calendar')}
                                     className="glass rounded-[2rem] p-5 border-white shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all hover:bg-white hover:shadow-md cursor-pointer"
                                 >
                                     <div className="flex items-center gap-5">
@@ -1066,11 +1073,10 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                                             </p>
                                         </div>
                                     </div>
-                                    <div className={`px-5 py-2.5 rounded-2xl font-black text-[10px] shadow-sm transition-all ${
-                                        daysLeft <= 1 
-                                            ? 'bg-gradient-to-br from-rose-500 to-rose-600 text-white animate-pulse shadow-rose-500/20' 
+                                    <div className={`px-5 py-2.5 rounded-2xl font-black text-[10px] shadow-sm transition-all ${daysLeft <= 1
+                                            ? 'bg-gradient-to-br from-rose-500 to-rose-600 text-white animate-pulse shadow-rose-500/20'
                                             : 'bg-white text-rose-600 border border-rose-100'
-                                    }`}>
+                                        }`}>
                                         {daysLeft === 0 ? 'اليوم!' : daysLeft === 1 ? 'غداً' : `باقي ${daysLeft} يوم`}
                                     </div>
                                 </motion.div>
@@ -1083,7 +1089,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
             <AnimatePresence>
                 {showMap && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-background backdrop-blur-3xl flex flex-col p-8 font-sans">
-                         <div className="absolute inset-x-0 top-0 h-1/2 bg-rose-500/5 blur-[120px] rounded-full -z-10" />
+                        <div className="absolute inset-x-0 top-0 h-1/2 bg-rose-500/5 blur-[120px] rounded-full -z-10" />
                         <header className="flex items-center justify-between mb-8 px-2 mt-4"><motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowMap(false)} className="w-14 h-14 glass rounded-[1.5rem] flex items-center justify-center text-rose-500 shadow-xl border-white"><ChevronLeft className="rotate-180" size={24} /></motion.button><div className="text-right"><h2 className="text-2xl font-black italic tracking-tighter">موقع الروح</h2><p className="text-[10px] font-black text-rose-500/40 uppercase tracking-[0.5em] leading-none mt-1">اتصال فوري الآن</p></div></header>
                         <motion.div initial={{ scale: 0.95, y: 30 }} animate={{ scale: 1, y: 0 }} className="flex-1 rounded-[3.8rem] overflow-hidden border-[6px] border-white shadow-3xl relative mb-10 bg-zinc-100 ring-2 ring-black/5">
                             {partnerTracking.lat ? (
@@ -1093,8 +1099,8 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                             )}
                         </motion.div>
                         <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="glass rounded-[3.5rem] p-8 flex items-center justify-between border-white shadow-2xl bg-white/80 ring-1 ring-black/5">
-                             <div className="flex items-center gap-6"><div className="w-20 h-20 rounded-full ring-[6px] ring-white shadow-xl overflow-hidden relative">{avatars.partner ? <img src={avatars.partner} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-rose-50 flex items-center justify-center text-rose-200"><User size={40} /></div>}</div><div className="text-right"><h3 className="text-xl font-black mb-1">{isPartnerOnline() ? 'متصل الآن' : formatLastSeen(partnerTracking.last_seen)}</h3><p className="text-rose-600/60 font-black text-xs">يبعد عنك {distance}</p></div></div>
-                             <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { if (partnerTracking.lat) window.open(`https://www.google.com/maps/dir/?api=1&destination=${partnerTracking.lat},${partnerTracking.lng}`, '_blank'); }} className="w-20 h-20 bg-rose-500 text-white rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-rose-500/40"><Navigation fill="currentColor" size={30} /></motion.button>
+                            <div className="flex items-center gap-6"><div className="w-20 h-20 rounded-full ring-[6px] ring-white shadow-xl overflow-hidden relative">{avatars.partner ? <img src={avatars.partner} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-rose-50 flex items-center justify-center text-rose-200"><User size={40} /></div>}</div><div className="text-right"><h3 className="text-xl font-black mb-1">{isPartnerOnline() ? 'متصل الآن' : formatLastSeen(partnerTracking.last_seen)}</h3><p className="text-rose-600/60 font-black text-xs">يبعد عنك {distance}</p></div></div>
+                            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { if (partnerTracking.lat) window.open(`https://www.google.com/maps/dir/?api=1&destination=${partnerTracking.lat},${partnerTracking.lng}`, '_blank'); }} className="w-20 h-20 bg-rose-500 text-white rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-rose-500/40"><Navigation fill="currentColor" size={30} /></motion.button>
                         </motion.div>
                     </motion.div>
                 )}

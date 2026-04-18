@@ -20,6 +20,9 @@ interface GamesScreenProps {
   isDarkMode?: boolean;
   userId: string;
   partnershipId: string | null;
+  initialGame?: string;
+  initialCode?: string;
+  onConsumedParams?: () => void;
 }
 
 const ALL_GAMES = [
@@ -142,11 +145,29 @@ const PARTICLES = [
   { x: '88%',  y: '80%', size: 4,  delay: 0.6 },
 ];
 
-export function GamesScreen({ onNavigate, isDarkMode, userId, partnershipId }: GamesScreenProps) {
+export function GamesScreen({ 
+  onNavigate, isDarkMode, userId, partnershipId, 
+  initialGame, initialCode, onConsumedParams 
+}: GamesScreenProps) {
   const [selectedGame, setSelectedGame] = useState<string | null>(null);
   const [userName, setUserName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
+
+  useEffect(() => {
+    if (initialGame) {
+      setSelectedGame(initialGame);
+      // Wait a bit for the game component to mount, then the code logic in the game should ideally handle it
+      // But we might need to pass the code down.
+    }
+  }, [initialGame]);
+
+  // Clean up params once used
+  useEffect(() => {
+    if (selectedGame && initialGame && onConsumedParams) {
+      onConsumedParams();
+    }
+  }, [selectedGame, initialGame, onConsumedParams]);
 
   useEffect(() => {
     if (userId) {
@@ -524,21 +545,21 @@ export function GamesScreen({ onNavigate, isDarkMode, userId, partnershipId }: G
               className="absolute inset-0 overflow-hidden"
             >
               {selectedGame === 'mind-sync' ? (
-                <MindSyncGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
+                <MindSyncGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               ) : selectedGame === 'memory-map' ? (
-                <MemoryMapGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
+                <MemoryMapGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               ) : selectedGame === 'partner-predict' ? (
-                <PartnerPredictGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
+                <PartnerPredictGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               ) : selectedGame === 'if-i-were-you' ? (
-                <IfIWereYouGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
+                <IfIWereYouGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               ) : selectedGame === 'emoji-mood' ? (
-                <EmojiMoodGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
+                <EmojiMoodGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               ) : selectedGame === 'number-guess' ? (
-                <NumberGuessGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
+                <NumberGuessGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               ) : selectedGame === 'boom-boom' ? (
-                <BoomBoomGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName || 'اللاعب'} />
+                <BoomBoomGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               ) : (
-                <WordGuessGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName || 'اللاعب'} partnershipId={partnershipId} />
+                <WordGuessGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               )}
             </motion.div>
           )}

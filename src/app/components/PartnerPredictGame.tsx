@@ -10,6 +10,7 @@ interface PartnerPredictGameProps {
     userId: string;
     userName: string;
     partnershipId: string | null;
+    initialCode?: string;
 }
 
 type GameState = 'menu' | 'lobby' | 'playing' | 'finished';
@@ -41,13 +42,25 @@ const DILEMMAS = [
     { a: "نرجع للماضي نعدل موقف 🕰️", b: "نشوف المستقبل لدقيقة 🚀" }
 ];
 
-export function PartnerPredictGame({ onBack, userId, userName, partnershipId }: PartnerPredictGameProps) {
+export function PartnerPredictGame({ onBack, userId, userName, partnershipId, initialCode }: PartnerPredictGameProps) {
     const [uiState, setUiState] = useState<GameState>('menu');
     const [joinCode, setJoinCode] = useState('');
     const [roomData, setRoomData] = useState<RoomData | null>(null);
     const [loading, setLoading] = useState(false);
     const [presence, setPresence] = useState<Record<string, unknown>>({});
     const [partnerInfo, setPartnerInfo] = useState<{ id: string; name: string } | null>(null);
+
+    useEffect(() => {
+        if (initialCode && uiState === 'menu') {
+            setJoinCode(initialCode);
+        }
+    }, [initialCode, uiState]);
+
+    useEffect(() => {
+        if (initialCode && joinCode === initialCode && uiState === 'menu' && !loading) {
+            joinRoom();
+        }
+    }, [joinCode, initialCode, uiState, loading]);
 
     useEffect(() => {
         if (!roomData?.id) return;
@@ -77,7 +90,7 @@ export function PartnerPredictGame({ onBack, userId, userName, partnershipId }: 
             .eq('id', partnershipId).single().then(({ data }) => {
                 if (data) {
                     const isUser1 = data.user1_id === userId;
-                    setPartnerInfo({ id: isUser1 ? data.user2_id : data.user1_id, name: isUser1 ? (data.user2 as { name?: string })?.name : (data.user1 as { name?: string })?.name || 'الشريك' });
+                    setPartnerInfo({ id: isUser1 ? data.user2_id : data.user1_id, name: (isUser1 ? (data.user2 as { name?: string })?.name : (data.user1 as { name?: string })?.name) || 'الشريك' });
                 }
             });
     }, [partnershipId, userId]);

@@ -10,6 +10,8 @@ interface BoomBoomGameProps {
     userName: string;
     userAvatar?: string;
     isDarkMode?: boolean;
+    partnershipId: string | null;
+    initialCode?: string;
 }
 
 type GameState = 'menu' | 'lobby' | 'setup' | 'playing' | 'finished';
@@ -35,7 +37,7 @@ interface RoomData {
     rematch_requests: string[];
 }
 
-export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
+export function BoomBoomGame({ onBack, userId, userName, partnershipId, initialCode }: BoomBoomGameProps) {
     const [gameState, setGameState] = useState<GameState>('menu');
     const [roomCode, setRoomCode] = useState('');
     const [joinCode, setJoinCode] = useState('');
@@ -45,6 +47,33 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
     const [error, setError] = useState<string | null>(null);
     const [isAIMode, setIsAIMode] = useState(false);
     const [presence, setPresence] = useState<any>({});
+    const [partnerInfo, setPartnerInfo] = useState<{ id: string, name: string } | null>(null);
+
+    useEffect(() => {
+        if (initialCode && gameState === 'menu') {
+            setJoinCode(initialCode);
+        }
+    }, [initialCode, gameState]);
+
+    useEffect(() => {
+        if (initialCode && joinCode === initialCode && gameState === 'menu' && !loading) {
+            joinRoom();
+        }
+    }, [joinCode, initialCode, gameState, loading]);
+
+    // Fetch Partner Info
+    useEffect(() => {
+        if (!partnershipId) return;
+        supabase.from('partnerships').select('user1_id, user2_id, user1:user1_id(name), user2:user2_id(name)')
+            .eq('id', partnershipId).single().then(({ data }) => {
+                if (data) {
+                    const isUser1 = data.user1_id === userId;
+                    const pId = isUser1 ? data.user2_id : data.user1_id;
+                    const pName = isUser1 ? (data.user2 as any)?.name : (data.user1 as any)?.name;
+                    setPartnerInfo({ id: pId, name: pName || 'الشريك' });
+                }
+            });
+    }, [partnershipId, userId]);
 
     // Audio effects (optional, placeholders)
     const playSound = (type: 'pop' | 'boom' | 'win') => {
@@ -167,6 +196,17 @@ export function BoomBoomGame({ onBack, userId, userName }: BoomBoomGameProps) {
         });
         setGameState(withAI ? 'setup' : 'lobby');
         setLoading(false);
+
+        // Invite partner
+        if (!withAI && partnerInfo) {
+            await supabase.from('notifications').insert({
+                user_id: partnerInfo.id,
+                title: 'لعبة مفرقعة! 💣',
+                body: `${userName} يتحداك في لعبة مفرقعة! الكود: ${code}`,
+                type: 'game_invite',
+                metadata: { room_code: code, game_type: 'boom-boom' }
+            });
+        }
     };
 
     const joinRoom = async () => {
