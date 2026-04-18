@@ -2,16 +2,17 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft, Search, Gamepad2, Brain, Binary,
-  Zap, Image as ImageIcon, Split, Radio, Bomb, X,
-  Trophy, Heart, Star, Play, ChevronLeft
+  Zap, Image as ImageIcon, Bomb, X,
+  Trophy, Heart, Star, Play, ChevronLeft, HelpCircle, UserCircle, Smile
 } from 'lucide-react';
 import { BoomBoomGame } from './BoomBoomGame';
 import { WordGuessGame } from './WordGuessGame';
 import { NumberGuessGame } from './NumberGuessGame';
 import { MindSyncGame } from './MindSyncGame';
 import { MemoryMapGame } from './MemoryMapGame';
-import { WouldYouRatherGame } from './WouldYouRatherGame';
-import { RadarHuntGame } from './RadarHuntGame';
+import { PartnerPredictGame } from './PartnerPredictGame';
+import { IfIWereYouGame } from './IfIWereYouGame';
+import { EmojiMoodGame } from './EmojiMoodGame';
 import { supabase } from '../../lib/supabase';
 
 interface GamesScreenProps {
@@ -36,17 +37,43 @@ const ALL_GAMES = [
     bgAccent: 'bg-rose-500/8',
   },
   {
-    id: 'would-you-rather',
-    title: 'لو كنت مكاني',
-    desc: 'تخمين القرارات الصعبة',
-    icon: Split,
+    id: 'partner-predict',
+    title: 'ماذا يختار شريكك؟',
+    desc: 'خمّن اختياره في مواقف صعبة',
+    icon: HelpCircle,
     category: 'connection',
-    badge: '🔥',
+    badge: 'جديد',
+    gradient: 'from-violet-500 to-fuchsia-600',
+    iconGradient: 'from-violet-400 to-fuchsia-600',
+    glowColor: 'rgba(139,92,246,0.35)',
+    accentClass: 'text-violet-500',
+    bgAccent: 'bg-violet-500/8',
+  },
+  {
+    id: 'if-i-were-you',
+    title: 'لو كنت مكاني',
+    desc: 'موقف واحد وردّ بصراحة',
+    icon: UserCircle,
+    category: 'connection',
+    badge: '💬',
     gradient: 'from-sky-500 to-blue-600',
     iconGradient: 'from-sky-400 to-blue-600',
     glowColor: 'rgba(14,165,233,0.35)',
     accentClass: 'text-sky-500',
     bgAccent: 'bg-sky-500/8',
+  },
+  {
+    id: 'emoji-mood',
+    title: 'إيموجي مزاج',
+    desc: 'بالدور: إيموجي بلا حدّ والثاني يفسّر',
+    icon: Smile,
+    category: 'connection',
+    badge: '😊',
+    gradient: 'from-amber-400 to-orange-500',
+    iconGradient: 'from-amber-400 to-orange-500',
+    glowColor: 'rgba(245,158,11,0.38)',
+    accentClass: 'text-amber-600',
+    bgAccent: 'bg-amber-500/8',
   },
   {
     id: 'memory-map',
@@ -83,18 +110,6 @@ const ALL_GAMES = [
     glowColor: 'rgba(245,158,11,0.35)',
     accentClass: 'text-amber-500',
     bgAccent: 'bg-amber-500/8',
-  },
-  {
-    id: 'radar-hunt',
-    title: 'الرادار',
-    desc: 'تتبع الأهداف سراً',
-    icon: Radio,
-    category: 'adventure',
-    gradient: 'from-emerald-400 to-green-600',
-    iconGradient: 'from-emerald-400 to-green-600',
-    glowColor: 'rgba(16,185,129,0.35)',
-    accentClass: 'text-emerald-500',
-    bgAccent: 'bg-emerald-500/8',
   },
   {
     id: 'boom-boom',
@@ -381,7 +396,7 @@ export function GamesScreen({ onNavigate, isDarkMode, userId, partnershipId }: G
 
                 {/* ═══ GAME CARDS ═══ */}
                 {gridGames.map((game, idx) => {
-                  const isWide = game.id === 'radar-hunt' || game.id === 'boom-boom';
+                  const isWide = game.id === 'boom-boom';
 
                   return (
                     <motion.button
@@ -512,10 +527,12 @@ export function GamesScreen({ onNavigate, isDarkMode, userId, partnershipId }: G
                 <MindSyncGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
               ) : selectedGame === 'memory-map' ? (
                 <MemoryMapGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
-              ) : selectedGame === 'would-you-rather' ? (
-                <WouldYouRatherGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
-              ) : selectedGame === 'radar-hunt' ? (
-                <RadarHuntGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
+              ) : selectedGame === 'partner-predict' ? (
+                <PartnerPredictGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
+              ) : selectedGame === 'if-i-were-you' ? (
+                <IfIWereYouGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
+              ) : selectedGame === 'emoji-mood' ? (
+                <EmojiMoodGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
               ) : selectedGame === 'number-guess' ? (
                 <NumberGuessGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} />
               ) : selectedGame === 'boom-boom' ? (

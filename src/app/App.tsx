@@ -13,6 +13,7 @@ import { AdventureBucketScreen } from './components/AdventureBucketScreen';
 import { FinanceScreen } from './components/FinanceScreen';
 import { OccasionScreen } from './components/OccasionScreen';
 import { WishlistScreen } from './components/WishlistScreen';
+import { HomeBoxScreen } from './components/HomeBoxScreen';
 import { PlaylistScreen } from './components/PlaylistScreen';
 import { EveningJournalScreen } from './components/EveningJournalScreen';
 import { supabase } from '../lib/supabase';
@@ -33,6 +34,7 @@ type Screen =
   | 'adventure_bucket'
   | 'occasion'
   | 'wishlist'
+  | 'home_box'
   | 'playlist'
   | 'evening_journal';
 
@@ -171,6 +173,8 @@ function App() {
         return <OccasionScreen onBack={() => handleNavigate('home')} isDarkMode={isDarkMode} userId={userId} partnershipId={partnershipId} />;
       case 'wishlist':
         return <WishlistScreen onBack={() => handleNavigate('home')} userId={userId} partnershipId={partnershipId} />;
+      case 'home_box':
+        return <HomeBoxScreen onBack={() => handleNavigate('home')} userId={userId} partnershipId={partnershipId} />;
       case 'playlist':
         return <PlaylistScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       case 'evening_journal':

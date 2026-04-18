@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Settings, Heart, Sparkles, ChevronLeft, MapPin, Compass, Gift, Moon, Sun, 
     ShieldCheck, Target, Zap, Navigation, User, Calendar, ArrowUpRight, 
-    Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet, Lock, Music
+    Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet, Lock, Music, Armchair
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Button } from './ui/button';
@@ -668,6 +668,29 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                             <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5">صندوق الأمنيات</h3>
                             <p className="text-[10px] font-bold text-indigo-600/40 dark:text-indigo-400/50 uppercase tracking-widest">موالح الهدايا</p>
                         </div>
+                    </motion.div>
+
+                    {/* ── صندوق البيت — تجهيز العفش والمشتريات ── */}
+                    <motion.div
+                        initial={{ opacity: 0, y: 12 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        whileTap={{ scale: 0.98 }}
+                        viewport={{ once: true }}
+                        onClick={() => onNavigate('home_box')}
+                        className="col-span-2 bg-white/60 dark:bg-white/[0.05] rounded-[2.2rem] p-6 border border-white/80 dark:border-white/[0.08] shadow-sm bg-teal-500/[0.04] flex flex-row items-center justify-between gap-5 group cursor-pointer transition-all hover:bg-white dark:hover:bg-white/[0.09] hover:shadow-md"
+                    >
+                        <div className="flex items-center gap-5 min-w-0 flex-1">
+                            <div className="w-14 h-14 rounded-2xl bg-teal-500/12 dark:bg-teal-500/18 flex items-center justify-center text-teal-600 dark:text-teal-400 shadow-sm transition-transform group-hover:scale-105 shrink-0">
+                                <Armchair size={26} />
+                            </div>
+                            <div className="min-w-0 text-start">
+                                <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-tight mb-1">صندوق البيت</h3>
+                                <p className="text-[10px] font-bold text-teal-700/55 dark:text-teal-400/55 uppercase tracking-widest leading-relaxed">
+                                    قائمة العفش والمشتريات قبل العشّ
+                                </p>
+                            </div>
+                        </div>
+                        <ArrowUpRight size={18} className="text-teal-500/35 group-hover:text-teal-500 shrink-0 transition-colors" />
                     </motion.div>
 
                     {/* ── دفتر المساء ── */}

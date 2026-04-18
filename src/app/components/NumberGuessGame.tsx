@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { motion } from 'motion/react';
 import { supabase } from '../../lib/supabase';
-import { ArrowLeft, Copy, Binary, MessageCircle, Send, CheckCircle2, Trophy, Home, Users, Ghost, HelpCircle, Sparkles, Compass, Hash, Eye, EyeOff } from 'lucide-react';
+import { Copy, Binary, Trophy, Sparkles, Hash, Eye, EyeOff } from 'lucide-react';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 
@@ -12,7 +12,20 @@ interface NumberGuessGameProps {
     partnershipId: string | null;
 }
 
-type GameState = 'menu' | 'lobby' | 'setup' | 'playing' | 'finished';
+type UiState = 'menu' | 'lobby' | 'setup' | 'playing' | 'finished';
+
+type DigitLength = 2 | 3 | 4;
+
+interface GameStatePayload {
+    digit_length: DigitLength;
+    host_secret: string;
+    guest_secret: string;
+    /** خانات كشفها المضيف وهو يحاول تخمين رقم الضيف (نفس طول الرقم) */
+    host_revealed: (string | null)[];
+    /** خانات كشفها الضيف وهو يحاول تخمين رقم المضيف */
+    guest_revealed: (string | null)[];
+    winner: string | null;
+}
 
 interface RoomData {
     id: string;
@@ -20,96 +33,108 @@ interface RoomData {
     host_user_id: string;
     guest_user_id: string | null;
     status: string;
-    game_state: {
-        host_number: string;
-        guest_number: string;
-        question_count: number;
-        host_closeness: 'far' | 'near' | 'very_near' | null;
-        guest_closeness: 'far' | 'near' | 'very_near' | null;
-        turn: string | null;
-        winner: string | null;
-        rematch_requests: string[];
+    game_state: GameStatePayload;
+}
+
+function parseGs(raw: unknown): GameStatePayload {
+    const o = (typeof raw === 'string' ? JSON.parse(raw) : raw) as Partial<GameStatePayload>;
+    const L = (o.digit_length ?? 3) as DigitLength;
+    if (L !== 2 && L !== 3 && L !== 4) {
+        return {
+            digit_length: 3,
+            host_secret: '',
+            guest_secret: '',
+            host_revealed: emptyRevealed(3),
+            guest_revealed: emptyRevealed(3),
+            winner: null,
+        };
+    }
+    const hr = Array.isArray(o.host_revealed) ? o.host_revealed : emptyRevealed(L);
+    const gr = Array.isArray(o.guest_revealed) ? o.guest_revealed : emptyRevealed(L);
+    return {
+        digit_length: L,
+        host_secret: o.host_secret ?? '',
+        guest_secret: o.guest_secret ?? '',
+        host_revealed: hr.length === L ? hr : emptyRevealed(L),
+        guest_revealed: gr.length === L ? gr : emptyRevealed(L),
+        winner: o.winner ?? null,
     };
 }
 
+function emptyRevealed(len: DigitLength): (string | null)[] {
+    return Array(len).fill(null);
+}
+
+function applyPositionalReveal(guess: string, secret: string, prev: (string | null)[]): (string | null)[] {
+    const next = [...prev];
+    for (let i = 0; i < secret.length; i++) {
+        if (guess[i] === secret[i]) next[i] = secret[i];
+    }
+    return next;
+}
+
+function maskLine(revealed: (string | null)[]): string {
+    return revealed.map((c) => (c != null ? c : '•')).join(' ');
+}
+
 export function NumberGuessGame({ onBack, userId, userName, partnershipId }: NumberGuessGameProps) {
-    const [gameState, setGameState] = useState<GameState>('menu');
+    const [digitLength, setDigitLength] = useState<DigitLength>(3);
     const [joinCode, setJoinCode] = useState('');
     const [roomData, setRoomData] = useState<RoomData | null>(null);
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [tempNumber, setTempNumber] = useState('');
-    const [showNumber, setShowNumber] = useState(false);
-    const [presence, setPresence] = useState<any>({});
-    const [partnerInfo, setPartnerInfo] = useState<{ id: string, name: string } | null>(null);
+    const [tempSecret, setTempSecret] = useState('');
+    const [guessInput, setGuessInput] = useState('');
+    const [showSecret, setShowSecret] = useState(false);
+    const [partnerInfo, setPartnerInfo] = useState<{ id: string; name: string } | null>(null);
 
-    // Realtime Subscription
     useEffect(() => {
         if (!roomData?.id) return;
-
         const channel = supabase
-            .channel(`game_number_${roomData.id}`, {
-                config: { presence: { key: userId } }
-            })
-            .on('postgres_changes',
+            .channel(`game_number_${roomData.id}`)
+            .on(
+                'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'game_rooms', filter: `id=eq.${roomData.id}` },
                 (payload) => {
-                    const newData = payload.new as any;
-                    const parsedState = typeof newData.game_state === 'string' ? JSON.parse(newData.game_state) : newData.game_state;
-
-                    setRoomData(prev => ({
-                        ...prev!,
+                    const newData = payload.new as Record<string, unknown>;
+                    setRoomData({
                         ...newData,
-                        game_state: parsedState
-                    }));
+                        game_state: parseGs(newData.game_state),
+                    } as RoomData);
                 }
             )
-            .on('presence', { event: 'sync' }, () => {
-                setPresence(channel.presenceState());
-            })
-            .subscribe(async (status) => {
-                if (status === 'SUBSCRIBED') {
-                    await channel.track({
-                        user_id: userId,
-                        name: userName,
-                        online_at: new Date().toISOString(),
-                    });
-                }
-            });
-
+            .subscribe();
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [roomData?.id, userId, userName]);
+    }, [roomData?.id]);
 
-    useEffect(() => {
-        if (roomData?.status) {
-            let status = roomData.status as GameState;
-            if (roomData.status === 'waiting') status = 'lobby';
-
-            // Wait for both numbers to be set before playing
-            if (status === 'setup' && roomData.game_state.host_number && roomData.game_state.guest_number) {
-                status = 'playing';
-            }
-
-            if (roomData.game_state.winner && status !== 'finished') status = 'finished';
-
-            if (status !== gameState) {
-                setGameState(status);
-            }
+    const uiState = useMemo((): UiState => {
+        if (!roomData) return 'menu';
+        const gs = roomData.game_state;
+        if (roomData.status === 'waiting') return 'lobby';
+        if (roomData.status === 'setup') {
+            if (gs.host_secret && gs.guest_secret) return 'playing';
+            return 'setup';
         }
-    }, [roomData?.status, roomData?.game_state.host_number, roomData?.game_state.guest_number, roomData?.game_state.winner, gameState]);
+        if (roomData.status === 'playing') return 'playing';
+        if (roomData.status === 'finished') return 'finished';
+        return 'menu';
+    }, [roomData]);
 
-    // Fetch Partner Info
     useEffect(() => {
         if (!partnershipId) return;
-        supabase.from('partnerships').select('user1_id, user2_id, user1:user1_id(name), user2:user2_id(name)')
-            .eq('id', partnershipId).single().then(({ data }) => {
+        supabase
+            .from('partnerships')
+            .select('user1_id, user2_id, user1:user1_id(name), user2:user2_id(name)')
+            .eq('id', partnershipId)
+            .single()
+            .then(({ data }) => {
                 if (data) {
                     const isUser1 = data.user1_id === userId;
-                    const pId = isUser1 ? data.user2_id : data.user1_id;
-                    const pName = isUser1 ? (data.user2 as any)?.name : (data.user1 as any)?.name;
-                    setPartnerInfo({ id: pId, name: pName || 'الشريك' });
+                    setPartnerInfo({
+                        id: isUser1 ? data.user2_id : data.user1_id,
+                        name: isUser1 ? (data.user2 as { name?: string })?.name : (data.user1 as { name?: string })?.name || 'الشريك',
+                    });
                 }
             });
     }, [partnershipId, userId]);
@@ -117,17 +142,15 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
     const createRoom = async () => {
         setLoading(true);
         const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-        const initialGameState = {
-            host_number: '',
-            guest_number: '',
-            question_count: 0,
-            host_closeness: 'far',
-            guest_closeness: 'far',
-            turn: userId,
+        const L = digitLength;
+        const initial: GameStatePayload = {
+            digit_length: L,
+            host_secret: '',
+            guest_secret: '',
+            host_revealed: emptyRevealed(L),
+            guest_revealed: emptyRevealed(L),
             winner: null,
-            rematch_requests: []
         };
-
         const { data, error } = await supabase
             .from('game_rooms')
             .insert({
@@ -135,38 +158,34 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
                 game_type: 'number-guess',
                 host_user_id: userId,
                 status: 'waiting',
-                game_state: initialGameState
+                game_state: initial,
             })
             .select()
             .single();
 
         if (error) {
-            setError('تعذر إنشاء الغرفة');
+            toast.error('تعذّر إنشاء الغرفة');
             setLoading(false);
             return;
         }
-
-        setRoomData({ ...data, game_state: initialGameState });
-        setGameState('lobby');
+        setRoomData({ ...data, game_state: initial } as RoomData);
         setLoading(false);
-
         if (partnerInfo) {
             await supabase.from('notifications').insert({
                 user_id: partnerInfo.id,
-                title: 'تحدي الرقم! 🔢',
-                body: `${userName} يتحداك في لعبة الرقم! الكود: ${code}`,
+                title: 'تحدي الأرقام 🔢',
+                body: `${userName} يتحداك (${L} أرقام)! الكود: ${code}`,
                 type: 'game_invite',
-                metadata: { room_code: code, game_type: 'number-guess' }
+                metadata: { room_code: code, game_type: 'number-guess' },
             });
             toast.success(`تم إرسال دعوة لـ ${partnerInfo.name}`);
         }
     };
 
     const joinRoom = async () => {
-        if (!joinCode) return;
+        if (!joinCode.trim()) return;
         setLoading(true);
-
-        const { data: room, error: searchError } = await supabase
+        const { data: room, error } = await supabase
             .from('game_rooms')
             .select('*')
             .eq('room_code', joinCode.toUpperCase())
@@ -174,96 +193,149 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
             .eq('status', 'waiting')
             .single();
 
-        if (searchError || !room) {
-            setError('الغرفة غير موجودة');
+        if (error || !room) {
+            toast.error('الغرفة غير موجودة');
             setLoading(false);
             return;
         }
 
-        const { data: updatedRoom, error: joinError } = await supabase
+        const { data: updated, error: upErr } = await supabase
             .from('game_rooms')
             .update({ guest_user_id: userId, status: 'setup' })
             .eq('id', room.id)
             .select()
             .single();
 
-        if (joinError) return setLoading(false);
-
-        const parsedState = typeof updatedRoom.game_state === 'string' ? JSON.parse(updatedRoom.game_state) : updatedRoom.game_state;
-        setRoomData({ ...updatedRoom, game_state: parsedState });
-        setGameState('setup');
+        if (upErr || !updated) {
+            setLoading(false);
+            return;
+        }
+        setRoomData({ ...updated, game_state: parseGs(updated.game_state) } as RoomData);
         setLoading(false);
+    };
+
+    const validateSecret = (s: string, L: DigitLength): boolean => {
+        if (s.length !== L) return false;
+        return /^\d+$/.test(s);
     };
 
     const setSecretNumber = async () => {
-        if (!tempNumber.trim() || !roomData) return;
+        if (!roomData || !tempSecret.trim()) return;
+        const L = roomData.game_state.digit_length;
+        const trimmed = tempSecret.trim();
+        if (!validateSecret(trimmed, L)) {
+            toast.error(`الرقم لازم يكون بالضبط ${L} خانات (أرقام فقط)`);
+            return;
+        }
         setLoading(true);
-
         const isHost = userId === roomData.host_user_id;
-        const newState = {
+        const key = isHost ? 'host_secret' : 'guest_secret';
+        const newState: GameStatePayload = {
             ...roomData.game_state,
-            [isHost ? 'host_number' : 'guest_number']: tempNumber.trim()
+            [key]: trimmed,
         };
-
-        await supabase.from('game_rooms').update({ game_state: newState }).eq('id', roomData.id);
+        const bothReady = !!(newState.host_secret && newState.guest_secret);
+        await supabase
+            .from('game_rooms')
+            .update({
+                game_state: newState,
+                ...(bothReady ? { status: 'playing' } : {}),
+            })
+            .eq('id', roomData.id);
+        setTempSecret('');
         setLoading(false);
     };
 
-    const updateCloseness = async (status: 'far' | 'near' | 'very_near') => {
-        if (!roomData) return;
+    const submitGuess = useCallback(async () => {
+        if (!roomData || !guessInput.trim()) return;
+        const gs = roomData.game_state;
+        const L = gs.digit_length;
+        const g = guessInput.trim();
+        if (!validateSecret(g, L)) {
+            toast.error(`${L} أرقام بالضبط`);
+            return;
+        }
         const isHost = userId === roomData.host_user_id;
-        const newState = {
-            ...roomData.game_state,
-            [isHost ? 'guest_closeness' : 'host_closeness']: status
-        };
+        const opponentSecret = isHost ? gs.guest_secret : gs.host_secret;
+        const revealKey = isHost ? 'host_revealed' : 'guest_revealed';
+        const prev = isHost ? gs.host_revealed : gs.guest_revealed;
+
+        if (g === opponentSecret) {
+            const newState: GameStatePayload = { ...gs, winner: userId };
+            await supabase.from('game_rooms').update({ game_state: newState, status: 'finished' }).eq('id', roomData.id);
+            toast.success('صح! خمّنت الرقم كامل 🎉');
+            setGuessInput('');
+            return;
+        }
+
+        const merged = applyPositionalReveal(g, opponentSecret, prev);
+        const newState: GameStatePayload = { ...gs, [revealKey]: merged };
         await supabase.from('game_rooms').update({ game_state: newState }).eq('id', roomData.id);
-    };
 
-    const handleWin = async () => {
-        if (!roomData) return;
-        const newState = { ...roomData.game_state, winner: userId };
-        await supabase.from('game_rooms').update({ game_state: newState, status: 'finished' }).eq('id', roomData.id);
-        toast.success('ألف مبروك! حزرت الرقم 🎉');
-    };
+        const newHits = merged.filter((x, i) => x !== null && prev[i] === null).length;
+        if (newHits > 0) toast.success(`خمنّت ${newHits} خانة صح — تبقّى على الباقي!`);
+        else toast.message('لا خانة مطابقة في هذا التخمين');
+        setGuessInput('');
+    }, [guessInput, roomData, userId]);
 
-    // --- RENDERERS ---
+    const isHost = roomData ? userId === roomData.host_user_id : false;
 
-    if (gameState === 'menu') {
+    if (uiState === 'menu') {
         return (
-            <div className="flex flex-col h-full bg-background p-6">
-                <div className="flex-1 flex flex-col justify-center gap-6 pb-20">
+            <div dir="rtl" className="flex flex-col h-full bg-background p-6 overflow-y-auto">
+                <div className="flex-1 flex flex-col justify-center gap-6 pb-20 max-w-md mx-auto w-full">
                     <motion.div
                         initial={{ scale: 0.9, opacity: 0 }}
                         animate={{ scale: 1, opacity: 1 }}
                         className="bg-amber-500/10 rounded-[2.5rem] p-8 text-center border-2 border-amber-500/20"
                     >
-                        <div className="w-20 h-20 bg-amber-500 text-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-amber-500/30 rotate-3">
+                        <div className="w-20 h-20 bg-amber-500 text-white rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl rotate-3">
                             <Binary className="w-10 h-10" />
                         </div>
                         <h2 className="text-2xl font-black mb-2">احزر الرقم 🔢</h2>
-                        <p className="text-muted-foreground font-bold text-sm mb-8">خمن الرقم السري اللي في بال شريكك!</p>
+                        <p className="text-muted-foreground font-bold text-sm mb-6">
+                            كل واحد يخفي رقمًا من {2}–{4} خانات. كل تخمين يكشف الخانات اللي خمنتها صح فقط (مثل 3••• إذا الخانة الأولى صح).
+                        </p>
 
-                        <div className="space-y-3">
-                            <Button onClick={createRoom} disabled={loading} className="w-full h-16 rounded-2xl text-lg font-black shadow-lg bg-amber-500 hover:bg-amber-600">
-                                {loading ? 'جاري الإنشاء..' : '🎮 إنشاء تحدي'}
-                            </Button>
+                        <p className="text-[11px] font-black text-amber-700/80 mb-3 uppercase tracking-widest">عدد الخانات</p>
+                        <div className="flex gap-3 justify-center mb-8">
+                            {([2, 3, 4] as const).map((n) => (
+                                <button
+                                    key={n}
+                                    type="button"
+                                    onClick={() => setDigitLength(n)}
+                                    className={`flex-1 max-w-[88px] py-4 rounded-2xl font-black text-lg border-2 transition-all ${
+                                        digitLength === n ? 'bg-amber-500 text-white border-amber-500 shadow-lg' : 'bg-white/50 dark:bg-white/5 border-border'
+                                    }`}
+                                >
+                                    {n}
+                                </button>
+                            ))}
                         </div>
+
+                        <Button onClick={createRoom} disabled={loading} className="w-full h-14 rounded-2xl text-lg font-black shadow-lg bg-amber-500 hover:bg-amber-600">
+                            {loading ? 'جاري الإنشاء…' : '🎮 إنشاء تحدي'}
+                        </Button>
                     </motion.div>
 
                     <div className="relative">
-                        <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border"></div></div>
-                        <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground font-black">أو انضم للتحدي</span></div>
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-border" />
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                            <span className="bg-background px-2 text-muted-foreground font-black">أو انضم بالكود</span>
+                        </div>
                     </div>
 
                     <div className="space-y-4">
                         <input
                             value={joinCode}
                             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                            placeholder="كود الغرفة.."
-                            className="w-full h-16 rounded-2xl bg-muted/50 border-2 border-border px-6 text-center text-xl font-black tracking-widest uppercase outline-none focus:border-amber-500 transition-all"
+                            placeholder="كود الغرفة"
+                            className="w-full h-14 rounded-2xl bg-muted/50 border-2 border-border px-6 text-center text-xl font-black tracking-widest uppercase outline-none focus:border-amber-500"
                         />
-                        <Button onClick={joinRoom} disabled={!joinCode || loading} variant="secondary" className="w-full h-16 rounded-2xl text-lg font-black">
-                            انضمام للعبة
+                        <Button onClick={joinRoom} disabled={!joinCode || loading} variant="secondary" className="w-full h-14 rounded-2xl text-lg font-black">
+                            انضمام
                         </Button>
                     </div>
                 </div>
@@ -271,203 +343,134 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
         );
     }
 
-    if (gameState === 'lobby') {
-        const isPartnerInRoom = partnerInfo && presence[partnerInfo.id];
+    if (uiState === 'lobby' && roomData) {
+        const L = roomData.game_state.digit_length;
         return (
-            <div className="flex flex-col h-full bg-background p-6 pt-12 items-center text-center">
-                <h2 className="text-2xl font-black mb-2">بانتظار المنافس 🕒</h2>
+            <div dir="rtl" className="flex flex-col h-full bg-background p-6 pt-12 items-center text-center">
+                <h2 className="text-xl font-black mb-4">شارِك الكود مع شريكك</h2>
+                <p className="text-sm text-muted-foreground font-bold mb-6">التحدي بـ {L} أرقام</p>
                 <div className="bg-card w-full max-w-xs rounded-[2.5rem] p-8 border-2 border-dashed border-amber-500/30 relative mb-8">
-                    <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-2">كود الغرفة</p>
-                    <p className="text-4xl font-black tracking-widest text-foreground">{roomData?.room_code}</p>
+                    <p className="text-[10px] font-black text-amber-600 uppercase mb-2">الكود</p>
+                    <p className="text-4xl font-black tracking-widest">{roomData.room_code}</p>
                     <Button
                         size="icon"
                         variant="ghost"
-                        className="absolute bottom-4 right-4 text-amber-500"
+                        className="absolute bottom-4 end-4 text-amber-600"
                         onClick={() => {
-                            navigator.clipboard.writeText(roomData?.room_code || '');
+                            navigator.clipboard.writeText(roomData.room_code);
                             toast.success('تم نسخ الكود');
                         }}
                     >
                         <Copy className="w-5 h-5" />
                     </Button>
                 </div>
-
-                <div className="space-y-4 w-full max-w-xs">
-                    <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-2xl border border-border">
-                        <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-black">{userName[0]}</div>
-                        <div className="text-right flex-1">
-                            <p className="font-bold text-sm">{userName}</p>
-                            <span className="text-[10px] font-black text-emerald-500 flex items-center gap-1">
-                                <CheckCircle2 className="w-3 h-3" /> متواجد
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${isPartnerInRoom ? 'bg-emerald-500/5 border-emerald-500/30' : 'bg-muted/10 border-dashed border-border/50 opacity-60'}`}>
-                        <div className="w-10 h-10 rounded-full bg-muted-foreground/20 flex items-center justify-center text-muted-foreground">
-                            {isPartnerInRoom ? <Users className="w-5 h-5 text-emerald-500" /> : <Ghost className="w-5 h-5" />}
-                        </div>
-                        <div className="text-right flex-1">
-                            <p className="font-bold text-sm">{partnerInfo?.name || 'الشريك'}</p>
-                            <span className={`text-[10px] font-black ${isPartnerInRoom ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                {isPartnerInRoom ? 'دخل اللعبة ✅' : 'لسه ما دخل..'}
-                            </span>
-                        </div>
-                    </div>
-                </div>
+                <p className="text-xs text-muted-foreground font-bold">لما ينضم الشريك تبدأ مرحلة إدخال الأرقام السرّية</p>
             </div>
         );
     }
 
-    if (gameState === 'setup') {
-        const isHost = userId === roomData?.host_user_id;
-        const myNumberSet = isHost ? !!roomData?.game_state.host_number : !!roomData?.game_state.guest_number;
-        const partnerNumberSet = isHost ? !!roomData?.game_state.guest_number : !!roomData?.game_state.host_number;
+    if (uiState === 'setup' && roomData) {
+        const gs = roomData.game_state;
+        const L = gs.digit_length;
+        const mineSet = isHost ? !!gs.host_secret : !!gs.guest_secret;
+        const partnerSet = isHost ? !!gs.guest_secret : !!gs.host_secret;
 
         return (
-            <div className="flex flex-col h-full bg-background p-6 pt-10">
-                <header className="text-center mb-10">
+            <div dir="rtl" className="flex flex-col h-full bg-background p-6 pt-10">
+                <header className="text-center mb-8">
                     <div className="w-16 h-16 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto mb-4 text-amber-600">
                         <Hash className="w-8 h-8" />
                     </div>
-                    <h2 className="text-2xl font-black">{!myNumberSet ? 'اختر رقمك السري 🔒' : 'بانتظار الشريك..'}</h2>
+                    <h2 className="text-2xl font-black">{!mineSet ? `اختر رقمك السري (${L} خانات)` : 'بانتظار الشريك…'}</h2>
                     <p className="text-muted-foreground font-bold text-sm mt-2">
-                        {!myNumberSet ? 'اكتب رقم من 1 إلى 100 (أو أي رقم تحبه)!' : 'شريكك الآن يحدد رقمه، خليك مستعد!'}
+                        أرقام فقط • مثال لـ {L} خانات: {L === 2 ? '42' : L === 3 ? '307' : '4523'}
                     </p>
                 </header>
 
-                {!myNumberSet ? (
-                    <div className="space-y-6">
+                {!mineSet ? (
+                    <div className="space-y-6 max-w-md mx-auto w-full">
                         <div className="relative">
                             <input
-                                type={showNumber ? "text" : "password"}
-                                value={tempNumber}
-                                onChange={(e) => setTempNumber(e.target.value)}
-                                placeholder="الرقم هنا.."
-                                className="w-full h-16 rounded-2xl bg-card border-2 border-border px-6 text-center text-2xl font-black outline-none focus:border-amber-500"
+                                type={showSecret ? 'text' : 'password'}
+                                inputMode="numeric"
+                                autoComplete="off"
+                                value={tempSecret}
+                                onChange={(e) => setTempSecret(e.target.value.replace(/\D/g, '').slice(0, L))}
+                                placeholder={'•'.repeat(L)}
+                                className="w-full h-16 rounded-2xl bg-card border-2 border-border px-6 text-center text-2xl font-black tracking-[0.4em] outline-none focus:border-amber-500"
                             />
-                            <button 
-                                onClick={() => setShowNumber(!showNumber)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-                            >
-                                {showNumber ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                            <button type="button" onClick={() => setShowSecret(!showSecret)} className="absolute end-4 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                {showSecret ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                             </button>
                         </div>
                         <Button
                             onClick={setSecretNumber}
-                            disabled={!tempNumber.trim() || loading}
-                            className="w-full h-16 bg-amber-500 hover:bg-amber-600 rounded-2xl text-lg font-black text-white shadow-lg"
+                            disabled={!validateSecret(tempSecret, L) || loading}
+                            className="w-full h-16 bg-amber-500 hover:bg-amber-600 rounded-2xl text-lg font-black"
                         >
-                            تم، حفظت الرقم! 🚀
+                            حفظ الرقم السري
                         </Button>
                     </div>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center gap-6">
-                        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                        <div className="bg-emerald-500/10 text-emerald-500 px-6 py-3 rounded-2xl border border-emerald-500/20 font-black">
-                            {partnerNumberSet ? 'الشريك جاهز! جاري التحميل..' : 'أنت جاهز ✅ بانتظار الشريك..'}
-                        </div>
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                        <div className="w-12 h-12 border-4 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="font-black text-amber-700">{partnerSet ? 'جاري بدء اللعب…' : `بانتظار يدخل شريكك رقمه (${L} خانات)`}</p>
                     </div>
                 )}
             </div>
         );
     }
 
-    if (gameState === 'playing') {
-        const isHost = userId === roomData?.host_user_id;
-        const myCloseness = isHost ? roomData?.game_state.host_closeness : roomData?.game_state.guest_closeness;
-        const partnerCloseness = isHost ? roomData?.game_state.guest_closeness : roomData?.game_state.host_closeness;
-        const mySecret = isHost ? roomData?.game_state.host_number : roomData?.game_state.guest_number;
+    if (uiState === 'playing' && roomData) {
+        const gs = roomData.game_state;
+        const L = gs.digit_length;
+        const mySecret = isHost ? gs.host_secret : gs.guest_secret;
+        const theirSecret = isHost ? gs.guest_secret : gs.host_secret;
+        const myReveal = isHost ? gs.host_revealed : gs.guest_revealed;
 
         return (
-            <div className="flex flex-col h-full bg-background p-4 pt-4 overflow-hidden relative">
-                <div className="flex items-center justify-between mb-8 bg-card p-4 rounded-2xl border-2 border-amber-500/10 shadow-md">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white text-xs font-black">أنا</div>
-                        <div className="text-right">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-tighter">رقمي السري</p>
-                            <p className="text-lg font-black text-foreground">{mySecret}</p>
-                        </div>
+            <div dir="rtl" className="flex flex-col h-full bg-background p-4 pt-4 overflow-hidden">
+                <div className="flex items-center justify-between mb-4 bg-card p-4 rounded-2xl border-2 border-amber-500/15">
+                    <div className="text-start">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase">رقمي</p>
+                        <p className="text-xl font-black tracking-widest">{mySecret}</p>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-500">
-                        <Binary className="w-5 h-5" />
-                    </div>
+                    <Binary className="w-8 h-8 text-amber-500 opacity-50" />
                 </div>
 
-                <div className="flex-1 flex flex-col items-center justify-start pt-6 gap-10">
-                    <div className="text-center space-y-4">
-                        <motion.div
-                            animate={{ scale: myCloseness === 'very_near' ? [1, 1.05, 1] : 1 }}
-                            transition={{ duration: 1.5, repeat: Infinity }}
-                            className={`w-32 h-32 rounded-[3rem] mx-auto flex items-center justify-center shadow-xl transition-colors duration-500 relative border-4 border-white/20 ${
-                                myCloseness === 'far' ? 'bg-rose-500 text-white' :
-                                myCloseness === 'near' ? 'bg-amber-500 text-white' :
-                                'bg-emerald-500 text-white'
-                            }`}>
-                            {myCloseness === 'far' ? <Ghost className="w-14 h-14" /> :
-                             myCloseness === 'near' ? <Compass className="w-14 h-14" /> : <Sparkles className="w-14 h-14" />}
-                        </motion.div>
-
-                        <div className="space-y-1">
-                            <p className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">تلميح الشريك لك</p>
-                            <h3 className="text-3xl font-black text-foreground tracking-tighter">
-                                {myCloseness === 'far' ? 'لسه بعيد! 💨' :
-                                 myCloseness === 'near' ? 'قربت كثير! 👀' : 'خلاص، قربت جداً! 🔥'}
-                            </h3>
-                        </div>
-                    </div>
-
-                    <div className="w-full flex flex-col gap-4 max-w-[320px]">
-                        <Button
-                            onClick={handleWin}
-                            className="w-full h-20 rounded-[2rem] bg-indigo-600 hover:bg-indigo-700 text-white shadow-xl text-xl font-black border-b-4 border-indigo-900/30 active:border-b-0 active:translate-y-1 transition-all"
-                        >
-                            حزرت الرقم! 🎉
-                        </Button>
-                        <p className="text-[10px] text-center text-muted-foreground font-bold px-8">
-                            اسأل شريكك (مثلاً: هل الرقم أكبر من 50؟) وهو بيعطيك تلميحات بالأزرار تحت
-                        </p>
-                    </div>
+                <div className="rounded-3xl bg-amber-500/10 border border-amber-500/20 p-6 mb-4 text-center">
+                    <p className="text-[10px] font-black text-amber-800 dark:text-amber-200 uppercase mb-2">تقدّمك نحو رقم {partnerInfo?.name}</p>
+                    <p dir="ltr" className="text-3xl font-black tracking-[0.35em] text-amber-950 dark:text-white">
+                        {maskLine(myReveal)}
+                    </p>
+                    <p className="text-[11px] font-bold text-muted-foreground mt-3">الخانات الظاهرة = خمنت الرقم الصحيح في مكانها</p>
                 </div>
 
-                {/* Feedback Panel */}
-                <div className="fixed bottom-10 left-6 right-6 bg-white/10 backdrop-blur-3xl p-6 rounded-[2.5rem] border-2 border-white/20 shadow-2xl space-y-5 z-40">
-                    <div className="flex items-center justify-between px-2">
-                        <p className="text-[11px] font-black text-foreground uppercase tracking-widest">وجه شريكك لرقمك ({mySecret}):</p>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                        {[
-                            { id: 'far', label: 'بعيد', icon: Ghost, color: 'bg-rose-500' },
-                            { id: 'near', label: 'قريب', icon: Compass, color: 'bg-amber-500' },
-                            { id: 'very_near', label: 'جداً!', icon: Sparkles, color: 'bg-emerald-500' }
-                        ].map((item) => (
-                            <button
-                                key={item.id}
-                                onClick={() => updateCloseness(item.id as any)}
-                                className={`h-16 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-300 border-2 active:scale-95 ${
-                                    partnerCloseness === item.id
-                                    ? `${item.color} text-white border-white/20 shadow-lg`
-                                    : 'bg-white/5 text-foreground border-transparent opacity-60'
-                                }`}
-                            >
-                                <item.icon className={`w-5 h-5 ${partnerCloseness === item.id ? 'text-white' : 'text-muted-foreground'}`} />
-                                <span className="text-[10px] font-black">{item.label}</span>
-                            </button>
-                        ))}
-                    </div>
+                <div className="flex-1 flex flex-col gap-4 max-w-md mx-auto w-full">
+                    <p className="text-center font-black text-sm">خمّن رقم شريكك ({L} خانات)</p>
+                    <input
+                        inputMode="numeric"
+                        value={guessInput}
+                        onChange={(e) => setGuessInput(e.target.value.replace(/\D/g, '').slice(0, L))}
+                        placeholder={Array(L).fill('•').join('')}
+                        className="w-full h-14 rounded-2xl border-2 border-border bg-card text-center text-2xl font-black tracking-[0.4em] outline-none focus:border-amber-500"
+                    />
+                    <Button onClick={submitGuess} disabled={guessInput.length !== L || loading} className="h-14 rounded-2xl font-black bg-indigo-600 hover:bg-indigo-700 text-lg">
+                        جرّب التخمين
+                    </Button>
                 </div>
             </div>
         );
     }
 
-    if (gameState === 'finished') {
-        const iWon = roomData?.game_state.winner === userId;
-        const myNum = isHost ? roomData?.game_state.host_number : roomData?.game_state.guest_number;
-        const partnerNum = isHost ? roomData?.game_state.guest_number : roomData?.game_state.host_number;
+    if (uiState === 'finished' && roomData) {
+        const gs = roomData.game_state;
+        const iWon = gs.winner === userId;
+        const myNum = isHost ? gs.host_secret : gs.guest_secret;
+        const partnerNum = isHost ? gs.guest_secret : gs.host_secret;
 
         return (
-            <div className="flex flex-col h-full bg-background items-center justify-center p-6 text-center">
+            <div dir="rtl" className="flex flex-col h-full bg-background items-center justify-center p-6 text-center overflow-y-auto">
                 <motion.div
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
@@ -476,28 +479,23 @@ export function NumberGuessGame({ onBack, userId, userName, partnershipId }: Num
                     {iWon ? <Trophy className="w-12 h-12" /> : <Sparkles className="w-12 h-12" />}
                 </motion.div>
 
-                <h2 className="text-4xl font-black mb-2 tracking-tighter">{iWon ? 'عبقري! حزرت الرقم 🏆' : 'مبروك لشريكك! حزره 👏'}</h2>
-                <p className="text-muted-foreground font-bold mb-10">انتهى تحدي الأرقام!</p>
+                <h2 className="text-3xl font-black mb-2">{iWon ? 'فزت! خمّنت الرقم 🏆' : `${partnerInfo?.name} فاز بالتحدي`}</h2>
+                <p className="text-muted-foreground font-bold mb-10">رقم من {gs.digit_length} خانات</p>
 
-                <div className="grid grid-cols-1 gap-4 w-full max-w-xs mb-12">
-                    <div className="bg-card p-6 rounded-3xl border border-border shadow-sm text-right">
+                <div className="grid grid-cols-1 gap-4 w-full max-w-xs mb-10">
+                    <div className="bg-card p-6 rounded-3xl border text-start">
                         <p className="text-[11px] font-black text-muted-foreground uppercase mb-2">رقمك</p>
-                        <p className="text-3xl font-black text-amber-500">{myNum}</p>
+                        <p className="text-3xl font-black text-amber-500 tracking-widest">{myNum}</p>
                     </div>
-                    <div className="bg-indigo-500/5 p-6 rounded-3xl border border-indigo-500/10 shadow-sm text-right">
+                    <div className="bg-indigo-500/5 p-6 rounded-3xl border border-indigo-500/10 text-start">
                         <p className="text-[11px] font-black text-indigo-500 uppercase mb-2">رقم الشريك</p>
-                        <p className="text-3xl font-black text-indigo-600">{partnerNum}</p>
+                        <p className="text-3xl font-black text-indigo-600 tracking-widest">{partnerNum}</p>
                     </div>
                 </div>
 
-                <div className="w-full max-w-xs space-y-3">
-                    <Button onClick={() => setGameState('setup')} className="w-full h-16 rounded-2xl text-lg font-black shadow-lg bg-indigo-600 hover:bg-indigo-700">
-                        تحدي جديد 🔄
-                    </Button>
-                    <Button onClick={onBack} variant="ghost" className="w-full h-14 rounded-2xl font-black text-xs opacity-50">
-                        العودة للألعاب
-                    </Button>
-                </div>
+                <Button onClick={onBack} variant="secondary" className="w-full max-w-xs h-14 rounded-2xl font-black">
+                    العودة للألعاب
+                </Button>
             </div>
         );
     }
