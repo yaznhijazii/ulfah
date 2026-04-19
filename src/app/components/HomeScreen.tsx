@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Settings, Heart, Sparkles, ChevronLeft, MapPin, Compass, Gift, Moon, Sun,
     ShieldCheck, Target, Zap, Navigation, User, Calendar, ArrowUpRight,
-    Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet, Lock, Music, Armchair
+    Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet, Lock, Music, Armchair, Mail, LayoutGrid, Smile
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Button } from './ui/button';
 import { supabase } from '../../lib/supabase';
 import { getAIRecommendation } from '../../utils/aiAdvisor';
+import { FloatingChatbot } from './FloatingChatbot';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 
@@ -37,6 +38,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     const [myCommitments, setMyCommitments] = useState<any[]>([]);
     const [showMap, setShowMap] = useState(false);
     const [statsCount, setStatsCount] = useState({ notes: 0, commitments: 0, goals: 0, songs: 0, memories: 0, adventures: 0 });
+    const [monthlyMoods, setMonthlyMoods] = useState<Record<string, string>>({});
 
     const initialLoadDone = useRef(false);
 
@@ -146,6 +148,28 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 if (myMood) { setSelectedMoodId(myMood.mood); setShowMoodPrompt(false); }
                 if (pMood) setPartnerMood(pMood.mood);
                 setUpcomingEvents(events || []);
+
+                // Map partner's mood history too? No, let's keep it to their current mood as requested for now.
+
+                // Fetch monthly moods for the calendar
+                const now = new Date();
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+                
+                const { data: monthLogs } = await supabase
+                    .from('mood_logs')
+                    .select('mood, mood_date')
+                    .eq('user_id', userId)
+                    .gte('mood_date', startOfMonth)
+                    .lte('mood_date', endOfMonth);
+
+                if (monthLogs) {
+                    const moodMap: Record<string, string> = {};
+                    monthLogs.forEach(log => {
+                        moodMap[log.mood_date] = log.mood;
+                    });
+                    setMonthlyMoods(moodMap);
+                }
 
                 // Fetch stats for عداد اللحظات و بستان ألفة
                 const [
@@ -565,305 +589,200 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 </section>
 
                 {/* ── مهامي اليوم — QUICK COMMITMENTS PREVIEW ── */}
+                <div className="flex items-center gap-4 px-1 mb-4">
+                    <div className="w-9 h-9 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 flex items-center justify-center text-blue-500">
+                        <Target size={18} />
+                    </div>
+                    <h3 className="text-xl font-black tracking-tight text-zinc-900 dark:text-white uppercase">مهام اليوم</h3>
+                    <div className="h-px flex-1 bg-gradient-to-r from-blue-500/30 dark:from-blue-500/40 to-transparent" />
+                </div>
                 <section>
-                    <motion.div
-                        whileTap={{ scale: 0.98 }}
-                        onClick={() => onNavigate('commitments')}
-                        className="bg-white/60 dark:bg-white/[0.05] rounded-[2.4rem] border border-blue-100/50 dark:border-blue-900/20 shadow-sm overflow-hidden cursor-pointer transition-all hover:shadow-md group"
-                    >
-                        {/* Header row */}
-                        <div className="flex items-center justify-between px-6 pt-6 pb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-2xl bg-blue-500/10 dark:bg-blue-500/15 flex items-center justify-center text-blue-500 dark:text-blue-400 shadow-sm transition-transform group-hover:rotate-6">
-                                    <Target size={20} />
-                                </div>
-                                <div>
-                                    <h3 className="text-[15px] font-black text-zinc-800 dark:text-white/90 tracking-tight leading-none">مهامي اليوم</h3>
-                                    <p className="text-[9px] font-bold text-blue-500/50 dark:text-blue-400/50 uppercase tracking-widest mt-0.5">ميثاق الغلا</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {myCommitments.length > 0 && (
-                                    <span className="bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-[9px] font-black px-2.5 py-1 rounded-full border border-blue-400/20">
-                                        {myCommitments.length} نشطة
-                                    </span>
-                                )}
-                                <div className="w-8 h-8 rounded-xl bg-white/60 dark:bg-white/[0.07] border border-white dark:border-white/10 flex items-center justify-center text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
-                                    <ChevronLeft size={16} className="rotate-180" />
-                                </div>
-                            </div>
-                        </div>
+                    <div className="bg-white/60 dark:bg-white/[0.05] rounded-[2.4rem] border border-blue-100/50 dark:border-blue-900/20 shadow-sm overflow-hidden transition-all hover:shadow-md">
 
                         {/* Tasks list or empty CTA */}
                         {myCommitments.length === 0 ? (
-                            <div className="px-6 pb-6">
-                                <div className="bg-blue-50/60 dark:bg-blue-500/[0.07] rounded-2xl px-4 py-3 border border-blue-100/40 dark:border-blue-500/10 flex items-center gap-3">
-                                    <span className="text-xl">🤝</span>
-                                    <p className="text-[12px] font-bold text-blue-500/60 dark:text-blue-400/50">أضف أول ميثاق مودة لك</p>
+                            <div className="px-6 py-6">
+                                <div className="bg-blue-50/60 dark:bg-blue-500/[0.07] rounded-2xl px-4 py-4 border border-blue-100/40 dark:border-blue-500/10 flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
+                                        <Target size={20} />
+                                    </div>
+                                    <p className="text-[13px] font-bold text-blue-500/60 dark:text-blue-400/50">أضف أول ميثاق مودة لك</p>
                                 </div>
                             </div>
                         ) : (
-                            <div className="px-6 pb-6 space-y-3">
+                            <div className="px-5 py-5 space-y-3">
                                 {myCommitments.map((c) => {
                                     const current = Number(c.current_count) || 0;
                                     const target = Number(c.target_count) || 1;
                                     const pct = Math.min(100, Math.round((current / target) * 100));
+                                    const isDone = current >= target;
                                     const periodMap: Record<string, string> = { daily: 'يومي', weekly: 'أسبوعي', monthly: 'شهري' };
-                                    const statusColor = c.status === 'completed' ? 'bg-emerald-500' : c.status === 'at-risk' ? 'bg-amber-500' : 'bg-blue-500';
+
+                                    const handleTap = async (e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        if (isDone) return;
+                                        const newCount = current + 1;
+                                        try {
+                                            await supabase.from('commitments').update({ current_count: newCount }).eq('id', c.id);
+                                            fetchMyCommitments();
+                                        } catch {}
+                                    };
+
                                     return (
-                                        <div key={c.id} className="bg-white/50 dark:bg-white/[0.04] rounded-2xl px-4 py-3 border border-white/70 dark:border-white/[0.06]">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <span className="text-base">🎯</span>
-                                                    <span className="text-[13px] font-black text-zinc-800 dark:text-white/90 truncate">{c.title}</span>
+                                        <div key={c.id} className="bg-white/70 dark:bg-white/[0.04] rounded-2xl px-4 py-3.5 border border-white/80 dark:border-white/[0.07]">
+                                            <div className="flex items-center gap-3 mb-2.5">
+                                                {/* Tap button */}
+                                                <motion.button
+                                                    whileTap={{ scale: 0.85 }}
+                                                    onClick={handleTap}
+                                                    className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                                                        isDone
+                                                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
+                                                            : 'bg-blue-500/10 dark:bg-blue-500/15 text-blue-500 hover:bg-blue-500 hover:text-white'
+                                                    }`}
+                                                >
+                                                    {isDone ? (
+                                                        <motion.div
+                                                            initial={{ scale: 0 }}
+                                                            animate={{ scale: 1 }}
+                                                            transition={{ type: 'spring', stiffness: 400 }}
+                                                        >
+                                                            ✓
+                                                        </motion.div>
+                                                    ) : (
+                                                        <Target size={16} />
+                                                    )}
+                                                </motion.button>
+
+                                                {/* Title */}
+                                                <div className="flex-1 min-w-0">
+                                                    <span className={`text-[13px] font-black truncate block ${isDone ? 'text-emerald-600 dark:text-emerald-400 line-through opacity-60' : 'text-zinc-800 dark:text-white/90'}`}>
+                                                        {c.title}
+                                                    </span>
+                                                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">
+                                                        {periodMap[c.period_type] || ''}
+                                                    </span>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 shrink-0 mr-2">
-                                                    <span className="text-[9px] font-bold text-zinc-400 dark:text-white/30">{periodMap[c.period_type] || ''}</span>
-                                                    <span className="text-[9px] font-black text-blue-600 dark:text-blue-400">{current}/{target}</span>
+
+                                                {/* Count badge */}
+                                                <div className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-black tabular-nums transition-all ${
+                                                    isDone
+                                                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                                        : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                                                }`}>
+                                                    {current}/{target}
                                                 </div>
                                             </div>
+
+                                            {/* Progress bar */}
                                             <div className="h-1.5 bg-zinc-100 dark:bg-white/[0.06] rounded-full overflow-hidden">
                                                 <motion.div
-                                                    className={`h-full rounded-full ${statusColor}`}
+                                                    className={`h-full rounded-full ${isDone ? 'bg-emerald-500' : 'bg-blue-500'}`}
                                                     initial={{ width: 0 }}
                                                     animate={{ width: `${pct}%` }}
-                                                    transition={{ duration: 1, ease: 'easeOut' }}
+                                                    transition={{ duration: 0.5, ease: 'easeOut' }}
                                                 />
                                             </div>
                                         </div>
                                     );
                                 })}
+
+                                {/* View all link */}
+                                <button
+                                    onClick={() => onNavigate('commitments')}
+                                    className="w-full mt-1 py-2.5 text-[11px] font-black text-blue-500/60 hover:text-blue-500 uppercase tracking-widest transition-colors flex items-center justify-center gap-1.5"
+                                >
+                                    <span>عرض كل المهام</span>
+                                    <ArrowUpRight size={13} />
+                                </button>
                             </div>
                         )}
-                    </motion.div>
+                    </div>
                 </section>
 
 
-                {/* --- BENTO GRID SECTIONS --- */}
-                <section className="grid grid-cols-2 gap-5 px-1">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        whileTap={{ scale: 0.97 }}
-                        viewport={{ once: true }}
-                        onClick={() => onNavigate('adventure_bucket')}
-                        className="col-span-1 bg-white/60 dark:bg-white/[0.05] rounded-[2.2rem] p-6 border border-white/80 dark:border-white/[0.08] shadow-sm bg-amber-500/[0.03] flex flex-col gap-5 group cursor-pointer transition-all hover:bg-white dark:hover:bg-white/[0.09] hover:shadow-md"
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="w-11 h-11 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 flex items-center justify-center text-amber-600 dark:text-amber-400 transition-transform group-hover:rotate-6 shadow-sm"><Compass size={22} /></div>
-                            <ArrowUpRight size={16} className="text-amber-500/30 group-hover:text-amber-400 dark:group-hover:text-amber-400 transition-colors" />
-                        </div>
-                        <div>
-                            <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5">خططنا القادمة</h3>
-                            <p className="text-[10px] font-bold text-amber-600/50 dark:text-amber-500/60 uppercase tracking-widest">بوصلة الشغف</p>
-                        </div>
-                    </motion.div>
 
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        whileTap={{ scale: 0.97 }}
-                        viewport={{ once: true }}
-                        onClick={() => onNavigate('wishlist')}
-                        className="col-span-1 bg-white/60 dark:bg-white/[0.05] rounded-[2.2rem] p-6 border border-white/80 dark:border-white/[0.08] shadow-sm bg-indigo-500/[0.03] flex flex-col gap-5 group cursor-pointer transition-all hover:bg-white dark:hover:bg-white/[0.09] hover:shadow-md"
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 dark:bg-indigo-500/15 flex items-center justify-center text-indigo-500 dark:text-indigo-400 transition-transform group-hover:scale-110 shadow-sm"><Gift size={22} /></div>
-                            <ArrowUpRight size={16} className="text-indigo-500/30 group-hover:text-indigo-400 transition-colors" />
-                        </div>
-                        <div>
-                            <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5">صندوق الأمنيات</h3>
-                            <p className="text-[10px] font-bold text-indigo-600/40 dark:text-indigo-400/50 uppercase tracking-widest">موالح الهدايا</p>
-                        </div>
-                    </motion.div>
-
-                    {/* ── صندوق البيت — تجهيز العفش والمشتريات ── */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 12 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        whileTap={{ scale: 0.98 }}
-                        viewport={{ once: true }}
-                        onClick={() => onNavigate('home_box')}
-                        className="col-span-2 bg-white/60 dark:bg-white/[0.05] rounded-[2.2rem] p-6 border border-white/80 dark:border-white/[0.08] shadow-sm bg-teal-500/[0.04] flex flex-row items-center justify-between gap-5 group cursor-pointer transition-all hover:bg-white dark:hover:bg-white/[0.09] hover:shadow-md"
-                    >
-                        <div className="flex items-center gap-5 min-w-0 flex-1">
-                            <div className="w-14 h-14 rounded-2xl bg-teal-500/12 dark:bg-teal-500/18 flex items-center justify-center text-teal-600 dark:text-teal-400 shadow-sm transition-transform group-hover:scale-105 shrink-0">
-                                <Armchair size={26} />
-                            </div>
-                            <div className="min-w-0 text-start">
-                                <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-tight mb-1">صندوق البيت</h3>
-                                <p className="text-[10px] font-bold text-teal-700/55 dark:text-teal-400/55 uppercase tracking-widest leading-relaxed">
-                                    قائمة العفش والمشتريات قبل العشّ
-                                </p>
-                            </div>
-                        </div>
-                        <ArrowUpRight size={18} className="text-teal-500/35 group-hover:text-teal-500 shrink-0 transition-colors" />
-                    </motion.div>
-
-                    {/* ── دفتر المساء ── */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        whileTap={{ scale: 0.97 }}
-                        viewport={{ once: true }}
-                        onClick={() => {
-                            const hour = new Date().getHours();
-                            if (hour < 21) {
-                                alert("التوقيت لم يحن بعد! 🌙\nدفتر المساء يفتح أبوابه فقط بعد الساعة 9:00 مساءً ليكون ختام يومكم.");
-                            } else {
-                                onNavigate('evening_journal');
-                            }
-                        }}
-                        className={`col-span-1 bg-white/60 dark:bg-white/[0.05] rounded-[2.2rem] p-6 border shadow-sm flex flex-col gap-5 group transition-all ${new Date().getHours() < 21 ? 'border-zinc-200/50 dark:border-white/[0.03] opacity-70 cursor-not-allowed grayscale-[30%]' : 'border-white/80 dark:border-white/[0.08] bg-indigo-500/[0.03] cursor-pointer hover:bg-white dark:hover:bg-white/[0.09] hover:shadow-md'}`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-transform shadow-sm ${new Date().getHours() < 21 ? 'bg-zinc-100 dark:bg-white/5 text-zinc-400' : 'bg-indigo-500/10 dark:bg-indigo-500/15 text-indigo-500 dark:text-indigo-400 group-hover:scale-110'}`}>
-                                <Moon size={22} />
-                            </div>
-                            {new Date().getHours() < 21 ? (
-                                <div className="text-[9px] font-black bg-zinc-100 dark:bg-white/10 text-zinc-500 dark:text-zinc-400 px-2.5 py-1 rounded-full uppercase tracking-widest flex items-center gap-1">
-                                    <Lock size={10} /> 9:00 PM
-                                </div>
-                            ) : (
-                                <ArrowUpRight size={16} className="text-indigo-500/30 group-hover:text-indigo-400 transition-colors" />
-                            )}
-                        </div>
-                        <div>
-                            <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5 flex items-center gap-2">
-                                دفتر المساء
-                            </h3>
-                            <p className="text-[10px] font-bold text-indigo-600/40 dark:text-indigo-400/50 uppercase tracking-widest leading-relaxed">
-                                {new Date().getHours() < 21 ? 'يعود الليلة بسؤال جديد' : 'سؤال يومي مشترك'}
-                            </p>
-                        </div>
-                    </motion.div>
-
-                    {/* ── بلايليستنا ── */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
-                        whileTap={{ scale: 0.97 }}
-                        viewport={{ once: true }}
-                        onClick={() => onNavigate('playlist')}
-                        className="col-span-1 bg-white/60 dark:bg-white/[0.05] rounded-[2.2rem] p-6 border border-white/80 dark:border-white/[0.08] shadow-sm bg-rose-500/[0.03] flex flex-col gap-5 group cursor-pointer transition-all hover:bg-white dark:hover:bg-white/[0.09] hover:shadow-md"
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="w-11 h-11 rounded-2xl bg-rose-500/10 dark:bg-rose-500/15 flex items-center justify-center text-rose-500 dark:text-rose-400 transition-transform group-hover:scale-110 shadow-sm">
-                                <Music size={22} />
-                            </div>
-                            <ArrowUpRight size={16} className="text-rose-500/30 group-hover:text-rose-400 transition-colors" />
-                        </div>
-                        <div>
-                            <h3 className="text-[16px] font-black text-zinc-800 dark:text-white/90 leading-none mb-1.5">بلايليستنا</h3>
-                            <p className="text-[10px] font-bold text-rose-600/40 dark:text-rose-400/50 uppercase tracking-widest">أغاني تجمعنا</p>
-                        </div>
-                    </motion.div>
-
-                    {/* ── صندوق الأمنيات ── */}
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        className="col-span-2 relative overflow-hidden rounded-[2.6rem] border border-amber-200/50 dark:border-amber-800/25"
-                        style={{
-                            background: 'linear-gradient(135deg, rgba(255,255,255,0.80) 0%, rgba(255,251,235,0.65) 50%, rgba(255,255,255,0.75) 100%)',
-                        }}
-                    >
-                        {/* Dark mode bg override */}
-                        <div className="absolute inset-0 hidden dark:block rounded-[2.6rem]"
-                            style={{ background: 'linear-gradient(135deg, rgba(120,53,15,0.20) 0%, rgba(78,35,8,0.14) 60%, rgba(92,45,10,0.08) 100%)' }} />
-
-                        {/* Background SVG decoration — abstract arcs / orbits */}
-                        <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.07] dark:opacity-[0.10]" viewBox="0 0 400 200" preserveAspectRatio="xMidYMid slice">
-                            <circle cx="340" cy="30" r="80" fill="none" stroke="#f59e0b" strokeWidth="18" />
-                            <circle cx="340" cy="30" r="55" fill="none" stroke="#d97706" strokeWidth="8" />
-                            <circle cx="340" cy="30" r="30" fill="#fbbf24" opacity="0.5" />
-                            <path d="M 0,160 Q 80,120 160,150 Q 240,180 320,140 Q 380,110 400,130" stroke="#f59e0b" strokeWidth="2" fill="none" />
-                            <path d="M 0,180 Q 100,150 200,170 Q 300,185 400,160" stroke="#fbbf24" strokeWidth="1.5" fill="none" />
-                        </svg>
-
-                        {/* Glow orbs */}
+                {/* --- SHORTCUTS GRID --- */}
+                <div className="flex items-center gap-4 px-1 mb-4">
+                    <div className="w-9 h-9 rounded-xl bg-violet-500/10 dark:bg-violet-500/20 flex items-center justify-center text-violet-500">
+                        <LayoutGrid size={18} />
+                    </div>
+                    <h3 className="text-xl font-black tracking-tight text-zinc-900 dark:text-white uppercase">الاختصارات</h3>
+                    <div className="h-px flex-1 bg-gradient-to-r from-violet-500/30 dark:from-violet-500/40 to-transparent" />
+                </div>
+                <section className="grid grid-cols-4 gap-4 px-1 pb-6">
+                    {[
+                        { id: 'adventure_bucket', icon: Compass, title: 'خططنا', sub: 'القادمة', color: 'from-amber-400 to-orange-500', hoverBg: 'rgba(251,191,36,0.2)', glow: 'bg-amber-400' },
+                        { id: 'wishlist', icon: Gift, title: 'الأمنيات', sub: 'للذكرى', color: 'from-indigo-500 to-purple-600', hoverBg: 'rgba(99,102,241,0.2)', glow: 'bg-indigo-500' },
+                        { id: 'home_box', icon: Armchair, title: 'البيت', sub: 'تجهيزات', color: 'from-teal-500 to-emerald-600', hoverBg: 'rgba(20,184,166,0.2)', glow: 'bg-teal-500' },
+                        { id: 'evening_journal', icon: Moon, title: 'المساء', sub: 'سؤالنا', color: 'from-indigo-600 to-violet-700', hoverBg: 'rgba(79,70,229,0.2)', glow: 'bg-violet-500', lock: new Date().getHours() < 21 },
+                        { id: 'playlist', icon: Music, title: 'موسيقى', sub: 'أغانينا', color: 'from-rose-500 to-pink-600', hoverBg: 'rgba(244,63,94,0.2)', glow: 'bg-rose-500' },
+                    ].map((item) => (
                         <motion.div
-                            className="absolute top-[-20px] right-[-20px] w-40 h-40 bg-amber-400/25 dark:bg-amber-500/18 blur-3xl rounded-full pointer-events-none"
-                            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.85, 0.5] }}
-                            transition={{ repeat: Infinity, duration: 5.5, ease: 'easeInOut' }}
-                        />
-                        <div className="absolute bottom-[-15px] left-[-10px] w-28 h-28 bg-orange-300/15 dark:bg-orange-500/10 blur-3xl rounded-full pointer-events-none" />
+                            key={item.id}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            whileInView={{ opacity: 1, scale: 1 }}
+                            viewport={{ once: true }}
+                            whileHover={{ scale: 1.05, y: -4 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={() => {
+                                if (item.id === 'evening_journal' && item.lock) {
+                                    toast.info("🌙 لم يحن الوقت بعد\nدفتر المساء يفتح الساعة 9:00 مساءً.");
+                                    return;
+                                }
+                                onNavigate(item.id);
+                            }}
+                            className="relative group cursor-pointer"
+                        >
+                            <div 
+                                className={`aspect-square rounded-[2rem] border border-zinc-100 dark:border-white/5 shadow-sm overflow-hidden flex flex-col items-center justify-center gap-2.5 transition-all duration-300 ${item.lock ? 'opacity-60 grayscale' : ''}`}
+                                style={{ background: isDarkMode ? `rgba(255,255,255,0.04)` : `rgba(255,255,255,0.95)` }}
+                            >
+                                {/* Gradient — visible only on hover */}
+                                <div 
+                                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                    style={{ background: item.hoverBg }}
+                                />
+                                {/* Glow burst */}
+                                <div className={`absolute inset-0 opacity-0 group-hover:opacity-30 transition-opacity duration-400 ${item.glow} blur-3xl`} />
 
-                        {/* Shimmer sweep */}
-                        <motion.div
-                            className="absolute inset-0 pointer-events-none"
-                            style={{ background: 'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.28) 50%, transparent 70%)' }}
-                            animate={{ x: ['-100%', '200%'] }}
-                            transition={{ repeat: Infinity, duration: 6, ease: 'linear', repeatDelay: 5 }}
-                        />
-
-                        <div className="relative z-10 p-7 flex gap-5 items-start">
-                            {/* Seed orb */}
-                            <div className="shrink-0 flex flex-col items-center gap-2.5 mt-1">
-                                <div className="relative">
-                                    <motion.div
-                                        className="absolute -inset-3 rounded-full bg-amber-400/25 dark:bg-amber-500/30 blur-lg"
-                                        animate={{ scale: [1, 1.28, 1], opacity: [0.4, 0.75, 0.4] }}
-                                        transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
-                                    />
-                                    <div className="relative w-16 h-16 rounded-[1.6rem] bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 shadow-xl shadow-amber-500/35 flex items-center justify-center">
-                                        <motion.span
-                                            className="text-3xl select-none"
-                                            animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-                                            transition={{ repeat: Infinity, duration: 5.5, ease: 'easeInOut' }}
-                                        >
-                                            {aiRecommendation?.title?.includes('🕊') ? '🕊️'
-                                                : aiRecommendation?.title?.includes('☕') ? '☕'
-                                                    : aiRecommendation?.title?.includes('🌟') ? '🌟'
-                                                        : aiRecommendation?.title?.includes('✍') ? '✍️'
-                                                            : gardenInfo.icon}
-                                        </motion.span>
+                                <div className="relative z-10 flex flex-col items-center gap-3">
+                                    <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300`}>
+                                        <item.icon size={26} />
                                     </div>
-                                </div>
-                                {/* Today's Arabic day name */}
-                                <div className="bg-amber-500/12 dark:bg-amber-400/15 border border-amber-400/25 dark:border-amber-500/25 rounded-xl px-2.5 py-1 text-center">
-                                    <span className="text-[9px] font-black text-amber-700 dark:text-amber-400 tracking-wide">
-                                        {['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'][new Date().getDay()]}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Content */}
-                            <div className="flex-1 min-w-0">
-                                {/* Title pill */}
-                                <div className="flex items-center justify-between mb-3 min-w-0">
-                                    <div className="inline-flex items-center gap-2 bg-amber-500/10 dark:bg-amber-500/18 border border-amber-400/25 dark:border-amber-500/30 rounded-full px-3 py-1">
-                                        <motion.span
-                                            className={`w-1.5 h-1.5 rounded-full ${gardenInfo.level > 1 ? 'bg-emerald-500' : 'bg-amber-500'} inline-block`}
-                                            animate={{ scale: [1, 1.6, 1], opacity: [0.7, 1, 0.7] }}
-                                            transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-                                        />
-                                        <span className="text-[9px] font-black text-amber-800 dark:text-amber-400 uppercase tracking-widest">
-                                            {gardenInfo.label}
+                                    <div className="text-center px-1">
+                                        <span className="text-[10px] font-black text-zinc-800 dark:text-white leading-tight block">
+                                            {item.title}
+                                        </span>
+                                        <span className="text-[7.5px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-0.5 block opacity-60">
+                                            {item.sub}
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-1.5 opacity-60">
-                                        <span className="text-[9px] font-black text-amber-700/50 dark:text-amber-400/30">{gardenInfo.pts} نقطة</span>
-                                    </div>
                                 </div>
-                                {/* Advice text */}
-                                <p className="text-[14px] font-bold text-zinc-700 dark:text-white/87 leading-[1.85] tracking-wide mb-3">
-                                    {aiRecommendation?.advice || 'كن بجانب شريكك دائماً بالكلمة الطيبة والمشاعر الصادقة.'}
-                                </p>
-                                {/* Footer */}
-                                <div className="flex items-center gap-2 mt-4 opacity-45">
-                                    <div className="h-px flex-1 bg-gradient-to-r from-amber-500/50 to-transparent" />
-                                    <span className="text-[9px] font-black text-amber-700 dark:text-amber-500 tracking-[0.3em]">نصيحة اليوم</span>
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
 
-                    <div className="col-span-2 flex items-center gap-4 px-2 mt-4">
-                        <h3 className="text-xl font-black tracking-tight text-zinc-800 dark:text-white/90 uppercase">بريد الحب</h3>
+                                {item.lock && (
+                                    <div className="absolute top-2.5 right-2.5 opacity-30">
+                                        <Lock size={10} className="text-zinc-400" />
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    ))}
+                </section>
+
+
+                <section className="grid grid-cols-2 gap-5 px-1 pb-4">
+
+
+                    {/* Love Mail Section Header */}
+                    <div className="col-span-2 flex items-center gap-4 px-2 mt-8 mb-4">
+                        <div className="w-9 h-9 rounded-xl bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center text-rose-500">
+                            <Mail size={18} />
+                        </div>
+                        <h3 className="text-xl font-black tracking-tight text-zinc-900 dark:text-white uppercase">بريد الحب</h3>
                         <div className="h-px flex-1 bg-gradient-to-r from-rose-500/30 dark:from-rose-500/40 to-transparent" />
                     </div>
+
 
                     <motion.div
                         whileTap={{ scale: 0.98 }}
@@ -967,67 +886,149 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                     </motion.div>
                 </section>
 
-                <section>
+                {/* ── المزاج — MONTHLY MOOD TRACKER ── */}
+                <div className="col-span-2 flex items-center gap-4 px-2 mt-8 mb-4">
+                    <div className="w-9 h-9 rounded-xl bg-orange-500/10 dark:bg-orange-500/20 flex items-center justify-center text-orange-500">
+                        <Smile size={18} />
+                    </div>
+                    <h3 className="text-xl font-black tracking-tight text-zinc-900 dark:text-white uppercase">المزاج</h3>
+                    <div className="h-px flex-1 bg-gradient-to-r from-orange-500/40 dark:from-orange-500/50 to-transparent" />
+                </div>
+
+                <section className="pb-8">
                     <motion.div
                         initial={{ opacity: 0 }}
                         whileInView={{ opacity: 1 }}
                         viewport={{ once: true }}
-                        className="bg-white/65 dark:bg-white/[0.04] rounded-[2.8rem] p-9 relative overflow-visible border border-white/80 dark:border-white/[0.07] shadow-xl dark:shadow-[0_20px_60px_rgba(0,0,0,0.3)]"
+                        className="bg-white/65 dark:bg-white/[0.04] rounded-[2.8rem] p-6 relative overflow-visible border border-white/80 dark:border-white/[0.07] shadow-xl"
                     >
-                        <div className="absolute top-[-20px] left-10 w-40 h-40 bg-rose-500/8 dark:bg-rose-600/15 blur-[60px] rounded-full pointer-events-none animate-pulse" />
-                        <div className="relative z-10 flex flex-col items-center gap-10">
-                            <div className="text-center">
-                                <h3 className="text-2xl font-black tracking-tight mb-2 text-zinc-800 dark:text-white/90">كيف حالك؟ 🫶</h3>
-                                <div className="flex items-center justify-center gap-3">
-                                    <div className="h-px w-6 bg-gradient-to-r from-transparent to-rose-500/30" />
-                                    <p className="text-[10px] font-black text-rose-500/50 uppercase tracking-[0.5em]">مزاجك اليوم</p>
-                                    <div className="h-px w-6 bg-gradient-to-l from-transparent to-rose-500/30" />
+                        <div className="absolute top-[-20px] left-10 w-40 h-40 bg-orange-500/5 blur-[50px] rounded-full pointer-events-none" />
+                        <div className="relative z-10 space-y-6">
+                            <div className="flex items-center justify-between px-1">
+                                <span className="text-lg font-black text-zinc-900 dark:text-white">
+                                    {['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'][new Date().getMonth()]}
+                                </span>
+                                <div className="flex items-center gap-1.5 opacity-40">
+                                    <Clock size={10} className="text-zinc-400" />
+                                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">تتبع شهري</span>
                                 </div>
                             </div>
+                            
+                            {/* Monthly Calendar Grid */}
+                            <div className="grid grid-cols-7 gap-2.5">
+                                {(() => {
+                                    const now = new Date();
+                                    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                                    const todayDate = now.getDate();
+                                    const cells = [];
+                                    
+                                    for (let d = 1; d <= daysInMonth; d++) {
+                                        const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                                        const dayMood = monthlyMoods[dateStr];
+                                        const moodObj = moodsList.find(m => m.id === dayMood);
+                                        const isToday = d === todayDate;
+
+                                        cells.push(
+                                            <motion.div
+                                                key={d}
+                                                whileHover={{ scale: 1.1 }}
+                                                className={`aspect-square rounded-xl flex items-center justify-center relative cursor-pointer group/cell ${
+                                                    isToday ? 'ring-2 ring-orange-500 ring-offset-2 dark:ring-offset-[#080010]' : ''
+                                                } ${dayMood ? '' : 'bg-zinc-100/50 dark:bg-white/5 border border-dashed border-zinc-200 dark:border-white/10'}`}
+                                                onClick={() => isToday && setShowMoodPrompt(true)}
+                                            >
+                                                {moodObj ? (
+                                                    <div className={`w-full h-full rounded-xl flex items-center justify-center ${moodObj.bg} text-[14px] shadow-sm`}>
+                                                        <moodObj.icon size={14} className={moodObj.color} />
+                                                        <div className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-white dark:bg-zinc-800 shadow-xs" />
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[10px] font-black text-zinc-400 opacity-40">{d}</span>
+                                                )}
+                                                
+                                                {isToday && !dayMood && (
+                                                    <motion.div 
+                                                        animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+                                                        transition={{ repeat: Infinity, duration: 2 }}
+                                                        className="absolute inset-0 bg-orange-400/20 rounded-xl" 
+                                                    />
+                                                )}
+                                            </motion.div>
+                                        );
+                                    }
+                                    return cells;
+                                })()}
+                            </div>
+
+                            {/* Today's Status / Selection Prompt */}
                             <AnimatePresence mode="wait">
                                 {showMoodPrompt ? (
-                                    <motion.div key="mood-grid" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="flex flex-wrap justify-center gap-6">
-                                        {moodsList.map((m) => {
-                                            const MoodIconComp = m.icon;
-                                            return (
+                                    <motion.div 
+                                        key="mood-grid" 
+                                        initial={{ opacity: 0, y: 10 }} 
+                                        animate={{ opacity: 1, y: 0 }} 
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        className="bg-zinc-50 dark:bg-black/20 rounded-3xl p-5 border border-zinc-200/50 dark:border-white/5"
+                                    >
+                                        <div className="flex justify-between items-center mb-4">
+                                            <p className="text-[11px] font-black text-zinc-500 uppercase tracking-widest px-1">كيف حالك اليوم؟</p>
+                                            <button onClick={() => setShowMoodPrompt(false)} className="text-[10px] font-black text-zinc-400">إغلاق</button>
+                                        </div>
+                                        <div className="flex justify-between gap-3">
+                                            {moodsList.map((m) => (
                                                 <motion.button
                                                     key={m.id}
                                                     onClick={() => handleMoodSelect(m.id)}
-                                                    whileHover={{ y: -6, scale: 1.05 }}
-                                                    whileTap={{ scale: 0.95 }}
-                                                    className="flex flex-col items-center gap-4 group/mood"
+                                                    whileHover={{ y: -4 }}
+                                                    whileTap={{ scale: 0.9 }}
+                                                    className="flex-1 flex flex-col items-center gap-2"
                                                 >
-                                                    <div className={`w-16 h-16 rounded-[1.8rem] glass flex items-center justify-center ${m.color} shadow-lg border-white bg-white/90 dark:bg-zinc-800/90 transition-all group-hover/mood:shadow-rose-500/10`}><MoodIconComp size={28} /></div>
-                                                    <span className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest">{m.label}</span>
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${m.color} ${m.bg} shadow-sm border border-white dark:border-white/5`}>
+                                                        <m.icon size={20} />
+                                                    </div>
+                                                    <span className="text-[8px] font-black text-zinc-400 uppercase">{m.label.split(' ')[0]}</span>
                                                 </motion.button>
-                                            );
-                                        })}
+                                            ))}
+                                        </div>
                                     </motion.div>
                                 ) : (
-                                    <motion.div key="mood-saved" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center gap-8 w-full max-w-[320px]">
-                                        <div className="flex items-center justify-between w-full relative h-24">
-                                            <div className="absolute left-1/2 top-12 -translate-x-1/2 w-40 h-px bg-gradient-to-r from-transparent via-rose-500/30 to-transparent" />
-                                            <div className="flex flex-col items-center gap-4">
-                                                <div className="w-18 h-18 glass rounded-[2rem] border-rose-500/30 flex items-center justify-center text-rose-500 shadow-xl relative bg-white ring-8 ring-rose-500/5">
-                                                    {(() => { const mood = moodsList.find(m => m.id === selectedMoodId); const ActiveIcon = mood ? mood.icon : Sun; return <ActiveIcon size={32} />; })()}
-                                                    <div className="absolute -bottom-3 text-[9px] bg-emerald-500 text-white px-3 py-1.5 rounded-xl shadow-lg font-black uppercase tracking-widest">أنا</div>
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col items-center gap-4">
-                                                <div className="w-18 h-18 glass rounded-[2rem] border-rose-500/30 flex items-center justify-center shadow-xl relative bg-white ring-8 ring-rose-500/5">
-                                                    {partnerMood ? (
-                                                        <div className="text-rose-500">
-                                                            {(() => { const pMoodObj = moodsList.find(m => m.id === partnerMood); const PartnerIcon = pMoodObj ? pMoodObj.icon : Heart; return <PartnerIcon size={32} />; })()}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-zinc-200 animate-pulse"><User size={32} /></div>
-                                                    )}
-                                                    <div className="absolute -bottom-3 text-[9px] bg-rose-500 text-white px-3 py-1.5 rounded-xl shadow-lg font-black uppercase tracking-widest">الشريك</div>
-                                                </div>
+                                    <div className="flex items-center justify-between px-2 pt-2 border-t border-zinc-100 dark:border-white/5">
+                                        <div className="flex flex-col">
+                                            <h4 className="text-[14px] font-black text-zinc-800 dark:text-white">تتبع مشاعرك</h4>
+                                            <div className="flex items-center gap-3 mt-1">
+                                                {partnerMood ? (
+                                                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/5 dark:bg-rose-500/10 border border-rose-500/10 text-[9px] font-black text-rose-500">
+                                                        <span>{partnerName} اليوم:</span>
+                                                        <span className="opacity-80 flex items-center gap-1.5">
+                                                            {(() => { 
+                                                                const pMoodObj = moodsList.find(m => m.id === partnerMood); 
+                                                                if (!pMoodObj) return 'غير معروف';
+                                                                const PIcon = pMoodObj.icon;
+                                                                return (
+                                                                    <>
+                                                                        <PIcon size={10} />
+                                                                        <span>{pMoodObj.label.split(' ')[0]}</span>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">سجل مشاعرك يومياً لبناء بستانك</p>
+                                                )}
                                             </div>
                                         </div>
-                                        <button onClick={() => setShowMoodPrompt(true)} className="text-[11px] font-black text-rose-600/60 hover:text-rose-600 uppercase tracking-widest transition-all bg-rose-500/5 px-7 py-3 rounded-2xl border border-rose-500/10 hover:bg-rose-500/10">تعديل المزاج</button>
-                                    </motion.div>
+                                        {!selectedMoodId && (
+                                            <motion.button 
+                                                whileHover={{ scale: 1.05 }}
+                                                whileTap={{ scale: 0.95 }}
+                                                onClick={() => setShowMoodPrompt(true)}
+                                                className="bg-orange-500 text-white px-5 py-2.5 rounded-2xl text-[10px] font-black shadow-lg shadow-orange-500/20"
+                                            >
+                                                سجل الآن
+                                            </motion.button>
+                                        )}
+                                    </div>
                                 )}
                             </AnimatePresence>
                         </div>
@@ -1035,17 +1036,16 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                 </section>
 
                 <section className="space-y-6">
-                    <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-3">
-                            <h3 className="text-xl font-black tracking-tight text-foreground/90 uppercase">أحداث قادمة</h3>
-                            <span className="bg-rose-500/10 text-rose-500 px-3 py-1 rounded-full text-[10px] font-black shadow-sm">
-                                {upcomingEvents.length}
-                            </span>
+                    <div className="flex items-center gap-4 px-1">
+                        <div className="w-9 h-9 rounded-xl bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center text-rose-500">
+                            <Calendar size={18} />
                         </div>
-                        <button onClick={() => onNavigate('calendar')} className="flex items-center gap-3 group">
+                        <h3 className="text-xl font-black tracking-tight text-zinc-900 dark:text-white uppercase">أحداث قادمة</h3>
+                        <div className="h-px flex-1 bg-gradient-to-r from-rose-500/30 dark:from-rose-500/40 to-transparent" />
+                        <button onClick={() => onNavigate('calendar')} className="flex items-center gap-2 shrink-0 group">
                             <span className="text-[11px] font-black text-rose-500 opacity-60 group-hover:opacity-100 transition-opacity uppercase tracking-widest">السجل</span>
-                            <div className="w-9 h-9 rounded-2xl glass border-white flex items-center justify-center text-rose-500 shadow-sm group-hover:bg-rose-500 group-hover:text-white transition-all">
-                                <ArrowUpRight size={18} />
+                            <div className="w-8 h-8 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-500 shadow-sm group-hover:bg-rose-500 group-hover:text-white transition-all">
+                                <ArrowUpRight size={16} />
                             </div>
                         </button>
                     </div>
@@ -1084,6 +1084,26 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         })}
                     </div>
                 </section>
+                {/* AI Floating Chatbot */}
+                <FloatingChatbot 
+                    gardenInfo={gardenInfo} 
+                    userId={userId} 
+                    partnershipId={partnershipId}
+                    contextData={{
+                        userName: partnership ? (partnership.user1_id === userId ? partnership.user1?.name : partnership.user2?.name) : 'صديقي',
+                        partnerName: partnership ? (partnership.user1_id === userId ? partnership.user2?.name : partnership.user1?.name) : 'الشريك',
+                        stats: statsCount,
+                        commitments: myCommitments.map(c => ({ title: c.title, weight: c.weight, is_done: c.is_done })),
+                        events: upcomingEvents.map(e => ({ title: e.title, date: e.event_date })),
+                        latestNote: latestNote,
+                        partnerLocation: { 
+                            ...partnerTracking, 
+                            distance, 
+                            isOnline: isPartnerOnline(),
+                            lastSeenFormatted: partnerTracking.last_seen ? formatLastSeen(partnerTracking.last_seen) : 'غير معروف'
+                        }
+                    }}
+                />
             </main>
 
             <AnimatePresence>

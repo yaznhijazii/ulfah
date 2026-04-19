@@ -256,10 +256,13 @@ function App() {
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentScreen}
-                  initial={{ opacity: 0, scale: 0.99, y: 10 }}
+                  initial={currentScreen === 'home_box' ? { y: '100%', opacity: 1 } : { opacity: 0, scale: 0.99, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 1.01, y: -10 }}
-                  transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                  exit={currentScreen === 'home_box' ? { y: '100%', opacity: 1 } : { opacity: 0, scale: 1.01, y: -10 }}
+                  transition={{ 
+                    duration: currentScreen === 'home_box' ? 0.6 : 0.4, 
+                    ease: currentScreen === 'home_box' ? [0.32, 0.72, 0, 1] : [0.22, 1, 0.36, 1] 
+                  }}
                   className="min-h-full flex flex-col"
                 >
                   {renderScreen()}
