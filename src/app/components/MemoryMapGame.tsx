@@ -125,24 +125,55 @@ export function MemoryMapGame({ onBack, userId, userName, partnershipId, initial
     }, [joinCode, initialCode]);
 
     const joinRoom = async () => {
-        const codeToUse = joinCode || initialCode;
+        const codeToUse = (joinCode || initialCode)?.trim();
         if (!codeToUse) return;
-        setLoading(true);
-        const { data: room, error } = await supabase
-            .from('game_rooms')
-            .select('*')
-            .eq('room_code', codeToUse.toUpperCase())
-            .eq('game_type', 'memory-map')
-            .eq('status', 'waiting')
-            .single();
-        if (error || !room) { toast.error('الغرفة غير موجودة'); setLoading(false); return; }
         
-        const gs = parseGs(room.game_state);
-        const nextGs = { ...gs, scores: { ...gs.scores, [userId]: 0 } };
+        setLoading(true);
+        try {
+            const { data: room, error } = await supabase
+                .from('game_rooms')
+                .select('*')
+                .eq('room_code', codeToUse.toUpperCase())
+                .eq('game_type', 'memory-map')
+                .single();
 
-        const { data: updated } = await supabase.from('game_rooms').update({ guest_user_id: userId, status: 'playing', game_state: nextGs }).eq('id', room.id).select().single();
-        if (updated) setRoomData({ ...updated, game_state: parseGs(updated.game_state) });
-        setLoading(false);
+            if (error || !room) {
+                toast.error('لم نجد هذه الذكرى.. تأكد من الكود');
+                setLoading(false);
+                return;
+            }
+
+            if (room.status === 'finished') {
+                toast.error('هذه الرحلة انتهت بالفعل');
+                setLoading(false);
+                return;
+            }
+            
+            const gs = parseGs(room.game_state);
+            const nextGs = { ...gs, scores: { ...gs.scores, [userId]: gs.scores[userId] || 0 } };
+
+            const { data: updated, error: updError } = await supabase
+                .from('game_rooms')
+                .update({ 
+                    guest_user_id: userId, 
+                    status: 'playing', 
+                    game_state: nextGs 
+                })
+                .eq('id', room.id)
+                .select()
+                .single();
+
+            if (updError) {
+                toast.error('عذراً، تعذر الانضمام للرحلة');
+            } else if (updated) {
+                setRoomData({ ...updated, game_state: parseGs(updated.game_state) });
+            }
+        } catch (err) {
+            console.error(err);
+            toast.error('خطأ غير متوقع');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const setMemory = async () => {

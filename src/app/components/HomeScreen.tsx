@@ -258,6 +258,15 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
     const formatLastSeen = (lastSeen: string | null) => {
         if (!lastSeen) return 'غير متوفر';
         const date = new Date(lastSeen);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+
+        if (diffMins < 1) return 'الآن';
+        if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
+        if (diffHours < 24) return `منذ ${diffHours} ${diffHours === 1 ? 'ساعة' : diffHours < 11 ? 'ساعات' : 'ساعة'}`;
+        
         return date.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' });
     };
 

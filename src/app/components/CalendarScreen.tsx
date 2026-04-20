@@ -49,23 +49,36 @@ const DAY_ABBR    = ['أحد','إثن','ثلا','أرب','خمي','جمع','سب
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────────
 const SkeletonMemory = () => (
-  <div className="rounded-[2.8rem] overflow-hidden bg-white dark:bg-white/[0.03] border border-black/5 dark:border-white/6 animate-pulse shadow-md">
-    <div className="h-48 bg-rose-500/8 dark:bg-rose-500/5" />
-    <div className="p-7 space-y-3">
-      <div className="h-5 bg-black/6 dark:bg-white/8 rounded-xl w-3/4 mr-0 ml-auto" />
-      <div className="h-3.5 bg-black/4 dark:bg-white/5 rounded-xl w-full" />
-      <div className="h-3.5 bg-black/4 dark:bg-white/5 rounded-xl w-2/3 ml-auto" />
+  <div className="relative rounded-[2.8rem] overflow-hidden bg-white/5 dark:bg-white/[0.03] border border-white/5 animate-pulse shadow-md mb-8">
+    <div className="h-52 bg-gradient-to-br from-rose-500/10 to-indigo-600/5 relative overflow-hidden">
+      <motion.div 
+        animate={{ x: ['-100%', '100%'] }} 
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent w-1/2"
+      />
+    </div>
+    <div className="p-7 space-y-4">
+      <div className="h-6 bg-white/10 rounded-xl w-3/4 mr-0 ml-auto" />
+      <div className="space-y-2">
+        <div className="h-3.5 bg-white/5 rounded-xl w-full" />
+        <div className="h-3.5 bg-white/5 rounded-xl w-4/5 ml-auto" />
+      </div>
+      <div className="pt-4 border-t border-white/5 flex justify-between items-center">
+        <div className="w-9 h-9 rounded-xl bg-white/5" />
+        <div className="h-3 bg-white/5 rounded-full w-20" />
+      </div>
     </div>
   </div>
 );
 
 const SkeletonEvent = () => (
-  <div className="rounded-[2rem] bg-white dark:bg-white/[0.03] border border-black/5 dark:border-white/6 animate-pulse p-5 flex items-center gap-4 shadow-sm">
-    <div className="w-14 h-14 rounded-[1.2rem] bg-rose-500/8 flex-shrink-0" />
-    <div className="flex-1 space-y-2.5">
-      <div className="h-5 bg-black/6 dark:bg-white/8 rounded-xl w-3/4 ml-auto" />
-      <div className="h-3 bg-black/4 dark:bg-white/5 rounded-xl w-1/3 ml-auto" />
+  <div className="relative rounded-[2rem] bg-white/5 dark:bg-white/[0.03] border border-white/5 animate-pulse p-5 flex items-center gap-4 shadow-sm mb-6">
+    <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-br from-rose-500/20 to-indigo-600/20 flex-shrink-0" />
+    <div className="flex-1 space-y-3">
+      <div className="h-5 bg-white/10 rounded-xl w-2/3 ml-auto" />
+      <div className="h-3 bg-white/5 rounded-xl w-1/3 ml-auto" />
     </div>
+    <div className="w-20 h-8 rounded-xl bg-white/5" />
   </div>
 );
 
@@ -299,52 +312,62 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
   // ── Data loading ───────────────────────────────────────────────────────────
   useEffect(() => {
     if (!partnershipId) return;
-    if (cached) {
-      // Show cached data immediately, silently refresh in background after 1s
-      const refresh = setTimeout(() => doFullLoad(partnershipId, true), 1000);
-      return () => clearTimeout(refresh);
+    // Fast initial sync
+    if (!cached) {
+      doFullLoad(partnershipId, false);
     }
-    doFullLoad(partnershipId, false);
   }, [partnershipId]);
 
   async function doFullLoad(pid: string, background: boolean) {
     if (!background) setLoading(true);
 
-    // Phase 1: 3 items fast → unblock UI
-    if (!background) {
-      const [qe, qm] = await Promise.all([
-        supabase.from('calendar_events').select('id,title,event_date,event_time,location,event_type')
-          .eq('partnership_id', pid).order('event_date', { ascending: false }).limit(3),
-        supabase.from('memories').select('id,title,memory_date,description,images:memory_images(image_url)')
-          .eq('partnership_id', pid).order('memory_date', { ascending: false }).limit(3),
-      ]);
-      if (qe.data) setEvents(qe.data);
-      if (qm.data) setMemories(qm.data);
+    try {
+      // 1. Prioritize Memories for instant visual feedback
+      const memRes = await supabase.from('memories')
+          .select('*, images:memory_images(image_url)')
+          .eq('partnership_id', pid)
+          .order('memory_date', { ascending: false })
+          .limit(PAGE_SIZE);
+      
+      if (memRes.data) {
+        setMemories(memRes.data);
+        setHasMore(memRes.data.length >= PAGE_SIZE);
+        if (!background) setLoading(false); 
+      }
+
+      // 2. Fetch secondary data in background
+      Promise.all([
+        supabase.from('calendar_events')
+          .select('*')
+          .eq('partnership_id', pid)
+          .order('event_date', { ascending: false })
+          .limit(PAGE_SIZE),
+        supabase.from('occasion_greetings')
+          .select('*')
+          .eq('partnership_id', pid)
+          .eq('sender_id', userId)
+          .order('target_date', { ascending: false }),
+      ]).then(([evRes, grRes]) => {
+        const newEvents = evRes.data || [];
+        const newGreetings = grRes.data || [];
+        
+        setEvents(newEvents);
+        setGreetings(newGreetings);
+
+        // Update cache with everything
+        writeCache(pid, { 
+          events: newEvents, 
+          memories: memRes.data || [], 
+          greetings: newGreetings, 
+          hasMore: (memRes.data?.length ?? 0) >= PAGE_SIZE 
+        });
+      });
+
+    } catch (error) {
+      console.error('Full load failed:', error);
+    } finally {
       setLoading(false);
     }
-
-    // Phase 2: full page
-    const [evRes, memRes, grRes] = await Promise.all([
-      supabase.from('calendar_events').select('*')
-        .eq('partnership_id', pid).order('event_date', { ascending: false }).limit(PAGE_SIZE),
-      supabase.from('memories').select('*,images:memory_images(image_url)')
-        .eq('partnership_id', pid).order('memory_date', { ascending: false }).limit(PAGE_SIZE),
-      supabase.from('occasion_greetings').select('*')
-        .eq('partnership_id', pid).eq('sender_id', userId).order('target_date', { ascending: false }),
-    ]);
-
-    const newEvents   = evRes.data  ?? events;
-    const newMemories = memRes.data ?? memories;
-    const newGreetings= grRes.data  ?? greetings;
-    const more = (memRes.data?.length ?? 0) >= PAGE_SIZE;
-
-    setEvents(newEvents);
-    setMemories(newMemories);
-    setGreetings(newGreetings);
-    setHasMore(more);
-    setLoading(false);
-
-    writeCache(pid, { events: newEvents, memories: newMemories, greetings: newGreetings, hasMore: more });
   }
 
   // Incremental load-more: only fetches the NEXT page, appends to existing
@@ -746,13 +769,21 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
 
           <div className="space-y-10">
 
-            {/* Skeleton */}
+            {/* Skeleton / Cyber Loading Interface */}
             {loading && (
-              <>
-                <SkeletonMemory />
-                <SkeletonEvent />
-                <SkeletonMemory />
-              </>
+              <div className="relative">
+                {/* Horizontal Scanner Beam */}
+                <motion.div 
+                  animate={{ top: ['0%', '100%'] }}
+                  transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+                  className="absolute left-0 right-0 h-1 z-20 bg-gradient-to-r from-transparent via-rose-500/40 to-transparent shadow-[0_0_15px_rgba(244,63,94,0.3)] pointer-events-none"
+                />
+                <div className="opacity-90">
+                  <SkeletonMemory />
+                  <SkeletonEvent />
+                  <SkeletonMemory />
+                </div>
+              </div>
             )}
 
             {/* Empty state */}
