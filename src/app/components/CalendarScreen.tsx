@@ -9,7 +9,7 @@ import { Button } from './ui/button';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { supabase } from '../../lib/supabase';
-
+import { readCache, writeCache, invalidateCache, PAGE_SIZE } from '../../lib/calendarService';
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface CalendarScreenProps {
   onNavigate: (screen: string) => void;
@@ -18,30 +18,6 @@ interface CalendarScreenProps {
   isDarkMode?: boolean;
 }
 
-// ─── Module-level Session Cache ────────────────────────────────────────────────
-// Survives navigation within the same session — instant re-open, no spinner.
-interface CacheEntry {
-  events: any[];
-  memories: any[];
-  greetings: any[];
-  hasMore: boolean;
-  ts: number;
-}
-const _sessionCache: Record<string, CacheEntry> = {};
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-const PAGE_SIZE = 6;
-
-function readCache(pid: string): CacheEntry | null {
-  const c = _sessionCache[pid];
-  if (c && Date.now() - c.ts < CACHE_TTL) return c;
-  return null;
-}
-function writeCache(pid: string, data: Omit<CacheEntry, 'ts'>) {
-  _sessionCache[pid] = { ...data, ts: Date.now() };
-}
-function invalidateCache(pid: string) {
-  delete _sessionCache[pid];
-}
 
 // ─── Stable constants (outside component to avoid re-allocation) ───────────────
 const MONTH_NAMES = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
@@ -290,6 +266,8 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
   const [greetingForm,setGreetingForm]= useState({ title: '', target_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], message: '' });
   const [editingGreetingId, setEditingGreetingId] = useState<string | null>(null);
   const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+
   const [selectedImages, setSelectedImages] = useState<{ file?: File; preview: string; isOld?: boolean; url?: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -442,6 +420,7 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
   }, []);
 
   const editEvent = useCallback((ev: any) => {
+      setEditingEventId(ev.id);
       setEventForm({
           title: ev.title,
           event_date: new Date(ev.event_date).toISOString().split('T')[0],
@@ -449,11 +428,9 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
           location: ev.location || '',
           event_type: ev.event_type || 'other'
       });
-      // We don't have an editingEventId state yet, we should add it or use a combined one
-      // For now, let's just trigger the form. Real edit requires an ID.
-      // I will add [editingEventId, setEditingEventId] to the component state.
       setShowAddRealEventForm(true);
   }, []);
+
 
   const nextImage = useCallback(() => setGalleryIndex(p => (p + 1) % galleryImages.length), [galleryImages.length]);
   const prevImage = useCallback(() => setGalleryIndex(p => (p - 1 + galleryImages.length) % galleryImages.length), [galleryImages.length]);
@@ -495,12 +472,22 @@ export function CalendarScreen({ onNavigate, userId, partnershipId, isDarkMode }
     e.preventDefault();
     if (!partnershipId) return;
     setIsSubmitting(true);
-    const { error } = await supabase.from('calendar_events').insert({
+    const payload = {
       partnership_id: partnershipId, created_by_user_id: userId, ...eventForm,
-    });
+    };
+
+    let error;
+    if (editingEventId) {
+      ({ error } = await supabase.from('calendar_events').update(payload).eq('id', editingEventId));
+    } else {
+      ({ error } = await supabase.from('calendar_events').insert(payload));
+    }
+
     if (!error) {
       setShowAddRealEventForm(false);
+      setEditingEventId(null);
       setEventForm({ title: '', event_date: '', event_time: '', location: '', event_type: 'other' });
+
       if (partnershipId) invalidateCache(partnershipId);
       doFullLoad(partnershipId, true);
       toast.success('تم تثبيت الوعد في السجل ✨');

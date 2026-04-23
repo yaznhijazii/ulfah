@@ -16,8 +16,9 @@ import { WishlistScreen } from './components/WishlistScreen';
 import { HomeBoxScreen } from './components/HomeBoxScreen';
 import { PlaylistScreen } from './components/PlaylistScreen';
 import { EveningJournalScreen } from './components/EveningJournalScreen';
-import { GameInvitePopup } from './components/GameInvitePopup';
 import { supabase } from '../lib/supabase';
+import { preloadCalendar } from '../lib/calendarService';
+import { useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster } from 'sonner';
 
@@ -56,6 +57,13 @@ function App() {
   });
   const [activeInvite, setActiveInvite] = useState<any>(null);
   const [gameParams, setGameParams] = useState<{ type: string, code: string } | null>(null);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
+  }, [currentScreen]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -147,6 +155,8 @@ function App() {
 
       if (partnership) {
         setPartnershipId(partnership.id);
+        // Start preloading the calendar screen in the background
+        preloadCalendar(partnership.id, userId);
       }
     } catch (err) {
       console.error('Error loading partnership:', err);
@@ -252,7 +262,7 @@ function App() {
           </div>
         ) : (
           <>
-            <main className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide pb-safe">
+            <main ref={mainRef} className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide pb-safe">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentScreen}

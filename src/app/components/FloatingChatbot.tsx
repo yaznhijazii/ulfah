@@ -8,9 +8,18 @@ const getMockResponse = (text: string): string => {
     return 'مرحباً! أنا لوفي 🤖. لم يتم تفعيل مفتاح الذكاء الاصطناعي الخاص بي بعد، لكنني هنا لأجلكم!';
 };
 
-const getAIResponse = async (text: string, contextData: any, fullDbData: any): Promise<string> => {
+const getAIResponseStreaming = async (
+    text: string, 
+    history: any[],
+    contextData: any, 
+    fullDbData: any,
+    onChunk: (text: string) => void
+): Promise<void> => {
     const openRouterKey = import.meta.env.VITE_OPENROUTER_API_KEY?.trim();
-    if (!openRouterKey) return "⚠️ مفتاح OpenRouter مفقود.";
+    if (!openRouterKey) {
+        onChunk("⚠️ مفتاح OpenRouter مفقود.");
+        return;
+    }
 
     let placeName = "غير محدد بدقة";
     const loc = contextData?.partnerLocation || {};
@@ -39,6 +48,7 @@ const getAIResponse = async (text: string, contextData: any, fullDbData: any): P
 - CRITICAL: Speak ONLY in natural Jordanian Arabic (اللهجة الأردنية العامية). 
 - RADIO ABILITY: You have a LIVE RADIO called 'راديو ألفة'. If the user asks for music or radio, say 'على راسي أبشر، أحلى موسيقى لعيونك!' and the player will appear.
 - IDENTITY: You are talking to ${contextData?.userName}. Their partner is ${contextData?.partnerName}.
+- CONTEXT: ${relationshipHistory}
 - Tone: Wise, empathetic, energetic Nashmi DJ. Use emojis.
 - Goal: Deepen the bond via advice and music.`;
 
@@ -55,19 +65,52 @@ const getAIResponse = async (text: string, contextData: any, fullDbData: any): P
                 model: "google/gemini-2.0-flash-lite-001",
                 messages: [
                     { role: "system", content: systemPrompt },
+                    ...history.map(m => ({ 
+                        role: m.isBot ? "assistant" : "user", 
+                        content: m.text 
+                    })),
                     { role: "user", content: text }
-                ]
+                ],
+                stream: true
             })
         });
         
-        if (res.ok) {
-            const data = await res.json();
-            return data.choices?.[0]?.message?.content || "لوفي صامت حالياً.";
-        } else {
-            return "لوفي يواجه مشكلة في التعبير حالياً. جرب لاحقاً! 👒";
+        if (!res.ok) {
+            onChunk("لوفي يواجه مشكلة في التعبير حالياً. جرب لاحقاً! 👒");
+            return;
+        }
+
+        const reader = res.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullText = "";
+
+        if (!reader) return;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split("\n");
+            
+            for (const line of lines) {
+                if (line.startsWith("data: ")) {
+                    const dataStr = line.slice(6).trim();
+                    if (dataStr === "[DONE]") break;
+                    
+                    try {
+                        const data = JSON.parse(dataStr);
+                        const content = data.choices?.[0]?.delta?.content || "";
+                        if (content) {
+                            fullText += content;
+                            onChunk(fullText);
+                        }
+                    } catch (e) {}
+                }
+            }
         }
     } catch (e: any) {
-        return `فشل الاتصال بـ لوفي: ${e.message}`;
+        onChunk(`فشل الاتصال بـ لوفي: ${e.message}`);
     }
 };
 
@@ -173,7 +216,7 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isTyping]);
 
-    const handleSend = (textOrEvent?: any) => {
+    const handleSend = async (textOrEvent?: any) => {
         const textToSend = (typeof textOrEvent === 'string') ? textOrEvent : inputValue;
         if (!textToSend || !textToSend.trim() || isTyping) return;
 
@@ -189,23 +232,38 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
         setIsTyping(true);
 
         const detectsRadio = /راديو|موسيقى|شغل|اغنية|playlist/i.test(textToSend);
+        const botMsgId = (Date.now() + 1).toString();
 
-        setTimeout(async () => {
-            const aiReplyText = await getAIResponse(newMsg.text, contextData, fullDbData);
+        // Add placeholder message for the bot
+        setMessages(prev => [...prev, {
+            id: botMsgId,
+            text: '',
+            isBot: true,
+            isRadio: detectsRadio,
+            time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+        }]);
+
+                        try {
+            let receivedFirstChunk = false;
+            // Pass the current messages as history (limit to last 10 for performance)
+            await getAIResponseStreaming(textToSend, messages.slice(-10), contextData, fullDbData, (updatedText) => {
+                if (!receivedFirstChunk && updatedText.length > 0) {
+                    setIsTyping(false);
+                    receivedFirstChunk = true;
+                }
+                setMessages(prev => prev.map(m => 
+                    m.id === botMsgId ? { ...m, text: updatedText } : m
+                ));
+            });
             
             if (detectsRadio && !isRadioPlaying) {
                 toggleRadio();
             }
-
-            setMessages(prev => [...prev, {
-                id: (Date.now() + 1).toString(),
-                text: aiReplyText,
-                isBot: true,
-                isRadio: detectsRadio,
-                time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
-            }]);
+        } catch (error) {
+            console.error("Streaming error:", error);
+        } finally {
             setIsTyping(false);
-        }, 800);
+        }
     };
 
     const clearChat = () => {
@@ -218,6 +276,7 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
+                        dir="rtl"
                         initial={{ opacity: 0, scale: 0.9, y: 30 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: 30, transition: { duration: 0.2 } }}
@@ -249,50 +308,62 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
                         </div>
 
                         {/* Messages Area */}
-                        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5 scrollbar-hide bg-zinc-50/30 dark:bg-black/10">
+                        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 scrollbar-hide bg-zinc-50/30 dark:bg-black/10">
                             {messages.map((msg) => (
                                 <motion.div
                                     key={msg.id}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className={`flex flex-col gap-3 ${msg.isBot ? 'items-start' : 'items-end'}`}
+                                    className={`flex gap-3 ${msg.isBot ? 'flex-row' : 'flex-row-reverse'} items-start`}
                                 >
-                                    <div className={`max-w-[85%] rounded-2xl px-5 py-3.5 shadow-sm border ${msg.isBot
-                                            ? 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border-zinc-100 dark:border-white/5'
-                                            : 'bg-rose-500 text-white border-rose-600/10'
-                                        }`}>
-                                        <p className="text-sm font-bold leading-relaxed whitespace-pre-wrap">
-                                            {msg.text.split(/(\*\*.*?\*\*)/).map((part: string, i: number) => 
-                                                part.startsWith('**') && part.endsWith('**') 
-                                                ? <strong key={i} className="font-black text-rose-600 dark:text-rose-400">{part.slice(2, -2)}</strong> 
-                                                : part
-                                            )}
-                                        </p>
-                                        <span className="text-[8px] font-medium opacity-50 mt-1.5 block text-left uppercase">
+                                    {msg.isBot && (
+                                        <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500 shrink-0 mt-1 shadow-sm">
+                                            <Bot size={16} />
+                                        </div>
+                                    )}
+                                    <div className={`flex flex-col gap-1 max-w-[80%] ${msg.isBot ? 'items-start' : 'items-end'}`}>
+                                        <div className={`rounded-2xl px-5 py-3.5 shadow-sm border ${msg.isBot
+                                                ? 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border-zinc-100 dark:border-white/5 rounded-tr-none'
+                                                : 'bg-rose-500 text-white border-rose-600/10 rounded-tl-none'
+                                            }`}>
+                                            <p className="text-sm font-bold leading-relaxed whitespace-pre-wrap">
+                                                {msg.text.split(/(\*\*.*?\*\*)/).map((part: string, i: number) => 
+                                                    part.startsWith('**') && part.endsWith('**') 
+                                                    ? <strong key={i} className="font-black text-rose-600 dark:text-rose-400">{part.slice(2, -2)}</strong> 
+                                                    : part
+                                                )}
+                                            </p>
+                                        </div>
+                                        <span className="text-[8px] font-black opacity-30 uppercase tracking-widest px-1">
                                             {msg.time}
                                         </span>
                                     </div>
                                 </motion.div>
                             ))}
-                            <div ref={messagesEndRef} />
-                        </div>
-
-                        {/* Animated Lufi Avatar - Simplified */}
-                        <AnimatePresence>
+                            
                             {isTyping && (
                                 <motion.div 
                                     initial={{ opacity: 0, x: 20 }}
                                     animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: 20 }}
-                                    className="absolute right-6 bottom-28 pointer-events-none z-20 flex items-center gap-2"
+                                    className="flex items-start gap-3"
                                 >
-                                    <div className="bg-white dark:bg-zinc-800 px-3 py-1.5 rounded-full shadow-lg border border-zinc-100 dark:border-white/5 text-[9px] font-black text-rose-500 animate-pulse">
-                                        لوفي بفكر...
+                                    <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500 shrink-0 mt-1 shadow-sm animate-bounce">
+                                        <Bot size={16} />
                                     </div>
-                                    <img src="/luffy_thinking.png" className="w-12 h-12 object-contain" alt="Thinking" />
+                                    <div className="bg-white dark:bg-zinc-800 px-4 py-2.5 rounded-2xl shadow-sm border border-rose-100 dark:border-white/5 flex items-center gap-3">
+                                        <div className="flex gap-1.5">
+                                            <motion.div animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                            <motion.div animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                            <motion.div animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                        </div>
+                                        <span className="text-[10px] font-black text-rose-500/60 uppercase tracking-widest">لوفي يفكر...</span>
+                                    </div>
                                 </motion.div>
                             )}
-                        </AnimatePresence>
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Animated Lufi Avatar Indicator Removed from here and moved into message list flow */}
 
                         {/* Sticky Radio & Quick Start Area */}
                         <div className="p-5 bg-white/90 dark:bg-zinc-900/90 border-t border-zinc-100 dark:border-white/5 space-y-4 shrink-0">
