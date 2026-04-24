@@ -17,6 +17,7 @@ import { HomeBoxScreen } from './components/HomeBoxScreen';
 import { PlaylistScreen } from './components/PlaylistScreen';
 import { EveningJournalScreen } from './components/EveningJournalScreen';
 import { DecisionMakerScreen } from './components/DecisionMakerScreen';
+import { FirstTimesScreen } from './components/FirstTimesScreen';
 import { supabase } from '../lib/supabase';
 import { preloadCalendar } from '../lib/calendarService';
 import { useRef } from 'react';
@@ -41,7 +42,8 @@ type Screen =
   | 'home_box'
   | 'playlist'
   | 'evening_journal'
-  | 'decision_maker';
+  | 'decision_maker'
+  | 'first_times';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
@@ -239,6 +241,8 @@ function App() {
         return <PlaylistScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       case 'evening_journal':
         return <EveningJournalScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
+      case 'first_times':
+        return <FirstTimesScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       default:
         return <HomeScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
     }
@@ -285,7 +289,7 @@ function App() {
               </AnimatePresence>
             </main>
 
-            {['home', 'calendar', 'commitments', 'dialogues', 'finance', 'games', 'love_notes', 'adventure_bucket', 'playlist', 'evening_journal'].includes(currentScreen) && (
+            {['home', 'calendar', 'commitments', 'dialogues', 'finance', 'games', 'love_notes', 'adventure_bucket', 'playlist', 'evening_journal', 'first_times'].includes(currentScreen) && (
               <footer className="shrink-0 bg-background/80 backdrop-blur-3xl border-t border-border/50 z-50">
                 <BottomNav currentScreen={currentScreen} onNavigate={handleNavigate} />
               </footer>

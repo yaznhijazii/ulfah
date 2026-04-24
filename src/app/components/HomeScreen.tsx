@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Settings, Heart, Sparkles, ChevronLeft, MapPin, Compass, Gift, Moon, Sun,
     ShieldCheck, Target, Zap, Navigation, User, Calendar, ArrowUpRight,
-    Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet, Lock, Music, Armchair, Mail, LayoutGrid, Smile, UtensilsCrossed
+    Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet, Lock, Music, Armchair, Mail, LayoutGrid, Smile, UtensilsCrossed, Star
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Button } from './ui/button';
@@ -712,29 +712,32 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
 
 
                 {/* --- SHORTCUTS GRID --- */}
-                <div className="flex items-center gap-4 px-1 mb-4">
+                <div className="flex items-center gap-4 px-1 mb-4 mt-8">
                     <div className="w-9 h-9 rounded-xl bg-violet-500/10 dark:bg-violet-500/20 flex items-center justify-center text-violet-500">
                         <LayoutGrid size={18} />
                     </div>
                     <h3 className="text-xl font-black tracking-tight text-zinc-900 dark:text-white uppercase">الاختصارات</h3>
                     <div className="h-px flex-1 bg-gradient-to-r from-violet-500/30 dark:from-violet-500/40 to-transparent" />
                 </div>
-                <section className="grid grid-cols-4 gap-4 px-1 pb-6">
+                
+                <section className="grid grid-cols-3 gap-3 px-1 pb-10">
                     {[
-                        { id: 'adventure_bucket', icon: Compass, title: 'خططنا', sub: 'القادمة', color: 'from-amber-400 to-orange-500', hoverBg: 'rgba(251,191,36,0.2)', glow: 'bg-amber-400' },
-                        { id: 'wishlist', icon: Gift, title: 'الأمنيات', sub: 'للذكرى', color: 'from-indigo-500 to-purple-600', hoverBg: 'rgba(99,102,241,0.2)', glow: 'bg-indigo-500' },
-                        { id: 'home_box', icon: Armchair, title: 'البيت', sub: 'تجهيزات', color: 'from-teal-500 to-emerald-600', hoverBg: 'rgba(20,184,166,0.2)', glow: 'bg-teal-500' },
-                        { id: 'evening_journal', icon: Moon, title: 'المساء', sub: 'سؤالنا', color: 'from-indigo-600 to-violet-700', hoverBg: 'rgba(79,70,229,0.2)', glow: 'bg-violet-500', lock: new Date().getHours() < 21 },
-                        { id: 'playlist', icon: Music, title: 'موسيقى', sub: 'أغانينا', color: 'from-rose-500 to-pink-600', hoverBg: 'rgba(244,63,94,0.2)', glow: 'bg-rose-500' },
-                        { id: 'decision_maker', icon: UtensilsCrossed, title: 'القرعة', sub: 'وين ناكل؟', color: 'from-orange-400 to-red-500', hoverBg: 'rgba(251,146,60,0.2)', glow: 'bg-orange-500' },
-                    ].map((item) => (
+                        { id: 'adventure_bucket', icon: Compass, title: 'خططنا', sub: 'القادمة', color: 'from-amber-400 to-orange-500', hoverBg: 'rgba(251,191,36,0.15)', glow: 'bg-amber-400' },
+                        { id: 'wishlist', icon: Gift, title: 'الأمنيات', sub: 'للذكرى', color: 'from-rose-400 to-pink-500', hoverBg: 'rgba(244,63,94,0.15)', glow: 'bg-rose-500' },
+                        { id: 'home_box', icon: Armchair, title: 'البيت', sub: 'تجهيزات', color: 'from-teal-400 to-emerald-500', hoverBg: 'rgba(20,184,166,0.15)', glow: 'bg-teal-500' },
+                        { id: 'evening_journal', icon: Moon, title: 'المساء', sub: 'سؤالنا', color: 'from-indigo-500 to-violet-600', hoverBg: 'rgba(79,70,229,0.15)', glow: 'bg-violet-500', lock: new Date().getHours() < 21 },
+                        { id: 'playlist', icon: Music, title: 'موسيقى', sub: 'أغانينا', color: 'from-violet-400 to-purple-500', hoverBg: 'rgba(139,92,246,0.15)', glow: 'bg-violet-500' },
+                        { id: 'decision_maker', icon: UtensilsCrossed, title: 'القرعة', sub: 'وين ناكل؟', color: 'from-indigo-400 to-blue-500', hoverBg: 'rgba(99,102,241,0.15)', glow: 'bg-indigo-500' },
+                        { id: 'first_times', icon: Star, title: 'أول مرة', sub: 'بداياتنا', color: 'from-rose-500 to-rose-600', hoverBg: 'rgba(244,63,94,0.15)', glow: 'bg-rose-500' },
+                    ].map((item, idx) => (
                         <motion.div
                             key={item.id}
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            whileInView={{ opacity: 1, scale: 1 }}
+                            initial={{ opacity: 0, y: 15 }}
+                            whileInView={{ opacity: 1, y: 0 }}
                             viewport={{ once: true }}
-                            whileHover={{ scale: 1.05, y: -4 }}
-                            whileTap={{ scale: 0.95 }}
+                            transition={{ delay: idx * 0.05 }}
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.96 }}
                             onClick={() => {
                                 if (item.id === 'evening_journal' && item.lock) {
                                     toast.info("🌙 لم يحن الوقت بعد\nدفتر المساء يفتح الساعة 9:00 مساءً.");
@@ -745,36 +748,43 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                             className="relative group cursor-pointer"
                         >
                             <div 
-                                className={`aspect-square rounded-[2rem] border border-zinc-100 dark:border-white/5 shadow-sm overflow-hidden flex flex-col items-center justify-center gap-2.5 transition-all duration-300 ${item.lock ? 'opacity-60 grayscale' : ''}`}
-                                style={{ background: isDarkMode ? `rgba(255,255,255,0.04)` : `rgba(255,255,255,0.95)` }}
+                                className={`aspect-square rounded-[2rem] border border-white/60 dark:border-white/5 shadow-md flex flex-col items-center justify-center gap-2.5 transition-all duration-500 relative overflow-hidden ${item.lock ? 'opacity-60 grayscale' : ''}`}
+                                style={{ background: isDarkMode ? `rgba(20,20,25,0.4)` : `rgba(255,255,255,0.7)` }}
                             >
-                                {/* Gradient — visible only on hover */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
                                 <div 
-                                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"
                                     style={{ background: item.hoverBg }}
                                 />
-                                {/* Glow burst */}
-                                <div className={`absolute inset-0 opacity-0 group-hover:opacity-30 transition-opacity duration-400 ${item.glow} blur-3xl`} />
+                                
+                                <div className="absolute -right-3 -bottom-3 opacity-[0.03] dark:opacity-[0.05] group-hover:opacity-10 transition-opacity duration-500">
+                                    <item.icon size={60} />
+                                </div>
 
-                                <div className="relative z-10 flex flex-col items-center gap-3">
-                                    <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300`}>
-                                        <item.icon size={26} />
-                                    </div>
+                                <div className="relative z-10 flex flex-col items-center gap-2">
+                                    <motion.div 
+                                        whileHover={{ rotate: [0, -10, 10, 0] }}
+                                        className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center text-white shadow-lg shadow-black/5 transition-all duration-500`}
+                                    >
+                                        <item.icon size={22} />
+                                    </motion.div>
+                                    
                                     <div className="text-center px-1">
-                                        <span className="text-[10px] font-black text-zinc-800 dark:text-white leading-tight block">
+                                        <h4 className="text-[12px] font-black text-zinc-800 dark:text-white tracking-tight leading-tight mb-0.5">
                                             {item.title}
-                                        </span>
-                                        <span className="text-[7.5px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-0.5 block opacity-60">
+                                        </h4>
+                                        <span className="text-[7px] font-bold text-zinc-500/60 dark:text-zinc-400/40 uppercase tracking-widest leading-none">
                                             {item.sub}
                                         </span>
                                     </div>
                                 </div>
 
                                 {item.lock && (
-                                    <div className="absolute top-2.5 right-2.5 opacity-30">
-                                        <Lock size={10} className="text-zinc-400" />
+                                    <div className="absolute top-3 right-3 text-zinc-400/30">
+                                        <Lock size={10} />
                                     </div>
                                 )}
+                                <div className="absolute inset-0 border border-white/0 group-hover:border-white/20 rounded-[2rem] transition-all duration-500" />
                             </div>
                         </motion.div>
                     ))}
@@ -1118,20 +1128,116 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
 
             <AnimatePresence>
                 {showMap && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-background backdrop-blur-3xl flex flex-col p-8 font-sans">
-                        <div className="absolute inset-x-0 top-0 h-1/2 bg-rose-500/5 blur-[120px] rounded-full -z-10" />
-                        <header className="flex items-center justify-between mb-8 px-2 mt-4"><motion.button whileTap={{ scale: 0.9 }} onClick={() => setShowMap(false)} className="w-14 h-14 glass rounded-[1.5rem] flex items-center justify-center text-rose-500 shadow-xl border-white"><ChevronLeft className="rotate-180" size={24} /></motion.button><div className="text-right"><h2 className="text-2xl font-black italic tracking-tighter">موقع الروح</h2><p className="text-[10px] font-black text-rose-500/40 uppercase tracking-[0.5em] leading-none mt-1">اتصال فوري الآن</p></div></header>
-                        <motion.div initial={{ scale: 0.95, y: 30 }} animate={{ scale: 1, y: 0 }} className="flex-1 rounded-[3.8rem] overflow-hidden border-[6px] border-white shadow-3xl relative mb-10 bg-zinc-100 ring-2 ring-black/5">
+                    <motion.div 
+                        initial={{ opacity: 0 }} 
+                        animate={{ opacity: 1 }} 
+                        exit={{ opacity: 0 }} 
+                        className={`fixed inset-0 z-[100] flex flex-col p-6 font-sans overflow-hidden ${isDarkMode ? 'bg-zinc-950 text-white' : 'bg-[#fcfcfc] text-slate-900'}`}
+                    >
+                        {/* Premium Background Atmosphere */}
+                        <div className="absolute inset-0 -z-10 pointer-events-none">
+                            <div className={`absolute top-[-10%] left-[-10%] w-[60%] h-[60%] blur-[120px] rounded-full transition-colors duration-1000 ${isDarkMode ? 'bg-rose-900/10' : 'bg-rose-400/10'}`} />
+                            <div className={`absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] blur-[120px] rounded-full transition-colors duration-1000 ${isDarkMode ? 'bg-amber-900/10' : 'bg-amber-400/5'}`} />
+                        </div>
+
+                        {/* Floating Header */}
+                        <div className="relative z-30 flex items-center justify-between mb-8 px-2 pt-4">
+                            <div className="text-right">
+                                <h2 className="text-2xl font-black tracking-tighter">موقع الروح</h2>
+                                <div className="flex items-center gap-2 justify-end mt-1">
+                                    <span className="text-[10px] font-black text-rose-500/60 uppercase tracking-[0.4em] leading-none">اتصال فوري الآن</span>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                </div>
+                            </div>
+                            <motion.button 
+                                whileTap={{ scale: 0.9 }} 
+                                onClick={() => setShowMap(false)} 
+                                className={`w-14 h-14 flex items-center justify-center rounded-[1.5rem] shadow-2xl border transition-all ${isDarkMode ? 'bg-zinc-900/80 border-white/10 text-white' : 'bg-white/80 border-rose-100 text-rose-500'}`}
+                            >
+                                <ChevronLeft size={24} />
+                            </motion.button>
+                        </div>
+
+                        {/* Map Immersive Frame */}
+                        <motion.div 
+                            initial={{ scale: 0.9, y: 40, opacity: 0 }} 
+                            animate={{ scale: 1, y: 0, opacity: 1 }} 
+                            className={`flex-1 rounded-[4.5rem] overflow-hidden border-[8px] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.2)] relative mb-8 transition-all duration-700 ${isDarkMode ? 'border-zinc-800 bg-zinc-900' : 'border-white bg-white ring-2 ring-black/5'}`}
+                        >
                             {partnerTracking.lat ? (
-                                <iframe width="100%" height="100%" frameBorder="0" style={{ border: 0 }} src={`https://maps.google.com/maps?q=${partnerTracking.lat},${partnerTracking.lng}&z=15&output=embed`} />
+                                <iframe 
+                                    width="100%" 
+                                    height="100%" 
+                                    frameBorder="0" 
+                                    style={{ border: 0, filter: isDarkMode ? 'invert(90%) hue-rotate(180deg) brightness(95%) contrast(90%) opacity(0.8)' : 'opacity(0.95)' }} 
+                                    src={`https://maps.google.com/maps?q=${partnerTracking.lat},${partnerTracking.lng}&z=15&output=embed`} 
+                                />
                             ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center gap-5 opacity-30"><Compass size={80} className="animate-spin-slow text-rose-500" /><p className="text-base font-black tracking-widest">جاري البحث...</p></div>
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-6">
+                                    <div className="relative">
+                                        <motion.div 
+                                            animate={{ rotate: 360 }} 
+                                            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                                            className="w-24 h-24 rounded-full border-4 border-dashed border-rose-500/30 flex items-center justify-center"
+                                        >
+                                            <Compass size={40} className="text-rose-500/40" />
+                                        </motion.div>
+                                    </div>
+                                    <p className="text-sm font-black tracking-[0.2em] text-rose-500/40 uppercase">جاري التحديد...</p>
+                                </div>
                             )}
+                            
+                            {/* Inner Overlay Gradient */}
+                            <div className="absolute inset-0 pointer-events-none shadow-[inner_0_0_80px_rgba(0,0,0,0.05)]" />
                         </motion.div>
-                        <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="glass rounded-[3.5rem] p-8 flex items-center justify-between border-white shadow-2xl bg-white/80 ring-1 ring-black/5">
-                            <div className="flex items-center gap-6"><div className="w-20 h-20 rounded-full ring-[6px] ring-white shadow-xl overflow-hidden relative">{avatars.partner ? <img src={avatars.partner} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-rose-50 flex items-center justify-center text-rose-200"><User size={40} /></div>}</div><div className="text-right"><h3 className="text-xl font-black mb-1">{isPartnerOnline() ? 'متصل الآن' : formatLastSeen(partnerTracking.last_seen)}</h3><p className="text-rose-600/60 font-black text-xs">يبعد عنك {distance}</p></div></div>
-                            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => { if (partnerTracking.lat) window.open(`https://www.google.com/maps/dir/?api=1&destination=${partnerTracking.lat},${partnerTracking.lng}`, '_blank'); }} className="w-20 h-20 bg-rose-500 text-white rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-rose-500/40"><Navigation fill="currentColor" size={30} /></motion.button>
+
+                        {/* Floating Partner Identity Card */}
+                        <motion.div 
+                            initial={{ y: 60, opacity: 0 }} 
+                            animate={{ y: 0, opacity: 1 }} 
+                            className={`rounded-[3.8rem] p-6 flex items-center justify-between border shadow-2xl transition-all duration-500 ${isDarkMode ? 'bg-zinc-900/90 border-white/10 backdrop-blur-2xl' : 'bg-white/95 border-rose-100 backdrop-blur-xl shadow-rose-200/20'}`}
+                        >
+                            <div className="flex items-center gap-5">
+                                <div className="relative">
+                                    <div className={`w-18 h-18 rounded-[2rem] shadow-xl overflow-hidden relative border-4 transition-colors ${isDarkMode ? 'border-zinc-800' : 'border-white'}`}>
+                                        {avatars.partner ? (
+                                            <img src={avatars.partner} className="w-full h-full object-cover" alt="Partner" />
+                                        ) : (
+                                            <div className="w-full h-full bg-rose-50 flex items-center justify-center text-rose-200">
+                                                <User size={30} />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <motion.div 
+                                        animate={{ scale: [1, 1.2, 1] }} 
+                                        transition={{ duration: 2, repeat: Infinity }}
+                                        className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-4 shadow-lg ${isPartnerOnline() ? 'bg-emerald-500' : 'bg-zinc-400'} ${isDarkMode ? 'border-zinc-900' : 'border-white'}`} 
+                                    />
+                                </div>
+                                <div className="text-right">
+                                    <h3 className="text-lg font-black leading-tight tracking-tight">
+                                        {isPartnerOnline() ? 'متصل الآن' : formatLastSeen(partnerTracking.last_seen)}
+                                    </h3>
+                                    <div className="flex items-center gap-2 justify-end mt-1.5">
+                                        <span className="text-[11px] font-black text-rose-500 uppercase tracking-widest">يبعد {distance}</span>
+                                        <div className="w-1 h-1 rounded-full bg-rose-300" />
+                                        <Heart size={12} className="text-rose-500 fill-rose-500" />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <motion.button 
+                                whileHover={{ scale: 1.08, rotate: -5 }} 
+                                whileTap={{ scale: 0.92 }} 
+                                onClick={() => { if (partnerTracking.lat) window.open(`https://www.google.com/maps/dir/?api=1&destination=${partnerTracking.lat},${partnerTracking.lng}`, '_blank'); }} 
+                                className="w-18 h-18 bg-gradient-to-br from-rose-500 to-rose-600 text-white rounded-[2.2rem] flex items-center justify-center shadow-2xl shadow-rose-500/40 border border-white/20"
+                            >
+                                <Navigation fill="currentColor" size={26} />
+                            </motion.button>
                         </motion.div>
+                        
+                        {/* Visual Footer Spacer */}
+                        <div className="h-6 shrink-0" />
                     </motion.div>
                 )}
             </AnimatePresence>

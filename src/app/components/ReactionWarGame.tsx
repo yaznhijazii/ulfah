@@ -126,29 +126,47 @@ export function ReactionWarGame({ onBack, userId, userName, partnershipId, initi
         }
     }, [countdown]);
 
-    // Game Loop (Moles popping)
+    // Game Loop (Moles popping) with Dynamic Acceleration
     useEffect(() => {
         if (roomData?.game_state.round_status === 'action') {
-            gameLoopRef.current = setInterval(() => {
+            const startTime = Date.now();
+            const totalDuration = 30000; // 30 seconds
+
+            const spawnTick = () => {
                 const now = Date.now();
+                const elapsed = now - startTime;
+                const progress = Math.min(1, elapsed / totalDuration);
+                
+                // Acceleration Logic:
+                // Interval between spawns: 450ms -> 180ms
+                const currentInterval = 450 - (progress * 270);
+                // How long rabbits stay: 900ms -> 350ms
+                const activeDuration = 900 - (progress * 550);
+
                 setHoles(prev => {
                     const next = [...prev];
                     // Clean up expired moles
                     next.forEach(h => { if (h.type !== 'empty' && h.activeUntil < now) h.type = 'empty'; });
                     
-                    // Spawn new mole randomly
-                    if (Math.random() > 0.4) { // 60% chance every 400ms to spawn something
+                    // Spawn probability slightly increases as game progresses
+                    if (Math.random() > (0.4 - progress * 0.15)) {
                         const emptyHoles = next.filter(h => h.type === 'empty');
                         if (emptyHoles.length > 0) {
                             const randomHole = emptyHoles[Math.floor(Math.random() * emptyHoles.length)];
-                            const isBomb = Math.random() > 0.8; // 20% chance for bomb
+                            const isBomb = Math.random() > 0.85; // Slightly fewer bombs initially
                             randomHole.type = isBomb ? 'bomb' : 'rabbit';
-                            randomHole.activeUntil = now + (isBomb ? 1200 : 800) + Math.random() * 400;
+                            randomHole.activeUntil = now + (isBomb ? activeDuration * 1.3 : activeDuration) + Math.random() * 100;
                         }
                     }
                     return next;
                 });
-            }, 400);
+
+                // Schedule next tick
+                gameLoopRef.current = setTimeout(spawnTick, currentInterval);
+            };
+
+            // Start the loop
+            gameLoopRef.current = setTimeout(spawnTick, 400);
 
             // Sync score interval
             syncIntervalRef.current = setInterval(() => {
@@ -161,7 +179,7 @@ export function ReactionWarGame({ onBack, userId, userName, partnershipId, initi
             }, 1000);
 
             return () => {
-                clearInterval(gameLoopRef.current);
+                clearTimeout(gameLoopRef.current);
                 clearInterval(syncIntervalRef.current);
                 clearInterval(timeTick);
             };
