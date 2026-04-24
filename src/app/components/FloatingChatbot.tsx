@@ -1,12 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Send, Sparkles, AlertCircle, Bot, Radio, Play, Pause } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-
-// Mock AI responses as fallback
-const getMockResponse = (text: string): string => {
-    return 'مرحباً! أنا لوفي 🤖. لم يتم تفعيل مفتاح الذكاء الاصطناعي الخاص بي بعد، لكنني هنا لأجلكم!';
-};
+import { X, Send, Radio, Play, Pause } from 'lucide-react';
 
 const getAIResponseStreaming = async (
     text: string, 
@@ -32,7 +26,9 @@ const getAIResponseStreaming = async (
                 const geoData = await geoRes.json();
                 placeName = geoData.display_name?.split(',').slice(0, 3).join(',') || placeName;
             }
-        } catch (e) {}
+        } catch (e) {
+            console.warn("Geolocation reverse geocoding failed", e);
+        }
     }
 
     const relationshipHistory = `
@@ -62,7 +58,8 @@ const getAIResponseStreaming = async (
                 "X-Title": "Ulfah App"
             },
             body: JSON.stringify({
-                model: "google/gemini-2.0-flash-lite-001",
+                model: "google/gemini-2.5-flash",
+                max_tokens: 1500,
                 messages: [
                     { role: "system", content: systemPrompt },
                     ...history.map(m => ({ 
@@ -105,12 +102,14 @@ const getAIResponseStreaming = async (
                             fullText += content;
                             onChunk(fullText);
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                        // Ignore parse error for incomplete chunks
+                    }
                 }
             }
         }
-    } catch (e: any) {
-        onChunk(`فشل الاتصال بـ لوفي: ${e.message}`);
+    } catch (e: unknown) {
+        onChunk(`فشل الاتصال بـ لوفي: ${(e as Error).message}`);
     }
 };
 
@@ -159,7 +158,7 @@ interface FloatingChatbotProps {
     partnershipId?: string | null;
 }
 
-export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, fullDbData, isFetchingDb }) => {
+export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, fullDbData, userId, partnershipId }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<any[]>([]);
     const [inputValue, setInputValue] = useState('');
@@ -167,6 +166,29 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
     const [isRadioPlaying, setIsRadioPlaying] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    const storageKey = `ulfah_chatbot_${partnershipId}_${userId}`;
+
+    // Load messages from memory
+    useEffect(() => {
+        if (!partnershipId || !userId) return;
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                setMessages(JSON.parse(saved));
+            } catch (e) {
+                console.error("Failed to parse chatbot memory", e);
+            }
+        }
+    }, [partnershipId, userId, storageKey]);
+
+    // Save messages to memory
+    useEffect(() => {
+        if (messages.length > 0 && partnershipId && userId) {
+            const messagesToSave = messages.slice(-50); // Keep last 50 messages to avoid quota limits
+            localStorage.setItem(storageKey, JSON.stringify(messagesToSave));
+        }
+    }, [messages, partnershipId, userId, storageKey]);
 
     useEffect(() => {
         if (!audioRef.current) {
@@ -216,8 +238,8 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isTyping]);
 
-    const handleSend = async (textOrEvent?: any) => {
-        const textToSend = (typeof textOrEvent === 'string') ? textOrEvent : inputValue;
+    const handleSend = async (textToSendArg?: string) => {
+        const textToSend = (typeof textToSendArg === 'string') ? textToSendArg : inputValue;
         if (!textToSend || !textToSend.trim() || isTyping) return;
 
         const newMsg = {
@@ -234,26 +256,26 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
         const detectsRadio = /راديو|موسيقى|شغل|اغنية|playlist/i.test(textToSend);
         const botMsgId = (Date.now() + 1).toString();
 
-        // Add placeholder message for the bot
-        setMessages(prev => [...prev, {
-            id: botMsgId,
-            text: '',
-            isBot: true,
-            isRadio: detectsRadio,
-            time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
-        }]);
-
-                        try {
+        try {
             let receivedFirstChunk = false;
             // Pass the current messages as history (limit to last 10 for performance)
             await getAIResponseStreaming(textToSend, messages.slice(-10), contextData, fullDbData, (updatedText) => {
-                if (!receivedFirstChunk && updatedText.length > 0) {
+                if (!receivedFirstChunk) {
                     setIsTyping(false);
                     receivedFirstChunk = true;
+                    // Add the bot message to the chat
+                    setMessages(prev => [...prev, {
+                        id: botMsgId,
+                        text: updatedText,
+                        isBot: true,
+                        isRadio: detectsRadio,
+                        time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+                    }]);
+                } else {
+                    setMessages(prev => prev.map(m => 
+                        m.id === botMsgId ? { ...m, text: updatedText } : m
+                    ));
                 }
-                setMessages(prev => prev.map(m => 
-                    m.id === botMsgId ? { ...m, text: updatedText } : m
-                ));
             });
             
             if (detectsRadio && !isRadioPlaying) {
@@ -268,6 +290,9 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
 
     const clearChat = () => {
         setMessages([]);
+        if (partnershipId && userId) {
+            localStorage.removeItem(storageKey);
+        }
         if (isRadioPlaying) toggleRadio();
     };
 
@@ -284,59 +309,62 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
                         style={{ height: '80vh', maxHeight: '720px' }}
                     >
                         {/* Header */}
-                        <div className="p-5 flex items-center justify-between border-b border-zinc-100 dark:border-white/5 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
+                        <div className="p-4 flex items-center justify-between border-b border-zinc-100 dark:border-white/5 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl shrink-0 z-30 shadow-sm relative">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-rose-500 shadow-sm">
-                                    <Bot size={20} />
+                                <div className="w-11 h-11 rounded-full bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center shadow-inner overflow-hidden border border-rose-100 dark:border-rose-900/50 p-0.5">
+                                    <img src="/luffy_normal.png" alt="Lufi" className="w-full h-full object-cover object-top rounded-full" />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-black text-zinc-900 dark:text-white flex items-center gap-2">
-                                        د. لوفي 👒
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                    <h3 className="text-base font-black text-zinc-900 dark:text-white flex items-center gap-2 leading-none mb-1">
+                                        د. لوفي
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
                                     </h3>
-                                    <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-tighter">محلل علاقات نشمي</p>
+                                    <p className="text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest">مستشار ألفة الذكي</p>
                                 </div>
                             </div>
                             <div className="flex gap-1.5">
-                                <button onClick={clearChat} className="w-9 h-9 rounded-xl bg-zinc-50 dark:bg-white/5 flex items-center justify-center text-zinc-400 hover:text-rose-500 transition-colors">
+                                <button onClick={clearChat} className="w-9 h-9 rounded-full bg-zinc-50 dark:bg-white/5 flex items-center justify-center text-zinc-400 hover:text-rose-500 hover:bg-rose-50 transition-all">
                                     <X size={14} className="rotate-45" />
                                 </button>
-                                <button onClick={() => setIsOpen(false)} className="w-9 h-9 rounded-xl bg-zinc-50 dark:bg-white/5 flex items-center justify-center text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+                                <button onClick={() => setIsOpen(false)} className="w-9 h-9 rounded-full bg-zinc-50 dark:bg-white/5 flex items-center justify-center text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-all">
                                     <X size={18} />
                                 </button>
                             </div>
                         </div>
 
                         {/* Messages Area */}
-                        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 scrollbar-hide bg-zinc-50/30 dark:bg-black/10">
+                        <div className="flex-1 overflow-y-auto px-5 py-6 space-y-6 scrollbar-hide bg-zinc-50/50 dark:bg-black/20 relative z-10">
+                            
                             {messages.map((msg) => (
                                 <motion.div
                                     key={msg.id}
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    className={`flex gap-3 ${msg.isBot ? 'flex-row' : 'flex-row-reverse'} items-start`}
+                                    className={`flex w-full ${msg.isBot ? 'justify-end' : 'justify-start'}`}
                                 >
-                                    {msg.isBot && (
-                                        <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500 shrink-0 mt-1 shadow-sm">
-                                            <Bot size={16} />
+                                    <div className={`flex gap-3 max-w-[85%] ${msg.isBot ? 'flex-row-reverse' : 'flex-row'} items-end`}>
+                                        {msg.isBot && (
+                                            <div className="w-8 h-8 rounded-full overflow-hidden bg-white dark:bg-zinc-800 shrink-0 shadow-sm border border-rose-100 dark:border-white/10 p-0.5 z-10">
+                                                <img src="/luffy_normal.png" alt="Lufi" className="w-full h-full object-cover object-top rounded-full" />
+                                            </div>
+                                        )}
+                                        <div className={`flex flex-col gap-1 w-full ${msg.isBot ? 'items-end' : 'items-start'}`}>
+                                            <div className={`rounded-[1.5rem] px-5 py-3.5 shadow-sm border relative z-10 ${msg.isBot
+                                                    ? 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border-zinc-100 dark:border-white/5 rounded-bl-sm'
+                                                    : 'bg-gradient-to-br from-rose-500 to-rose-600 text-white border-rose-600/20 rounded-br-sm shadow-rose-500/20'
+                                                }`}>
+                                                <p className="text-[14px] font-bold leading-relaxed whitespace-pre-wrap">
+                                                    {msg.text.split(/(\*\*.*?\*\*)/).map((part: string, i: number) => 
+                                                        part.startsWith('**') && part.endsWith('**') 
+                                                        ? <strong key={i} className={`font-black ${msg.isBot ? 'text-rose-600 dark:text-rose-400' : 'text-rose-100'}`}>{part.slice(2, -2)}</strong> 
+                                                        : part
+                                                    )}
+                                                </p>
+                                            </div>
+                                            <span className="text-[9px] font-black opacity-40 uppercase tracking-widest px-2">
+                                                {msg.time}
+                                            </span>
                                         </div>
-                                    )}
-                                    <div className={`flex flex-col gap-1 max-w-[80%] ${msg.isBot ? 'items-start' : 'items-end'}`}>
-                                        <div className={`rounded-2xl px-5 py-3.5 shadow-sm border ${msg.isBot
-                                                ? 'bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border-zinc-100 dark:border-white/5 rounded-tr-none'
-                                                : 'bg-rose-500 text-white border-rose-600/10 rounded-tl-none'
-                                            }`}>
-                                            <p className="text-sm font-bold leading-relaxed whitespace-pre-wrap">
-                                                {msg.text.split(/(\*\*.*?\*\*)/).map((part: string, i: number) => 
-                                                    part.startsWith('**') && part.endsWith('**') 
-                                                    ? <strong key={i} className="font-black text-rose-600 dark:text-rose-400">{part.slice(2, -2)}</strong> 
-                                                    : part
-                                                )}
-                                            </p>
-                                        </div>
-                                        <span className="text-[8px] font-black opacity-30 uppercase tracking-widest px-1">
-                                            {msg.time}
-                                        </span>
                                     </div>
                                 </motion.div>
                             ))}
@@ -345,25 +373,24 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
                                 <motion.div 
                                     initial={{ opacity: 0, x: 20 }}
                                     animate={{ opacity: 1, x: 0 }}
-                                    className="flex items-start gap-3"
+                                    className="flex w-full justify-end"
                                 >
-                                    <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-500 shrink-0 mt-1 shadow-sm animate-bounce">
-                                        <Bot size={16} />
-                                    </div>
-                                    <div className="bg-white dark:bg-zinc-800 px-4 py-2.5 rounded-2xl shadow-sm border border-rose-100 dark:border-white/5 flex items-center gap-3">
-                                        <div className="flex gap-1.5">
-                                            <motion.div animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                            <motion.div animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                            <motion.div animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                                    <div className="flex gap-3 max-w-[85%] flex-row-reverse items-end">
+                                        <div className="w-8 h-8 rounded-full overflow-hidden bg-white dark:bg-zinc-800 shrink-0 shadow-sm border border-rose-100 dark:border-white/10 p-0.5 z-10">
+                                            <img src="/luffy_thinking.png" alt="Lufi Thinking" className="w-full h-full object-cover object-top rounded-full" />
                                         </div>
-                                        <span className="text-[10px] font-black text-rose-500/60 uppercase tracking-widest">لوفي يفكر...</span>
+                                        <div className="bg-white dark:bg-zinc-800 px-5 py-4 rounded-[1.5rem] rounded-bl-sm shadow-sm border border-zinc-100 dark:border-white/5 flex items-center gap-2 relative z-10">
+                                            <div className="flex gap-1.5 flex-row-reverse">
+                                                <motion.div animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0 }} className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                                                <motion.div animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.2 }} className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                                                <motion.div animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.4 }} className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                                            </div>
+                                        </div>
                                     </div>
                                 </motion.div>
                             )}
-                            <div ref={messagesEndRef} />
+                            <div ref={messagesEndRef} className="h-4" />
                         </div>
-
-                        {/* Animated Lufi Avatar Indicator Removed from here and moved into message list flow */}
 
                         {/* Sticky Radio & Quick Start Area */}
                         <div className="p-5 bg-white/90 dark:bg-zinc-900/90 border-t border-zinc-100 dark:border-white/5 space-y-4 shrink-0">
@@ -418,12 +445,26 @@ export const FloatingChatbot: React.FC<FloatingChatbotProps> = ({ contextData, f
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-16 h-16 rounded-3xl bg-rose-500 text-white flex items-center justify-center shadow-xl shadow-rose-500/20 relative z-50 overflow-hidden"
+                className="w-[72px] h-[72px] rounded-full bg-white dark:bg-zinc-800 shadow-[0_10px_30px_rgba(244,63,94,0.3)] relative z-50 overflow-hidden border-[3px] border-rose-100 dark:border-rose-900/50 flex items-center justify-center group"
             >
-                <div className="absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity" />
-                <div className="text-3xl relative z-10 transition-transform">
-                    {isOpen ? <X size={28} /> : "👒"}
-                </div>
+                <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-rose-500/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <AnimatePresence mode="wait">
+                    {isOpen ? (
+                        <motion.div key="close" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} className="text-rose-500">
+                            <X size={32} />
+                        </motion.div>
+                    ) : (
+                        <motion.span 
+                            key="avatar" 
+                            initial={{ scale: 0.5, opacity: 0 }} 
+                            animate={{ scale: 1, opacity: 1 }} 
+                            exit={{ scale: 0.5, opacity: 0 }}
+                            className="text-[34px] drop-shadow-md"
+                        >
+                            👒
+                        </motion.span>
+                    )}
+                </AnimatePresence>
             </motion.button>
         </div>
     );

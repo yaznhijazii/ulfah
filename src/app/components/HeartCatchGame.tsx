@@ -28,14 +28,35 @@ export function HeartCatchGame({ onBack, userId, userName, partnershipId, initia
     const [score, setScore] = useState(0);
     const [partnerScore, setPartnerScore] = useState(0);
     const [items, setItems] = useState<FallingItem[]>([]);
+    const itemsRef = useRef<FallingItem[]>([]);
     const [bucketX, setBucketX] = useState(50); // percentage 0-100
+    const bucketXRef = useRef(50);
     const [highScore, setHighScore] = useState(0);
     const [roomId, setRoomId] = useState<string | null>(null);
+    const [playMode, setPlayMode] = useState<'partner' | 'bot'>('partner');
 
     const gameAreaRef = useRef<HTMLDivElement>(null);
     const requestRef = useRef<number | null>(null);
     const lastItemTime = useRef<number>(0);
     const scoreRef = useRef(0);
+
+    // Invite Handling
+    useEffect(() => {
+        if (initialCode) {
+            toast.success('تم الدخول للتحدي عبر الدعوة! 🔥');
+            setPlayMode('partner');
+        }
+    }, [initialCode]);
+
+    // Bot Logic
+    useEffect(() => {
+        if (gameState === 'playing' && playMode === 'bot') {
+            const interval = setInterval(() => {
+                setPartnerScore(prev => Math.max(0, prev + (Math.random() > 0.4 ? 10 : (Math.random() > 0.9 ? 50 : 0))));
+            }, 800);
+            return () => clearInterval(interval);
+        }
+    }, [gameState, playMode]);
 
     // Sync score to shared room
     useEffect(() => {
@@ -95,10 +116,13 @@ export function HeartCatchGame({ onBack, userId, userName, partnershipId, initia
         }
     }, [roomId, userId]);
 
-    const startGame = () => {
+    const startGame = (mode: 'partner' | 'bot') => {
+        setPlayMode(mode);
         setScore(0);
+        setPartnerScore(0);
         scoreRef.current = 0;
         setItems([]);
+        itemsRef.current = [];
         setGameState('playing');
         lastItemTime.current = Date.now();
     };
@@ -115,7 +139,7 @@ export function HeartCatchGame({ onBack, userId, userName, partnershipId, initia
 
         const now = Date.now();
         
-        // Spawn items
+        // Spawn new item
         if (now - lastItemTime.current > Math.max(400 - (scoreRef.current * 2), 150)) {
             const typeProb = Math.random();
             const type: FallingItem['type'] = typeProb > 0.85 ? 'bomb' : (typeProb < 0.1 ? 'gold' : 'heart');
@@ -126,41 +150,47 @@ export function HeartCatchGame({ onBack, userId, userName, partnershipId, initia
                 type,
                 speed: Math.random() * 2 + 3 + (scoreRef.current / 50)
             };
-            setItems(prev => [...prev, newItem]);
+            itemsRef.current.push(newItem);
             lastItemTime.current = now;
         }
 
-        // Update positions and collisions
-        setItems(prev => {
-            const nextItems: FallingItem[] = [];
-            for (const item of prev) {
-                const newY = item.y + item.speed;
-                
-                // Collision check (Y is around 85-95%)
-                if (newY > 82 && newY < 92 && Math.abs(item.x - bucketX) < 12) {
-                    if (item.type === 'heart') scoreRef.current += 10;
-                    else if (item.type === 'gold') scoreRef.current += 50;
-                    else if (item.type === 'bomb') {
-                        // Game Over or subtract? Let's go with life based or just subtract
-                        scoreRef.current = Math.max(0, scoreRef.current - 100);
-                        toast.error('احذر! نبضات سلبية 💣');
-                    }
-                    continue;
-                }
+        let hitBomb = false;
+        const nextItems: FallingItem[] = [];
 
-                if (newY < 110) {
-                    nextItems.push({ ...item, y: newY });
+        // Move existing items and check collisions
+        for (const item of itemsRef.current) {
+            const newY = item.y + item.speed;
+            
+            // Collision check
+            if (newY > 82 && newY < 92 && Math.abs(item.x - bucketXRef.current) < 12) {
+                if (item.type === 'heart') scoreRef.current += 10;
+                else if (item.type === 'gold') scoreRef.current += 50;
+                else if (item.type === 'bomb') {
+                    scoreRef.current = Math.max(0, scoreRef.current - 100);
+                    hitBomb = true;
                 }
+                continue;
             }
-            setScore(scoreRef.current);
-            return nextItems;
-        });
+
+            if (newY < 110) {
+                nextItems.push({ ...item, y: newY });
+            }
+        }
+
+        // Save back to ref and trigger render
+        itemsRef.current = nextItems;
+        setItems(nextItems);
+        setScore(scoreRef.current);
+
+        if (hitBomb) {
+            toast.error('احذر! نبضات سلبية 💣', { id: 'bomb-toast' });
+        }
 
         // Sync score occasionally
         if (Math.random() < 0.05) updateRemoteScore(scoreRef.current);
 
         requestRef.current = requestAnimationFrame(animate);
-    }, [gameState, bucketX, updateRemoteScore]);
+    }, [gameState, updateRemoteScore]);
 
     useEffect(() => {
         if (gameState === 'playing') {
@@ -176,7 +206,9 @@ export function HeartCatchGame({ onBack, userId, userName, partnershipId, initia
         const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
         const rect = gameAreaRef.current.getBoundingClientRect();
         const x = ((clientX - rect.left) / rect.width) * 100;
-        setBucketX(Math.max(5, Math.min(95, x)));
+        const newX = Math.max(5, Math.min(95, x));
+        setBucketX(newX);
+        bucketXRef.current = newX;
     };
 
     return (
@@ -189,19 +221,21 @@ export function HeartCatchGame({ onBack, userId, userName, partnershipId, initia
             </div>
 
             {/* Header / HUD */}
-            <div className="z-10 p-6 flex justify-between items-center bg-black/40 backdrop-blur-md border-b border-white/5">
+            <div className="z-10 px-8 py-5 flex justify-between items-center bg-black/50 backdrop-blur-xl border-b border-white/10 shadow-lg">
                 <div className="flex flex-col">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-rose-400">سكورك</span>
-                    <span className="text-3xl font-black">{score}</span>
+                    <span className="text-[11px] font-black uppercase tracking-widest text-rose-400 mb-1">سكورك</span>
+                    <span className="text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(244,63,94,0.5)]">{score}</span>
                 </div>
                 <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 mb-1">
-                        <Heart className="w-6 h-6 text-rose-500 fill-rose-500 animate-pulse" />
+                    <div className="w-14 h-14 rounded-[1.2rem] bg-gradient-to-b from-white/10 to-white/5 flex items-center justify-center border border-white/20 shadow-inner">
+                        <Heart className="w-8 h-8 text-rose-500 fill-rose-500 animate-pulse drop-shadow-md" />
                     </div>
                 </div>
                 <div className="flex flex-col items-end">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">سكور نور</span>
-                    <span className="text-3xl font-black">{partnerScore}</span>
+                    <span className="text-[11px] font-black uppercase tracking-widest text-indigo-400 mb-1">
+                        {playMode === 'bot' ? 'سكور لوفي 🤖' : 'سكور الشريك'}
+                    </span>
+                    <span className="text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(99,102,241,0.5)]">{partnerScore}</span>
                 </div>
             </div>
 
@@ -210,23 +244,36 @@ export function HeartCatchGame({ onBack, userId, userName, partnershipId, initia
                 ref={gameAreaRef}
                 onMouseMove={handleMouseMove}
                 onTouchMove={handleMouseMove}
-                className="flex-1 relative overflow-hidden bg-gradient-to-b from-transparent to-rose-500/5 cursor-none"
+                className="flex-1 relative overflow-hidden bg-gradient-to-b from-slate-900/50 to-rose-900/10 cursor-none"
             >
+                {/* Visual grid effect */}
+                <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+
                 {gameState === 'menu' && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-10 text-center z-20">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
                         <motion.div 
-                            initial={{ scale: 0.9, opacity: 0 }} 
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-[3rem] shadow-2xl"
+                            initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            className="w-full max-w-sm bg-zinc-950/80 backdrop-blur-2xl border border-white/10 p-8 rounded-[3rem] shadow-[0_30px_60px_rgba(0,0,0,0.6)]"
                         >
-                            <div className="w-20 h-20 bg-rose-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-rose-500/20">
-                                <Gamepad2 className="w-10 h-10 text-white" />
+                            <div className="w-24 h-24 bg-gradient-to-br from-rose-400 to-pink-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-rose-500/30 border border-white/20">
+                                <Gamepad2 className="w-12 h-12 text-white" />
                             </div>
-                            <h2 className="text-3xl font-black mb-4">صياد القلوب ❤️🎯</h2>
-                            <p className="text-sm text-white/50 mb-8 font-bold">حرّك السلة ولُمّ القلوب من السما..<br/>وابعد عن القنابل عشان تظل "ألفة"!</p>
-                            <Button onClick={startGame} className="w-full h-16 rounded-2xl bg-rose-500 hover:bg-rose-600 text-lg font-black shadow-lg shadow-rose-500/30">
-                                يلا نبلش! 🚀
-                            </Button>
+                            <h2 className="text-3xl font-black mb-3 text-white tracking-tight">صياد القلوب ❤️🎯</h2>
+                            <p className="text-[13px] text-white/50 mb-8 font-bold leading-relaxed">
+                                حرّك السلة ولُمّ القلوب من السما..<br/>وابعد عن القنابل عشان تظل "ألفة"!
+                            </p>
+                            <div className="flex flex-col gap-3">
+                                <Button onClick={() => startGame('partner')} className="w-full h-16 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-lg font-black shadow-lg shadow-rose-500/30 border border-rose-400/50">
+                                    لعب مع الشريك 👩‍❤️‍👨
+                                </Button>
+                                <Button onClick={() => startGame('bot')} className="w-full h-16 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-lg font-black shadow-md border border-white/5 text-white/80 transition-colors">
+                                    لعب ضد لوفي 🤖
+                                </Button>
+                            </div>
+                            <button onClick={onBack} className="mt-6 text-[12px] font-black text-white/30 hover:text-white/70 uppercase tracking-widest transition-colors">
+                                عودة للقائمة
+                            </button>
                         </motion.div>
                     </div>
                 )}
@@ -276,15 +323,15 @@ export function HeartCatchGame({ onBack, userId, userName, partnershipId, initia
                             <div className="w-24 h-24 bg-amber-500 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-2xl rotate-12">
                                 <Trophy className="w-12 h-12 text-white" />
                             </div>
-                            <h2 className="text-4xl font-black">جولة رهيبة! 👏</h2>
-                            <p className="text-xl font-bold text-rose-400">جمعت {score} نقطة مودة</p>
+                            <h2 className="text-4xl font-black text-white">جولة رهيبة! 👏</h2>
+                            <p className="text-xl font-bold text-rose-400 bg-rose-500/10 px-6 py-2 rounded-full mx-auto inline-block border border-rose-500/20">جمعت {score} نقطة مودة</p>
                             {score > partnerScore ? (
-                                <p className="text-sm font-black text-emerald-400">أنت حالياً متصدر على نور! 🔥</p>
+                                <p className="text-[15px] font-black text-emerald-400">أنت حالياً متصدر! 🔥</p>
                             ) : (
-                                <p className="text-sm font-black text-indigo-400">نور لسا متقدمة عليك.. شدّ حيلك! 💪</p>
+                                <p className="text-[15px] font-black text-indigo-400">خصمك متقدم عليك.. شدّ حيلك! 💪</p>
                             )}
                             <div className="flex gap-4 pt-6">
-                                <Button onClick={startGame} className="flex-1 h-16 rounded-2xl bg-rose-500 font-black text-lg">مرة ثانية؟</Button>
+                                <Button onClick={() => startGame(playMode)} className="flex-1 h-16 rounded-2xl bg-rose-500 hover:bg-rose-600 font-black text-lg border border-rose-400 shadow-lg shadow-rose-500/30">مرة ثانية؟</Button>
                                 <Button onClick={onBack} variant="outline" className="flex-1 h-16 rounded-2xl border-white/10 bg-white/5 font-black text-lg">الرجوع</Button>
                             </div>
                         </motion.div>

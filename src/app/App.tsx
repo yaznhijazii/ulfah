@@ -16,11 +16,13 @@ import { WishlistScreen } from './components/WishlistScreen';
 import { HomeBoxScreen } from './components/HomeBoxScreen';
 import { PlaylistScreen } from './components/PlaylistScreen';
 import { EveningJournalScreen } from './components/EveningJournalScreen';
+import { DecisionMakerScreen } from './components/DecisionMakerScreen';
 import { supabase } from '../lib/supabase';
 import { preloadCalendar } from '../lib/calendarService';
 import { useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster } from 'sonner';
+import { GameInvitePopup } from './components/GameInvitePopup';
 
 type Screen =
   | 'login'
@@ -38,7 +40,8 @@ type Screen =
   | 'wishlist'
   | 'home_box'
   | 'playlist'
-  | 'evening_journal';
+  | 'evening_journal'
+  | 'decision_maker';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
@@ -222,6 +225,8 @@ function App() {
         return <LoveNotesScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
       case 'finance':
         return <FinanceScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} isDarkMode={isDarkMode} />;
+      case 'decision_maker':
+        return <DecisionMakerScreen onBack={() => handleNavigate('home')} isDarkMode={isDarkMode} userId={userId} partnershipId={partnershipId} />;
       case 'adventure_bucket':
         return <AdventureBucketScreen onNavigate={handleNavigate} userId={userId} partnershipId={partnershipId} />;
       case 'occasion':

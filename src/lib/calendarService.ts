@@ -10,7 +10,7 @@ export interface CacheEntry {
 
 const _sessionCache: Record<string, CacheEntry> = {};
 const CACHE_TTL = 30 * 60 * 1000; // Increased to 30 minutes for better background persistence
-export const PAGE_SIZE = 6;
+export const PAGE_SIZE = 100;
 
 export function readCache(pid: string): CacheEntry | null {
   const c = _sessionCache[pid];
@@ -65,6 +65,34 @@ export async function preloadCalendar(pid: string, userId: string): Promise<void
         hasMore: memRes.data.length >= PAGE_SIZE
       });
       console.log('[CalendarPreloader] Background sync complete. Ready for instant load.');
+
+      // Silently preload images into the browser's HTTP cache
+      // so they appear instantly when the user navigates to the Calendar screen
+      const imageUrlsToPreload = new Set<string>();
+      
+      // Extract from memories
+      memRes.data.forEach((mem: any) => {
+        if (mem.images && Array.isArray(mem.images)) {
+          mem.images.forEach((img: any) => {
+            if (img.image_url) imageUrlsToPreload.add(img.image_url);
+          });
+        }
+      });
+
+      // Extract from events (if they have images)
+      if (evRes.data) {
+        evRes.data.forEach((ev: any) => {
+          if (ev.image_url) imageUrlsToPreload.add(ev.image_url);
+        });
+      }
+
+      // Fire off preloads
+      Array.from(imageUrlsToPreload).forEach(url => {
+        const img = new Image();
+        img.src = url;
+      });
+      
+      console.log(`[CalendarPreloader] Preloading ${imageUrlsToPreload.size} images...`);
     }
   } catch (error) {
     console.error('[CalendarPreloader] Background sync failed:', error);

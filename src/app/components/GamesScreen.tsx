@@ -8,13 +8,11 @@ import {
 import { BoomBoomGame } from './BoomBoomGame';
 import { WordGuessGame } from './WordGuessGame';
 import { NumberGuessGame } from './NumberGuessGame';
-import { MindSyncGame } from './MindSyncGame';
 import { MemoryMapGame } from './MemoryMapGame';
 import { PartnerPredictGame } from './PartnerPredictGame';
 import { IfIWereYouGame } from './IfIWereYouGame';
 import { EmojiMoodGame } from './EmojiMoodGame';
 import { ReactionWarGame } from './ReactionWarGame';
-import { HeartCatchGame } from './HeartCatchGame';
 import { supabase } from '../../lib/supabase';
 
 interface GamesScreenProps {
@@ -28,16 +26,6 @@ interface GamesScreenProps {
 }
 
 const ALL_GAMES = [
-  {
-    id: 'mind-sync',
-    title: 'تزامن الأرواح',
-    desc: 'هل تفكران بنفس الشيء الآن؟',
-    icon: Zap,
-    category: 'connection',
-    badge: 'الأكثر لعباً',
-    gradient: 'from-rose-500 via-pink-500 to-violet-600',
-    iconGradient: 'from-rose-400 to-violet-600',
-  },
   {
     id: 'partner-predict',
     title: 'ماذا يختار شريكك؟',
@@ -82,17 +70,6 @@ const ALL_GAMES = [
     cover: '/Untitled.png',
   },
   {
-    id: 'footprint-trail',
-    title: 'أثر الخطوات',
-    desc: 'اكتشف كم يعرف شريكك عن يومياتك وتفاصيلك!',
-    icon: MapPin,
-    category: 'connection',
-    badge: 'يوميات 👣',
-    gradient: 'from-emerald-400 to-teal-600',
-    iconGradient: 'from-emerald-400 to-teal-600',
-    cover: '/Pixelated-Heart-Transparent.png'
-  },
-  {
     id: 'word-guess',
     title: 'لعبة الكلمة',
     desc: 'ذكاء وتواصل ممتع',
@@ -132,17 +109,6 @@ const ALL_GAMES = [
     gradient: 'from-indigo-600 to-blue-700',
     iconGradient: 'from-indigo-500 to-blue-600',
     cover: '/Gemini_Generated_Image_eoxlcdeoxlcdeoxl-removebg-preview.png',
-  },
-  {
-    id: 'heart-catch',
-    title: 'صياد القلوب',
-    desc: 'لمّ القلوب وابعد عن النبض السيء!',
-    icon: Heart,
-    category: 'adventure',
-    badge: 'إدمان 🎯',
-    gradient: 'from-rose-500 to-pink-600',
-    iconGradient: 'from-rose-400 to-pink-500',
-    cover: '/Gemini_Generated_Image_2fgsx62fgsx62fgs-removebg-preview.png',
   },
 ];
 
@@ -257,13 +223,10 @@ export function GamesScreen({
     });
   }, [searchTerm, activeCategory]);
 
-  // Show mind-sync as hero only when browsing "all" with no search
-  const showHero = !searchTerm && activeCategory === 'all';
-  const heroGame = ALL_GAMES[0]; // mind-sync
-  const gridGames = filteredGames.filter(g => !showHero || g.id !== 'mind-sync');
+  const gridGames = filteredGames;
 
   return (
-    <div dir="rtl" className="flex-1 bg-zinc-950 flex flex-col relative overflow-hidden h-full font-sans">
+    <div dir="rtl" className="flex-1 bg-slate-50 dark:bg-zinc-950 flex flex-col relative overflow-hidden h-full font-sans transition-colors duration-500">
 
       {/* ─── Ambient Particles Layer ─── */}
       <div className="fixed inset-0 pointer-events-none z-0">
@@ -282,8 +245,8 @@ export function GamesScreen({
       {/* ─── SMART THEMED HEADER ─── */}
       <header className={`px-6 z-40 sticky top-0 transition-all duration-500 border-b ${
         selectedGame 
-          ? 'pt-4 pb-3 bg-[#fcfbf7]/90 backdrop-blur-xl border-black/5 shadow-sm' 
-          : 'pt-10 pb-6 bg-zinc-950/80 backdrop-blur-3xl border-white/5 shadow-[0_10px_40px_rgba(0,0,0,0.5)]'
+          ? 'pt-4 pb-3 bg-white/90 dark:bg-[#fcfbf7]/90 backdrop-blur-xl border-slate-200 dark:border-black/5 shadow-sm' 
+          : 'pt-10 pb-6 bg-slate-50/80 dark:bg-zinc-950/80 backdrop-blur-3xl border-slate-200/50 dark:border-white/5 shadow-sm dark:shadow-[0_10px_40px_rgba(0,0,0,0.5)]'
       }`}>
 
         {/* Top Operation Row */}
@@ -294,18 +257,18 @@ export function GamesScreen({
             onClick={() => selectedGame !== null ? setSelectedGame(null) : onNavigate('home')}
             className={`flex items-center justify-center rounded-2xl border transition-all duration-500 ${
               selectedGame
-                ? 'w-10 h-10 bg-black/5 border-black/5'
-                : 'w-12 h-12 bg-white/5 border-white/10 shadow-xl'
+                ? 'w-10 h-10 bg-slate-100 dark:bg-black/5 border-slate-200 dark:border-black/5'
+                : 'w-12 h-12 bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 shadow-sm dark:shadow-xl'
             }`}
           >
-            <ArrowLeft className={`w-5 h-5 transition-colors ${selectedGame ? 'text-black/40' : 'text-white/70'}`} />
+            <ArrowLeft className={`w-5 h-5 transition-colors ${selectedGame ? 'text-slate-500 dark:text-black/40' : 'text-slate-600 dark:text-white/70'}`} />
           </motion.button>
 
           <div className="text-center">
-            <h1 className={`font-black italic tracking-tighter flex items-center justify-center gap-3 transition-all duration-500 ${
+            <h1 className={`font-black tracking-tighter flex items-center justify-center gap-3 transition-all duration-500 ${
               selectedGame 
-                ? 'text-lg text-black/80' 
-                : 'text-2xl text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]'
+                ? 'text-lg text-slate-800 dark:text-black/80' 
+                : 'text-2xl text-slate-900 dark:text-white dark:drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]'
             }`}>
               {selectedGame
                 ? ALL_GAMES.find(g => g.id === selectedGame)?.title
@@ -319,11 +282,11 @@ export function GamesScreen({
             </h1>
             {!selectedGame && (
               <div className="flex items-center justify-center gap-2 mt-1">
-                 <div className="h-[1px] w-4 bg-white/10" />
-                 <span className="text-[9px] font-black text-white/30 uppercase tracking-[0.4em]">
+                 <div className="h-[1px] w-4 bg-slate-300 dark:bg-white/10" />
+                 <span className="text-[9px] font-black text-slate-400 dark:text-white/30 uppercase tracking-[0.4em]">
                     Digital Arena v2.0
                  </span>
-                 <div className="h-[1px] w-4 bg-white/10" />
+                 <div className="h-[1px] w-4 bg-slate-300 dark:bg-white/10" />
               </div>
             )}
           </div>
@@ -333,8 +296,8 @@ export function GamesScreen({
             whileTap={{ scale: 0.9 }}
             className={`flex items-center justify-center rounded-2xl border transition-all duration-500 ${
               selectedGame
-                ? 'w-10 h-10 bg-amber-500/10 border-amber-500/20 shadow-none'
-                : 'w-12 h-12 bg-gradient-to-br from-amber-400/20 to-orange-600/20 border-amber-500/30 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
+                ? 'w-10 h-10 bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 shadow-none'
+                : 'w-12 h-12 bg-gradient-to-br from-amber-50 dark:from-amber-400/20 to-orange-100 dark:to-orange-600/20 border-amber-200 dark:border-amber-500/30 shadow-sm dark:shadow-[0_0_20px_rgba(245,158,11,0.2)]'
             }`}
           >
             <Trophy className={`w-5 h-5 text-amber-500 transition-all ${selectedGame ? '' : 'drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]'}`} />
@@ -356,9 +319,9 @@ export function GamesScreen({
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 dir="rtl"
-                className="w-full h-14 bg-white/[0.03] border border-white/5 rounded-2xl px-6 pl-14 text-[13px] font-bold text-white outline-none focus:border-indigo-500/50 focus:bg-white/[0.05] focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-white/10"
+                className="w-full h-14 bg-white dark:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl px-6 pl-14 text-[13px] font-bold text-slate-800 dark:text-white outline-none focus:border-indigo-500/50 focus:bg-white dark:focus:bg-white/[0.05] focus:ring-4 focus:ring-indigo-500/10 transition-all placeholder:text-slate-400 dark:placeholder:text-white/10 shadow-sm"
               />
-              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-indigo-400 transition-colors" />
+              <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/20 group-focus-within:text-indigo-500 dark:group-focus-within:text-indigo-400 transition-colors" />
               
               <AnimatePresence>
                 {searchTerm && (
@@ -387,10 +350,10 @@ export function GamesScreen({
                     className={`flex-shrink-0 flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-[10px] font-black transition-all duration-300 border ${
                       active
                         ? 'bg-indigo-600 text-white border-indigo-400 shadow-[0_0_20px_rgba(79,70,229,0.4)]'
-                        : 'bg-white/5 border-white/5 text-white/40 hover:bg-white/10 hover:text-white/70'
+                        : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/5 text-slate-500 dark:text-white/40 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-800 dark:hover:text-white/70 shadow-sm dark:shadow-none'
                     }`}
                   >
-                    <cat.icon className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-white/30'}`} />
+                    <cat.icon className={`w-3.5 h-3.5 ${active ? 'text-white' : 'text-slate-400 dark:text-white/30'}`} />
                     <span className="tracking-wide">{cat.title}</span>
                   </motion.button>
                 );
@@ -412,7 +375,7 @@ export function GamesScreen({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.25 }}
-              className="absolute inset-0 overflow-y-auto px-5 pt-8 pb-36 bg-[#02040a]"
+              className="absolute inset-0 overflow-y-auto px-5 pt-8 pb-36 bg-slate-50 dark:bg-[#02040a] transition-colors duration-500"
               style={{ scrollbarWidth: 'none' }}
             >
               {/* Global Cosmic Backdrop */}
@@ -429,7 +392,7 @@ export function GamesScreen({
                 <motion.div 
                    initial={{ y: -30, opacity: 0 }}
                    animate={{ y: 0, opacity: 1 }}
-                   className="col-span-2 relative p-7 rounded-[3rem] bg-zinc-900/60 backdrop-blur-3xl border border-white/5 shadow-[0_30px_70px_rgba(0,0,0,0.7)] overflow-hidden mb-4"
+                   className="col-span-2 relative p-7 rounded-[3rem] bg-white dark:bg-zinc-900/60 backdrop-blur-3xl border border-slate-200 dark:border-white/5 shadow-xl dark:shadow-[0_30px_70px_rgba(0,0,0,0.7)] overflow-hidden mb-4 transition-colors duration-500"
                 >
                    {/* Scanning Line Animation */}
                    <motion.div 
@@ -454,12 +417,12 @@ export function GamesScreen({
                                   <span className="text-[10px] font-black uppercase text-indigo-400 tracking-[0.3em] font-mono">Rank: {stats.level > 10 ? 'Legendary' : 'Novice'}</span>
                                   <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
                                </div>
-                               <h2 className="text-2xl font-black text-white italic tracking-tighter drop-shadow-lg uppercase">أساطير أولفـة (LVL {stats.level})</h2>
+                               <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter drop-shadow-md dark:drop-shadow-lg uppercase">أساطير أولفـة (LVL {stats.level})</h2>
                             </div>
                          </div>
                          <div className="flex -space-x-3">
                             {Array.from({ length: stats.hearts }).map((_, i) => (
-                               <div key={i} className="w-11 h-11 rounded-full bg-zinc-900 border-2 border-zinc-800 flex items-center justify-center shadow-xl">
+                               <div key={i} className="w-11 h-11 rounded-full bg-slate-100 dark:bg-zinc-900 border-2 border-slate-200 dark:border-zinc-800 flex items-center justify-center shadow-sm dark:shadow-xl transition-colors">
                                   <Heart className="w-6 h-6 text-rose-500 fill-rose-500 drop-shadow-[0_0_12px_rgba(244,63,94,1)]" />
                                </div>
                             ))}
@@ -467,83 +430,17 @@ export function GamesScreen({
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
-                         <div className="bg-white/5 rounded-2xl p-4 border border-white/5 backdrop-blur-md">
-                            <span className="block text-[8px] font-black text-white/40 uppercase mb-1 tracking-widest">Global XP</span>
-                            <span className="text-[1.3rem] font-black text-white font-mono leading-none tracking-tight">{stats.xp.toLocaleString()} <span className="text-[10px] opacity-20 font-sans ml-1 text-white">XP</span></span>
+                         <div className="bg-slate-100 dark:bg-white/5 rounded-2xl p-4 border border-slate-200 dark:border-white/5 backdrop-blur-md transition-colors">
+                            <span className="block text-[8px] font-black text-slate-500 dark:text-white/40 uppercase mb-1 tracking-widest">Global XP</span>
+                            <span className="text-[1.3rem] font-black text-slate-900 dark:text-white font-mono leading-none tracking-tight">{stats.xp.toLocaleString()} <span className="text-[10px] opacity-50 dark:opacity-20 font-sans ml-1 text-slate-900 dark:text-white">XP</span></span>
                          </div>
-                         <div className="bg-white/5 rounded-2xl p-4 border border-white/5 backdrop-blur-md">
-                            <span className="block text-[8px] font-black text-white/40 uppercase mb-1 tracking-widest">Win Streak</span>
-                            <span className="text-[1.3rem] font-black text-rose-500 font-mono leading-none tracking-tight">{stats.streak} <span className="text-[10px] opacity-20 font-sans ml-1 text-white uppercase italic font-black">Days</span></span>
+                         <div className="bg-slate-100 dark:bg-white/5 rounded-2xl p-4 border border-slate-200 dark:border-white/5 backdrop-blur-md transition-colors">
+                            <span className="block text-[8px] font-black text-slate-500 dark:text-white/40 uppercase mb-1 tracking-widest">Win Streak</span>
+                            <span className="text-[1.3rem] font-black text-rose-500 font-mono leading-none tracking-tight">{stats.streak} <span className="text-[10px] opacity-50 dark:opacity-20 font-sans ml-1 text-slate-900 dark:text-white uppercase font-black">Days</span></span>
                          </div>
                       </div>
                    </div>
                 </motion.div>
-
-                {/* ═══ HERO CARD (Mind Sync) ═══ */}
-                {showHero && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ type: 'spring', stiffness: 70, damping: 18 }}
-                    className="col-span-2"
-                  >
-                    <motion.button
-                      whileTap={{ scale: 0.975 }}
-                      onClick={() => setSelectedGame('mind-sync')}
-                      className="w-full h-[250px] rounded-[3.8rem] relative overflow-hidden group shadow-[0_50px_100px_rgba(0,0,0,0.8)] text-right border border-white/10"
-                    >
-                      {/* Interactive Gaming Core BG */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-[#0c0d12] via-[#1a1b25] to-[#252a44]" />
-                      <div className="absolute inset-0 opacity-[0.06] mix-blend-overlay" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
-                      
-                      {/* Pulsing Core */}
-                      <motion.div 
-                        animate={{ scale: [1, 1.3, 1], opacity: [0.1, 0.2, 0.1] }}
-                        transition={{ duration: 6, repeat: Infinity }}
-                        className="absolute inset-0 bg-indigo-500 blur-[120px] rounded-full"
-                      />
-
-                      {/* Content Stack */}
-                      <div className="absolute inset-0 p-9 flex flex-col justify-between relative z-10">
-                        <div className="flex items-start justify-between">
-                          <div className="flex flex-col items-start gap-1">
-                             <div className="bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 px-4 py-1.5 rounded-2xl flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                                <span className="text-[9px] font-black uppercase tracking-[0.2em]">{heroGame.badge}</span>
-                             </div>
-                          </div>
-                          <motion.div 
-                             animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.1, 1] }}
-                             transition={{ duration: 5, repeat: Infinity }}
-                             className="w-20 h-20 bg-white/5 backdrop-blur-3xl rounded-[2.2rem] flex items-center justify-center border border-white/10 shadow-2xl"
-                          >
-                             <Zap className="w-10 h-10 text-indigo-400 fill-indigo-400/30" />
-                          </motion.div>
-                        </div>
-
-                        <div className="text-right">
-                          <h2 className="text-[2.8rem] font-black text-white leading-[0.85] tracking-tighter italic mb-3 drop-shadow-[0_10px_10px_rgba(0,0,0,0.8)]">
-                             {heroGame.title}
-                          </h2>
-                          <p className="text-[13px] font-bold text-indigo-200/50 mb-7 max-w-[320px] mr-0 ml-auto leading-relaxed">
-                             {heroGame.desc}
-                          </p>
-                          <div className="flex justify-end">
-                             <div className="bg-white text-zinc-950 px-9 py-3.5 rounded-2xl text-[12px] font-black shadow-[0_20px_40px_rgba(255,255,255,0.15)] group-hover:scale-110 group-hover:bg-indigo-50 transition-all flex items-center gap-3 active:scale-90">
-                                ENTER CHALLENGE
-                                <div className="w-6 h-6 rounded-lg bg-zinc-950 flex items-center justify-center">
-                                   <Play className="w-3 h-3 text-white fill-current translate-x-[0.5px]" />
-                                </div>
-                             </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Animated Scanner side */}
-                      <div className="absolute top-0 right-0 w-2 h-full bg-gradient-to-b from-indigo-500 to-rose-500 shadow-[0_0_30px_rgba(99,102,241,1)]" />
-                    </motion.button>
-                  </motion.div>
-                )}
 
                 {/* ═══ PRO CYBER GAME TILES ═══ */}
                 {gridGames.map((game, idx) => {
@@ -557,10 +454,10 @@ export function GamesScreen({
                       whileHover={{ y: -12 }}
                       whileTap={{ scale: 0.96 }}
                       onClick={() => setSelectedGame(game.id)}
-                      className="col-span-2 h-[175px] relative rounded-[3.2rem] overflow-hidden text-right border border-white/5 shadow-2xl group transition-all"
+                      className="col-span-2 h-[175px] relative rounded-[3.2rem] overflow-hidden text-right border border-slate-200 dark:border-white/5 shadow-md dark:shadow-2xl group transition-all"
                     >
                       {/* Material: Frosted Void Glass */}
-                      <div className="absolute inset-0 bg-zinc-950/80 group-hover:bg-zinc-900/90 transition-all duration-500" />
+                      <div className="absolute inset-0 bg-white/80 dark:bg-zinc-950/80 group-hover:bg-slate-50/90 dark:group-hover:bg-zinc-900/90 transition-all duration-500" />
                       <div className="absolute inset-0 opacity-[0.05] mix-blend-overlay pointer-events-none" style={{ backgroundImage: 'url("https://grainy-gradients.vercel.app/noise.svg")' }} />
                       
                       {/* Aura Glow */}
@@ -571,12 +468,12 @@ export function GamesScreen({
                          
                          {/* LEFT: Operation Panel */}
                          <div className="flex flex-col justify-between h-full py-2">
-                            <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md w-fit flex items-center gap-2">
-                               <div className="w-2 h-2 rounded-full bg-green- green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
-                               <span className="text-[8px] font-black text-white/50 uppercase tracking-[0.2em] font-mono">Status: Ready</span>
+                            <div className="px-3 py-1 rounded-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 backdrop-blur-md w-fit flex items-center gap-2 transition-colors">
+                               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
+                               <span className="text-[8px] font-black text-slate-500 dark:text-white/50 uppercase tracking-[0.2em] font-mono">Status: Ready</span>
                             </div>
 
-                            <div className="group/btn relative px-6 py-3 rounded-2xl bg-white/5 text-white/40 border border-white/10 hover:bg-white hover:text-zinc-950 hover:shadow-[0_15px_30px_rgba(255,255,255,0.1)] transition-all flex items-center gap-3">
+                            <div className="group/btn relative px-6 py-3 rounded-2xl bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-white/40 border border-slate-200 dark:border-white/10 hover:bg-slate-800 dark:hover:bg-white hover:text-white dark:hover:text-zinc-950 hover:shadow-lg dark:hover:shadow-[0_15px_30px_rgba(255,255,255,0.1)] transition-all flex items-center gap-3">
                                <Play className="w-3 h-3 fill-current" />
                                <span className="text-[10px] font-black uppercase tracking-[0.1em]">Engage</span>
                             </div>
@@ -587,10 +484,10 @@ export function GamesScreen({
                             <div className="mb-1">
                                <span className="text-[8px] font-black text-indigo-400/60 uppercase tracking-widest">{game.category}</span>
                             </div>
-                            <h4 className="text-[1.8rem] font-black text-white tracking-tighter leading-none mb-1.5 transition-all">
+                            <h4 className="text-[1.8rem] font-black text-slate-900 dark:text-white tracking-tighter leading-none mb-1.5 transition-all">
                                {game.title}
                             </h4>
-                            <p className="text-[11px] font-bold text-white/30 leading-snug max-w-[220px] mr-0 ml-auto italic">
+                            <p className="text-[11px] font-bold text-slate-500 dark:text-white/30 leading-snug max-w-[220px] mr-0 ml-auto italic">
                                {game.desc}
                             </p>
                          </div>
@@ -655,9 +552,7 @@ export function GamesScreen({
               transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               className="absolute inset-0 overflow-hidden"
             >
-              {selectedGame === 'mind-sync' ? (
-                <MindSyncGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
-              ) : selectedGame === 'memory-map' || selectedGame === 'footprint-trail' ? (
+              {selectedGame === 'memory-map' ? (
                 <MemoryMapGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               ) : selectedGame === 'partner-predict' ? (
                 <PartnerPredictGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
@@ -673,10 +568,8 @@ export function GamesScreen({
                 <BoomBoomGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               ) : selectedGame === 'reaction-war' ? (
                 <ReactionWarGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
-              ) : selectedGame === 'heart-catch' ? (
-                <HeartCatchGame onBack={() => setSelectedGame(null)} userId={userId} userName={userName} partnershipId={partnershipId} initialCode={initialCode} />
               ) : (
-                <div className="flex items-center justify-center h-full text-white/20 font-black">قريباً..</div>
+                <div className="flex items-center justify-center h-full text-slate-400 dark:text-white/20 font-black">قريباً..</div>
               )}
             </motion.div>
           )}

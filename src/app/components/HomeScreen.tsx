@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     Settings, Heart, Sparkles, ChevronLeft, MapPin, Compass, Gift, Moon, Sun,
     ShieldCheck, Target, Zap, Navigation, User, Calendar, ArrowUpRight,
-    Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet, Lock, Music, Armchair, Mail, LayoutGrid, Smile
+    Cloud, Camera, Bell, Share2, Layout, Clock, Feather, Wallet, Lock, Music, Armchair, Mail, LayoutGrid, Smile, UtensilsCrossed
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { Button } from './ui/button';
@@ -274,7 +274,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
         { id: 'happy', icon: Sun, label: 'بخير 😊', color: 'text-amber-500', bg: 'bg-amber-500/10', glow: 'shadow-amber-500/20' },
         { id: 'calm', icon: ShieldCheck, label: 'مرتاح 😌', color: 'text-emerald-500', bg: 'bg-emerald-500/10', glow: 'shadow-emerald-500/20' },
         { id: 'tired', icon: Moon, label: 'تعبان 😴', color: 'text-indigo-500', bg: 'bg-indigo-500/10', glow: 'shadow-indigo-500/20' },
-        { id: 'sad', icon: Cloud, label: 'مو بمزاجي 🌧️', color: 'text-rose-500', bg: 'bg-rose-500/10', glow: 'shadow-rose-500/20' },
+        { id: 'sad', icon: Cloud, label: 'متضايق 🌧️', color: 'text-rose-500', bg: 'bg-rose-500/10', glow: 'shadow-rose-500/20' },
     ], []);
     const gardenInfo = useMemo(() => {
         const points = (statsCount.notes * 2) + (statsCount.memories * 3) + (statsCount.adventures * 5) + (statsCount.commitments * 5) + (statsCount.songs * 1);
@@ -726,6 +726,7 @@ export function HomeScreen({ onNavigate, userId, partnershipId, isDarkMode }: Ho
                         { id: 'home_box', icon: Armchair, title: 'البيت', sub: 'تجهيزات', color: 'from-teal-500 to-emerald-600', hoverBg: 'rgba(20,184,166,0.2)', glow: 'bg-teal-500' },
                         { id: 'evening_journal', icon: Moon, title: 'المساء', sub: 'سؤالنا', color: 'from-indigo-600 to-violet-700', hoverBg: 'rgba(79,70,229,0.2)', glow: 'bg-violet-500', lock: new Date().getHours() < 21 },
                         { id: 'playlist', icon: Music, title: 'موسيقى', sub: 'أغانينا', color: 'from-rose-500 to-pink-600', hoverBg: 'rgba(244,63,94,0.2)', glow: 'bg-rose-500' },
+                        { id: 'decision_maker', icon: UtensilsCrossed, title: 'القرعة', sub: 'وين ناكل؟', color: 'from-orange-400 to-red-500', hoverBg: 'rgba(251,146,60,0.2)', glow: 'bg-orange-500' },
                     ].map((item) => (
                         <motion.div
                             key={item.id}
